@@ -1176,6 +1176,7 @@ async function fetchNetwork(){
       if(d.step==null) return;
     }
     netState.data=d;
+    netState.giantComponentIndices = getGiantComponentNodeIndices(d.n, d.edges);
     $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (log_gexf=false, or run hasn't reached step 5000)"
       : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
     renderNetControls();
@@ -1357,10 +1358,45 @@ function drawNet(){
 }
 /* map layout bbox -> ~90% of canvas, centered; k capped so a degenerate
    (near-collapsed) layout can't blow up. Shared by draw + hover hit-testing. */
+function getGiantComponentNodeIndices(n, edges) {
+  if (!edges || !edges.length) return Array.from({length: n}, (_, i) => i);
+  const adj = Array.from({length: n}, () => []);
+  for (const [u, v] of edges) {
+    adj[u].push(v);
+    adj[v].push(u);
+  }
+  const visited = new Set();
+  let giant = [];
+  for (let i = 0; i < n; i++) {
+    if (visited.has(i)) continue;
+    const comp = [];
+    const queue = [i];
+    visited.add(i);
+    while (queue.length) {
+      const u = queue.shift();
+      comp.push(u);
+      for (const v of adj[u]) {
+        if (!visited.has(v)) {
+          visited.add(v);
+          queue.push(v);
+        }
+      }
+    }
+    if (comp.length > giant.length) {
+      giant = comp;
+    }
+  }
+  return giant.length ? giant : Array.from({length: n}, (_, i) => i);
+}
+
 function fitView(s){
   const {x,y,n}=s;
+  const targetIndices = netState.giantComponentIndices || Array.from({length: n}, (_, i) => i);
   let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
-  for(let i=0;i<n;i++){ if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i]; if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i]; }
+  for(const i of targetIndices){
+    if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i];
+    if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i];
+  }
   const spanX=(mxx-mnx)||1, spanY=(mxy-mny)||1;
   const k=Math.min(6, 0.9*Math.min(s.W/spanX, s.H/spanY));
   return {k, ox:s.W/2-(mnx+mxx)/2*k, oy:s.H/2-(mny+mxy)/2*k};
