@@ -40,6 +40,12 @@
     border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
   button:hover, select:hover { border-color:var(--muted); }
   label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
+  input[type="color"] {
+    -webkit-appearance: none; border: 1px solid var(--border); border-radius: 6px;
+    width: 28px; height: 22px; padding: 0; cursor: pointer; background: none; vertical-align: middle;
+  }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+  input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
   #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
@@ -195,6 +201,7 @@
       <select id="netstep"><option value="latest">latest</option></select>
       <label class="ctl">size <select id="netsize"></select></label>
       <label class="ctl">color <select id="netcolor"></select></label>
+      <label class="ctl" title="set network link edge color">edge color <input type="color" id="netedgecolor"></label>
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
       <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
       <span id="netinfo" class="subnote"></span>
@@ -1019,6 +1026,7 @@ function renderOpinion(){
    uses a coarse-grid approximation instead of Barnes-Hut for compactness. */
 const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
+  edgeColor:store("netedgecolor",null),
   data:null, loading:false, sim:null, hover:-1 };
 
 /* ---- configurable node encoding ----
@@ -1192,6 +1200,8 @@ function renderNetControls(){
   st.value=netState.step;
   fillAttrSelect($("#netsize"), SIZE_KEYS, netState.sizeBy);
   fillAttrSelect($("#netcolor"), COLOR_KEYS, netState.colorBy);
+  const edgeColorInput = $("#netedgecolor");
+  if(edgeColorInput) edgeColorInput.value = netState.edgeColor || cssVar("--axis");
   renderColorControls();
   updateNetLegend();
   renderNetScrub();
@@ -1313,7 +1323,7 @@ function drawNet(){
      Node radii stay in screen px; only positions are scaled. */
   const view=fitView(s); s.view=view;
   const {k,ox,oy}=view, PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
-  ctx.lineWidth=0.5; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=0.4;
+  ctx.lineWidth=0.5; ctx.strokeStyle=netState.edgeColor||cssVar("--axis"); ctx.globalAlpha=0.4;
   ctx.beginPath();
   for(const [u,v] of d.edges){
     if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
@@ -1649,6 +1659,10 @@ $("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; s
   renderColorControls();
   const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d); updateNetLegend(); if(s&&!s.raf) drawNet(); });
 $("#netcross").checked=store("netcross",false);
+$("#netedgecolor").addEventListener("input",e=>{
+  netState.edgeColor=e.target.value; save("netedgecolor",netState.edgeColor);
+  const s=netState.sim; if(s&&!s.raf) drawNet();
+});
 $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").checked); renderNetControls();
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
