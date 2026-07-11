@@ -1,13 +1,18 @@
 import os
-import csv
-import re
+import json
+import lzma
 import math
+import re
 import threading
+import time
+from bisect import bisect_left
 from pathlib import Path
 
-# Path discovery with CWD fallback for standalone executions
-ROOT = Path(__file__).resolve().parent.parent
-if not (ROOT / "results").exists() and Path("results").exists():
+# Path discovery with CWD fallback for standalone executions.
+# The package lives at scripts/dashboard/ inside the echo-chamber repo, so the
+# repo root (which holds data/) is three levels up from this file.
+ROOT = Path(__file__).resolve().parent.parent.parent
+if not (ROOT / "data").exists() and Path("data").exists():
     ROOT = Path(".").resolve()
 
 # dataviz skill categorical palette (fixed order, not cycled by rank)
@@ -16,63 +21,45 @@ COLORS = [
     "#4a3aa7", "#e34948", "#e87ba4", "#eb6834",
 ]
 
-METRICS = [
-    ("opinionAssortativity", "opinion assortativity"),
-    ("crossCuttingFraction", "cross-cutting fraction"),
-    ("Q_sign", "modularity (Q_sign)"),
-    ("bimodalityCoeff", "bimodality coeff."),
-    ("opinionKurtosis", "opinion kurtosis"),
-    ("disagreement", "disagreement"),
-]
+# Metrics served by /api/series. source: which loader provides the values.
+# (echo-chamber catalogue; "label" is what the metric picker displays.)
+METRICS = {
+    "modularity": {"label": "modularity (Q)", "source": "modularity"},
+    "communities": {"label": "communities", "source": "modularity"},
+    "active_users": {"label": "active users", "source": "active_users"},
+    "triangles": {"label": "triangles", "source": "triangles"},
+    "opinion_mean": {"label": "opinion mean", "source": "opinions"},
+    "opinion_var": {"label": "opinion variance", "source": "opinions"},
+    "opinion_abs_mean": {"label": "|opinion| mean", "source": "opinions"},
+    "diversity_bias_mean": {"label": "diversity bias mean", "source": "diversity_bias"},
+    "screen_diversity_mean": {"label": "screen diversity mean", "source": "screen_diversity"},
+    "effective_mu_SUPPRESSION": {"label": "effective mu (SUP)", "source": "effective_mu"},
+    "effective_mu_AMPLIFICATION": {"label": "effective mu (AMP)", "source": "effective_mu"},
+    "effective_mu_INDIFFERENCE": {"label": "effective mu (IND)", "source": "effective_mu"},
+}
+DEFAULT_METRICS = ["modularity", "opinion_var", "opinion_mean",
+                   "diversity_bias_mean", "screen_diversity_mean", "active_users"]
 
-RESULTS_COLS = ["step", "opinionAssortativity", "crossCuttingFraction",
-                "bimodalityCoeff", "opinionKurtosis", "disagreement"]
+# xz-backed sources are only read once a run is done (mid-run xz streams are
+# not decodable); plain-CSV sources are tailed live.
+XZ_SOURCES = {"opinions", "diversity_bias", "screen_diversity", "effective_mu"}
 
-SEED_RE = re.compile(r"run_(\d+)\.log$")
+DEFAULT_ROOTS = ["data", "data_hdd1"]
+RESCAN_EVERY = 15.0          # seconds between run-discovery scans
+STALL_AFTER = 60.0           # no file update for this long => "stalled"
+OPINION_BINS = 10            # histogram bins over [-1, 1]
 DEFAULT_TARGET_STEPS = 40000
 
 DERIVED = {
-    "apparentPolarization": (("exposureOpinionVar", "opinionVar"), lambda a, b: a - b),
-    "repostShare": (("repostCount", "originalPostCount"),
-                     lambda r, o: (r / (r + o)) if (r + o) > 0 else None),
-    "EI_index": (("crossCuttingFraction",), lambda c: 2 * c - 1),
+    "opinion_std": (("opinion_var",), lambda v: math.sqrt(v) if v >= 0 else None),
 }
-DERIVED_IN_PICKER = ("apparentPolarization", "repostShare")
+DERIVED_IN_PICKER = ("opinion_std",)
 FAMILY_RE = re.compile(r"^(.+)_([0-4])$")
 
-STORES = {}          # seed -> SeedStore
+STORES = {}          # run id (path relative to a root's parent) -> RunStore
 LOCK = threading.Lock()
-SERVE_LOGDIR = None  # set at startup
-SERVE_ONLY = None
-
-
-def active_seeds(logdir: Path, only=None):
-    """seed -> status ('running' | 'done' | 'failed'), from logs/run_<seed>.log."""
-    out = {}
-    for f in sorted(logdir.glob("run_*.log")):
-        m = SEED_RE.search(f.name)
-        if not m:
-            continue
-        seed = int(m.group(1))
-        if only is not None and seed not in only:
-            continue
-        text = f.read_text(errors="ignore")
-        if re.search(r"Exception|TERMINATE", text):
-            status = "failed"
-        elif "Elapsed time" in text:
-            status = "done"
-        else:
-            status = "running"
-        out[seed] = status
-    return out
-
-
-def result_dir(seed: int):
-    """Newest results/run_<seed>_<tag>/ folder for this seed (mtime-based)."""
-    candidates = list(ROOT.glob(f"results/run_{seed}_*"))
-    if not candidates:
-        return None
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+SERVE_ROOTS = []     # set at startup
+LAST_SCAN = 0.0
 
 
 class CsvTail:
@@ -136,43 +123,344 @@ class CsvTail:
         return [r[i] for r in self.rows]
 
 
-class SeedStore:
-    """The tailed CSVs of one seed's live result folder."""
-    def __init__(self, seed: int, d: Path):
-        self.seed = seed
-        self.dir = d
-        self.main = CsvTail(d / "metrics" / "results.csv")
-        self.mod = CsvTail(d / "metrics" / "modularity.csv")
-        self.op = CsvTail(d / "opinion" / "opinion_result.csv", max_rows=2000)
-        self.repost = CsvTail(d / "posts" / "repost_cascades.csv", max_rows=8000)
+def read_xz_csv(path):
+    """Read a whole .xz CSV; returns (header, rows) with unquoted cells."""
+    with lzma.open(path, "rt", encoding="utf-8", errors="replace") as f:
+        header = None
+        rows = []
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            cells = [c.strip('"') for c in line.split(",")]
+            if header is None:
+                header = cells
+            else:
+                rows.append(cells)
+        return header, rows
+
+
+def opinion_histogram(ops):
+    counts = [0] * OPINION_BINS
+    for op in ops:
+        if op is None:
+            continue
+        b = int((op + 1.0) / 2.0 * OPINION_BINS)
+        counts[min(max(b, 0), OPINION_BINS - 1)] += 1
+    return counts
+
+
+class RunStore:
+    """Per-run state: run_meta.json, live CSV tails, and xz parse caches."""
+
+    def __init__(self, run_dir, rid):
+        self.dir = Path(run_dir)
+        self.id = rid
+        self.meta = None
+        self.main = CsvTail(self.dir / "modularity.csv")
+        self.active = CsvTail(self.dir / "data" / "active_users.csv")
+        self.tri = CsvTail(self.dir / "data" / "triangle_closures.csv")
+        self._xz_cache = {}     # source -> (stat_key, parsed)
+
+    # -- metadata / status ---------------------------------------------------
+
+    def load_meta(self):
+        if self.meta is not None:
+            return self.meta
+        try:
+            with open(self.dir / "run_meta.json", encoding="utf-8") as f:
+                self.meta = json.load(f)
+        except (OSError, ValueError):
+            self.meta = {}
+        return self.meta
 
     def poll(self):
+        self.load_meta()
         self.main.poll()
-        self.mod.poll()
-        self.op.poll()
-        self.repost.poll()
+        self.active.poll()
+        self.tri.poll()
+
+    def is_done(self):
+        # written once by the Java side when a run finishes (early stop included)
+        p = self.dir / "data" / "opinion_convergence_summary.csv"
+        try:
+            return p.stat().st_size > 0
+        except OSError:
+            return False
+
+    def newest_mtime(self):
+        newest = 0.0
+        probes = [self.dir / "modularity.csv",
+                  self.dir / "data" / "active_users.csv",
+                  self.dir / "data" / "triangle_closures.csv"]
+        try:
+            probes.extend((self.dir / "network_data").iterdir())
+        except OSError:
+            pass
+        for p in probes:
+            try:
+                newest = max(newest, p.stat().st_mtime)
+            except OSError:
+                continue
+        return newest
+
+    def current_step(self):
+        step = 0
+        for tail, col in ((self.main, "step"), (self.active, "step"), (self.tri, "time")):
+            s = tail.column(col)
+            if s:
+                step = max(step, int(s[-1]))
+        steps = self.network_steps()
+        if steps:
+            step = max(step, steps[-1])
+        return step
+
+    def status(self):
+        if self.is_done():
+            return "done"
+        age = time.time() - self.newest_mtime()
+        return "running" if age < STALL_AFTER else "stalled"
+
+    def summary(self):
+        meta = self.load_meta()
+        step = self.current_step()
+        target = meta.get("tMax") or DEFAULT_TARGET_STEPS
+        return {
+            "run": self.id,
+            "status": self.status(),
+            "step": step,
+            "target": max(target, step),
+            "seed": meta.get("seed"),
+            "n": meta.get("nAgents"),
+            "mix": meta.get("weightingHypothesisMixConfigured"),
+            "networkExportEvery": meta.get("networkExportEvery"),
+        }
+
+    # -- xz-backed sources (done runs only) ----------------------------------
+
+    def _xz_load(self, source):
+        paths = {
+            "opinions": self.dir / "data" / "opinions.csv.xz",
+            "diversity_bias": self.dir / "data" / "diversity_bias.csv.xz",
+            "screen_diversity": self.dir / "data" / "screen_diversity.csv.xz",
+            "effective_mu": self.dir / "data" / "effective_mu.csv.xz",
+        }
+        path = paths[source]
+        try:
+            st = path.stat()
+        except OSError:
+            return None
+        key = (st.st_size, st.st_mtime)
+        cached = self._xz_cache.get(source)
+        if cached and cached[0] == key:
+            return cached[1]
+        try:
+            header, rows = read_xz_csv(path)
+        except (OSError, lzma.LZMAError, EOFError):
+            return None
+        parsed = self._xz_parse(source, header, rows)
+        self._xz_cache[source] = (key, parsed)
+        return parsed
+
+    def _snapshot_every(self, rows):
+        """stateSnapshotEvery, inferred from the data when the (older) meta
+        lacks it: wide-matrix time columns are snapshot indices, so the real
+        step is index * every."""
+        meta = self.load_meta()
+        every = meta.get("stateSnapshotEvery")
+        if every:
+            return every
+        max_idx = 0
+        for row in rows:
+            try:
+                max_idx = max(max_idx, int(float(row[0])))
+            except (ValueError, IndexError):
+                continue
+        last = self.current_step()
+        if max_idx > 0 and last > max_idx:
+            return max(1, round(last / max_idx))
+        return 1
+
+    def _xz_parse(self, source, header, rows):
+        every = self._snapshot_every(rows)
+        if source == "opinions":
+            steps, means, variances, abs_means, hists = [], [], [], [], []
+            for row in rows:
+                try:
+                    idx = int(float(row[0]))
+                    ops = [float(c) for c in row[1:]]
+                except ValueError:
+                    continue
+                if not ops:
+                    continue
+                m = sum(ops) / len(ops)
+                steps.append(idx * every)
+                means.append(m)
+                variances.append(sum((o - m) ** 2 for o in ops) / len(ops))
+                abs_means.append(sum(abs(o) for o in ops) / len(ops))
+                hists.append(opinion_histogram(ops))
+            return {"step": steps, "opinion_mean": means, "opinion_var": variances,
+                    "opinion_abs_mean": abs_means, "hist": hists}
+        if source == "screen_diversity":
+            steps, means = [], []
+            for row in rows:
+                try:
+                    idx = int(float(row[0]))
+                    vals = [float(c) for c in row[1:] if c not in ("", "NaN")]
+                except ValueError:
+                    continue
+                if not vals:
+                    continue
+                steps.append(idx * every)
+                means.append(sum(vals) / len(vals))
+            return {"step": steps, "screen_diversity_mean": means}
+        if source == "diversity_bias":
+            by_step = {}
+            for row in rows:
+                try:
+                    step = int(float(row[0]))
+                    val = float(row[2])
+                except (ValueError, IndexError):
+                    continue
+                acc = by_step.setdefault(step, [0.0, 0])
+                acc[0] += val
+                acc[1] += 1
+            steps = sorted(by_step)
+            means = [by_step[s][0] / by_step[s][1] for s in steps]
+            return {"step": steps, "diversity_bias_mean": means}
+        if source == "effective_mu":
+            series = {}
+            for row in rows:
+                try:
+                    step = int(float(row[0]))
+                    hyp = row[1]
+                    val = float(row[2]) if row[2] not in ("", "NaN") else None
+                except (ValueError, IndexError):
+                    continue
+                key = f"effective_mu_{hyp}"
+                s = series.setdefault(key, {"step": [], key: []})
+                if val is not None:
+                    s["step"].append(step)
+                    s[key].append(val)
+            return series
+        return None
+
+    # -- network snapshots (GEXF parsing itself lives in analysis.py) ---------
+
+    def network_steps(self):
+        steps = []
+        try:
+            for p in (self.dir / "network_data").iterdir():
+                m = re.match(r"G_(\d+)\.gexf\.bz2$", p.name)
+                if m:
+                    steps.append(int(m.group(1)))
+        except OSError:
+            pass
+        return sorted(steps)
+
+    def snapshot_path(self, step):
+        return self.dir / "network_data" / f"G_{step:07d}.gexf.bz2"
+
+    def gexf_opinion_series(self):
+        """Snapshot-cadence opinion stats from GEXF (for running runs)."""
+        from . import analysis  # deferred: analysis imports core at module level
+        out = {"step": [], "hist": [], "opinion_mean": [], "opinion_var": [],
+               "opinion_abs_mean": []}
+        for s in self.network_steps():
+            try:
+                parsed = analysis.parse_gexf_cached(self.snapshot_path(s))
+            except Exception:
+                continue    # snapshot still being written; skip it
+            ops = [n["op"] for n in parsed["nodes"] if n["op"] is not None]
+            if not ops:
+                continue
+            m = sum(ops) / len(ops)
+            out["step"].append(s)
+            out["opinion_mean"].append(m)
+            out["opinion_var"].append(sum((o - m) ** 2 for o in ops) / len(ops))
+            out["opinion_abs_mean"].append(sum(abs(o) for o in ops) / len(ops))
+            out["hist"].append(opinion_histogram(ops))
+        return out
+
+    # -- series ---------------------------------------------------------------
+
+    def metric_series(self, name):
+        """(steps, values) for one catalogue metric; both [] when unavailable."""
+        spec = METRICS.get(name)
+        if spec is None:
+            return [], []
+        source = spec["source"]
+        steps, values = [], []
+        if source == "modularity":
+            col = "modularity_mean" if name == "modularity" else "communities"
+            steps, values = self.main.column("step"), self.main.column(col)
+        elif source == "active_users":
+            steps, values = self.active.column("step"), self.active.column("active_count")
+        elif source == "triangles":
+            steps, values = self.tri.column("time"), self.tri.column("triangle_count")
+        elif source in XZ_SOURCES:
+            if self.is_done():
+                parsed = self._xz_load(source)
+                if parsed:
+                    if source == "effective_mu":
+                        sub = parsed.get(name)
+                        if sub:
+                            steps, values = sub["step"], sub[name]
+                    else:
+                        steps, values = parsed["step"], parsed.get(name, [])
+            elif source == "opinions":
+                live = self.gexf_opinion_series()
+                steps, values = live["step"], live.get(name, [])
+        if not steps or not values:
+            return [], []
+        return [int(s) for s in steps], values
+
+
+def scan_runs(force=False):
+    """Discover run directories (marked by run_meta.json) under the roots."""
+    global LAST_SCAN
+    now = time.time()
+    if not force and now - LAST_SCAN < RESCAN_EVERY:
+        return
+    LAST_SCAN = now
+    for root in SERVE_ROOTS:
+        root = Path(root)
+        if not root.is_dir():
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            if "run_meta.json" in filenames:
+                rid = os.path.relpath(dirpath, root.parent)
+                if rid not in STORES:
+                    STORES[rid] = RunStore(Path(dirpath), rid)
+                dirnames[:] = []  # never descend into a run directory
+    for rid in list(STORES):
+        if not STORES[rid].dir.is_dir():
+            del STORES[rid]
 
 
 def poll_all():
-    """Refresh statuses and tail every store. Call under LOCK."""
-    statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY)
-    for seed in statuses:
-        d = result_dir(seed)
-        if d is None:
-            STORES.pop(seed, None)
-            continue
-        st = STORES.get(seed)
-        if st is None or st.dir != d:
-            STORES[seed] = st = SeedStore(seed, d)
+    """Refresh discovery and tail every store. Call under LOCK."""
+    scan_runs()
+    for st in STORES.values():
         st.poll()
-    for seed in list(STORES):
-        if seed not in statuses:
-            del STORES[seed]
-    return statuses
+
+
+def get_store(rid):
+    store = STORES.get(rid)
+    if store is None:
+        scan_runs(force=True)
+        store = STORES.get(rid)
+    return store
 
 
 def rnd(v):
-    return None if (v is None or math.isnan(v)) else round(v, 6)
+    if v is None:
+        return None
+    if isinstance(v, float):
+        if math.isnan(v) or math.isinf(v):
+            return None
+        return round(v, 6)
+    return v
 
 
 def decimate(arr, max_pts):
@@ -184,26 +472,9 @@ def decimate(arr, max_pts):
 
 def api_summary():
     with LOCK:
-        statuses = poll_all()
-        cols = set()
-        seeds = []
-        for seed in sorted(statuses):
-            st = STORES.get(seed)
-            step, tag, target = 0, "", DEFAULT_TARGET_STEPS
-            if st is not None:
-                tag = st.dir.name.removeprefix(f"run_{seed}_")
-                m = re.search(r"_st-(\d+)", st.dir.name)
-                if m:
-                    target = int(m.group(1))
-                s = st.main.column("step")
-                if s:
-                    step = int(s[-1])
-                if st.main.header:
-                    cols.update(st.main.header)
-            seeds.append({"seed": seed, "status": statuses[seed], "step": step,
-                          "target": max(target, step), "tag": tag})
-        cols.discard("step")
-        cols.discard("Q_sign")
+        poll_all()
+        runs = [STORES[rid].summary() for rid in sorted(STORES)]
+        cols = set(METRICS)
 
         families = {}
         for c in list(cols):
@@ -222,169 +493,95 @@ def api_summary():
             if all(dep in cols for dep in deps):
                 cols.add(name)
 
-        return {"seeds": seeds, "columns": sorted(cols), "families": families}
+        labels = {k: v["label"] for k, v in METRICS.items()}
+        return {"runs": runs, "columns": sorted(cols), "labels": labels,
+                "families": families, "defaultMetrics": DEFAULT_METRICS}
 
 
-def derived_column(st, name, idx):
-    """Compute a DERIVED metric at the given row indices from st.main's raw columns."""
+def derived_series(st, name):
+    """Compute a DERIVED metric; secondary deps are aligned onto the first
+    dep's step grid by nearest-step lookup."""
     deps, fn = DERIVED[name]
-    dep_cols = [st.main.column(d) for d in deps]
-    if any(dc is None for dc in dep_cols):
-        return None
+    dep_series = [st.metric_series(d) for d in deps]
+    if any(not s[0] for s in dep_series):
+        return [], []
+    steps = dep_series[0][0]
     out = []
-    for i in idx:
-        args = [dep_cols[k][i] for k in range(len(deps))]
-        if any(a is None or math.isnan(a) for a in args):
+    for i, stp in enumerate(steps):
+        args = [dep_series[0][1][i]]
+        for ss, vv in dep_series[1:]:
+            j = min(max(bisect_left(ss, stp), 0), len(ss) - 1)
+            args.append(vv[j])
+        if any(a is None or (isinstance(a, float) and math.isnan(a)) for a in args):
             out.append(None)
             continue
         try:
             v = fn(*args)
-        except ZeroDivisionError:
+        except (ValueError, ZeroDivisionError):
             v = None
-        out.append(rnd(v) if v is not None else None)
-    return out
+        out.append(v)
+    return steps, out
 
 
 def api_series(qs):
     want = [c for c in qs.get("cols", [""])[0].split(",") if c]
     max_pts = int(qs.get("max", ["1200"])[0])
+    only = qs.get("runs", [None])[0]
+    only = set(r for r in only.split(",") if r) if only is not None else None
     with LOCK:
         poll_all()
         out = {}
-        for seed, st in sorted(STORES.items()):
-            steps = st.main.column("step")
-            if not steps:
+        for rid, st in sorted(STORES.items()):
+            if only is not None and rid not in only:
                 continue
-            idx = list(range(len(steps)))
-            idx = decimate(idx, max_pts)
-            entry = {"step": [int(steps[i]) for i in idx], "cols": {}}
+            # every metric has its own step grid in the echo-chamber layout,
+            # so each one is served in the {step, values} "aux" form.
+            entry = {"step": [], "cols": {}, "aux": {}}
             for c in want:
                 if c in DERIVED:
-                    vals = derived_column(st, c, idx)
-                    if vals is not None:
-                        entry["cols"][c] = vals
+                    steps, values = derived_series(st, c)
+                else:
+                    steps, values = st.metric_series(c)
+                if not steps:
                     continue
-                col = st.main.column(c)
-                if col is not None:
-                    entry["cols"][c] = [rnd(col[i]) for i in idx]
-            if "Q_sign" in want:
-                qstep, qval = st.mod.column("step"), st.mod.column("Q_sign")
-                if qstep:
-                    entry["aux"] = {"Q_sign": {"step": [int(v) for v in qstep],
-                                                "values": [rnd(v) for v in qval]}}
-            out[str(seed)] = entry
-        return {"seeds": out}
+                idx = decimate(list(range(len(steps))), max_pts)
+                entry["aux"][c] = {"step": [steps[i] for i in idx],
+                                   "values": [rnd(values[i]) for i in idx]}
+            out[rid] = entry
+        return {"runs": out}
 
 
 def api_opinion(qs):
-    seed = int(qs.get("seed", ["-1"])[0])
+    rid = qs.get("run", [""])[0]
     max_pts = int(qs.get("max", ["800"])[0])
     with LOCK:
         poll_all()
-        st = STORES.get(seed)
+        st = get_store(rid)
         if st is None:
             return {"step": [], "bins": []}
-        steps = st.op.column("step")
-        if not steps:
+        parsed = st._xz_load("opinions") if st.is_done() else st.gexf_opinion_series()
+        if not parsed or not parsed.get("step"):
             return {"step": [], "bins": []}
-        idx = decimate(list(range(len(steps))), max_pts)
-        hdr = st.op.header or []
-        nb = sum(1 for c in hdr if c.startswith("bin_"))
-        bins = []
-        for b in range(nb):
-            col = st.op.column(f"bin_{b}")
-            bins.append([rnd(col[i]) for i in idx] if col else [])
-        return {"step": [int(steps[i]) for i in idx], "bins": bins}
-
-
-def _cascade_virality(edges, root):
-    """Structural virality (Goel et al. 2015) of one reconstructed cascade tree."""
-    adj = {}
-    for a, b in edges:
-        adj.setdefault(a, []).append(b)
-        adj.setdefault(b, []).append(a)
-    if root not in adj:
-        return None
-    order, parent, seen = [], {root: None}, {root}
-    stack = [root]
-    while stack:
-        u = stack.pop()
-        order.append(u)
-        for v in adj[u]:
-            if v not in seen:
-                seen.add(v); parent[v] = u; stack.append(v)
-    n = len(order)
-    if n < 2:
-        return None
-    size = {u: 1 for u in order}
-    for u in reversed(order):
-        p = parent[u]
-        if p is not None:
-            size[p] += size[u]
-    wiener = sum(size[u] * (n - size[u]) for u in order if parent[u] is not None)
-    return (2.0 * wiener / (n * (n - 1)), n)
+        idx = decimate(list(range(len(parsed["step"]))), max_pts)
+        hists = [parsed["hist"][i] for i in idx]
+        bins = [[h[b] for h in hists] for b in range(OPINION_BINS)]
+        return {"step": [int(parsed["step"][i]) for i in idx], "bins": bins,
+                "live": not st.is_done()}
 
 
 def api_repost(qs):
-    """Repost behavior over time from posts/repost_cascades.csv."""
-    seed = int(qs.get("seed", ["-1"])[0])
-    bucket = max(1, int(qs.get("bucket", ["1000"])[0]))
+    """No repost data exists in the echo-chamber layout; the route stays (the
+    frontend hides the panels) and always answers the empty shape."""
+    return {"step": [], "meanDepth": [], "structVirality": [], "depthHist": {}, "n": 0}
+
+
+def api_meta(qs):
+    rid = qs.get("run", [""])[0]
     with LOCK:
-        poll_all()
-        st = STORES.get(seed)
-        empty = {"step": [], "meanDepth": [], "structVirality": [], "depthHist": {}, "n": 0}
-        if st is None:
-            return empty
-        steps = st.repost.column("step")
-        depths = st.repost.column("depth")
-        if not steps:
-            return empty
-        roots = st.repost.column("rootPostId")
-        parents = st.repost.column("parentPostId")
-        posts = st.repost.column("postId")
-        buckets = {}
-        hist = {}
-        for s, dep in zip(steps, depths):
-            b = int(s // bucket) * bucket
-            sm, ct = buckets.get(b, (0.0, 0))
-            buckets[b] = (sm + dep, ct + 1)
-            di = int(dep)
-            hist[di] = hist.get(di, 0) + 1
-        bkeys = sorted(buckets)
-        vir_buckets = {}
-        if roots and parents and posts:
-            casc = {}
-            for s, r, pa, po in zip(steps, roots, parents, posts):
-                if any(math.isnan(v) for v in (r, pa, po)):
-                    continue
-                r, pa, po = int(r), int(pa), int(po)
-                c = casc.get(r)
-                if c is None:
-                    c = casc[r] = {"edges": [], "step": s}
-                c["edges"].append((pa, po))
-                if s < c["step"]:
-                    c["step"] = s
-            for r, c in casc.items():
-                res = _cascade_virality(c["edges"], r)
-                if res is None:
-                    continue
-                b = int(c["step"] // bucket) * bucket
-                sm, ct = vir_buckets.get(b, (0.0, 0))
-                vir_buckets[b] = (sm + res[0], ct + 1)
-        return {
-            "step": bkeys,
-            "meanDepth": [round(buckets[b][0] / buckets[b][1], 4) for b in bkeys],
-            "structVirality": [round(vir_buckets[b][0] / vir_buckets[b][1], 4)
-                               if b in vir_buckets else None for b in bkeys],
-            "depthHist": {str(k): v for k, v in sorted(hist.items())},
-            "n": len(steps),
-        }
+        st = get_store(rid)
+        return {"run": rid, "meta": st.load_meta() if st else None}
 
 
 def api_log(qs):
-    seed = int(qs.get("seed", ["-1"])[0])
-    lines = int(qs.get("lines", ["200"])[0])
-    f = SERVE_LOGDIR / f"run_{seed}.log"
-    if not f.exists():
-        return f"(no log file for seed {seed})"
-    return "\n".join(f.read_text(errors="replace").splitlines()[-lines:])
+    """No per-run log files exist in the echo-chamber layout; empty response."""
+    return ""

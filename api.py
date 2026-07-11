@@ -39,6 +39,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(core.api_repost(qs))
             elif u.path == "/api/network":
                 self._json(analysis.api_network(qs))
+            elif u.path == "/api/meta":
+                self._json(core.api_meta(qs))
             elif u.path == "/api/log":
                 self._send(200, core.api_log(qs).encode(), "text/plain; charset=utf-8")
             elif u.path == "/favicon.ico":
@@ -51,12 +53,13 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, f"{type(e).__name__}: {e}".encode(), "text/plain")
 
 
-def run_server(logdir: Path, only, host: str, port: int):
-    core.SERVE_LOGDIR = logdir
-    core.SERVE_ONLY = only
+def run_server(roots, host: str, port: int):
+    core.SERVE_ROOTS = roots
+    core.scan_runs(force=True)
     httpd = ThreadingHTTPServer((host, port), Handler)
     url = f"http://{host}:{port}"
-    print(f"Serving interactive dashboard at {url}")
+    print(f"Serving interactive dashboard at {url}  "
+          f"(roots: {', '.join(str(r) for r in roots)})")
     print("Over SSH / VSCode Remote-SSH: check the PORTS tab for an auto-forward "
           "toast, or Cmd/Ctrl+Shift+P -> 'Simple Browser: Show' -> paste the URL above.")
     print("Ctrl-C to stop (does not affect the simulations).")

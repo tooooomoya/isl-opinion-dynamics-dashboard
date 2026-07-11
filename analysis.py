@@ -1,14 +1,57 @@
+import bz2
 import os
 import csv
-import re
 import math
 import random
 import threading
+import xml.etree.ElementTree as ET
 from pathlib import Path
-from .core import result_dir, rnd
+from .core import LOCK, get_store, poll_all, rnd
 
 GRAPH_CACHE = {}
 GRAPH_LOCK = threading.Lock()
+
+
+def parse_gexf(path: Path):
+    """Parse one G_<step>.gexf.bz2 snapshot with the standard library only
+    (--serve must not require networkx).
+
+    Returns {"nodes": [{id, op, hyp}...] sorted by id, "edges": [[si, ti]...]}
+    with edges as indices into nodes, or raises on a truncated/partial file.
+    """
+    with bz2.open(path, "rb") as f:
+        tree = ET.parse(f)
+    root = tree.getroot()
+    ns = ""
+    if root.tag.startswith("{"):
+        ns = root.tag[: root.tag.index("}") + 1]
+    attr_titles = {}
+    for attr in root.iter(f"{ns}attribute"):
+        attr_titles[attr.get("id")] = attr.get("title")
+    nodes = []
+    for node in root.iter(f"{ns}node"):
+        info = {"id": int(node.get("id")), "op": None, "hyp": None}
+        for av in node.iter(f"{ns}attvalue"):
+            title = attr_titles.get(av.get("for"))
+            if title == "opinion":
+                try:
+                    info["op"] = float(av.get("value"))
+                except (TypeError, ValueError):
+                    pass
+            elif title == "hypothesis":
+                info["hyp"] = av.get("value")
+        nodes.append(info)
+    nodes.sort(key=lambda d: d["id"])
+    index = {d["id"]: i for i, d in enumerate(nodes)}
+    edges = []
+    for edge in root.iter(f"{ns}edge"):
+        try:
+            s = index[int(edge.get("source"))]
+            t = index[int(edge.get("target"))]
+        except (KeyError, TypeError, ValueError):
+            continue
+        edges.append([s, t])
+    return {"nodes": nodes, "edges": edges}
 
 
 def parse_gexf_cached(path: Path):
@@ -18,36 +61,27 @@ def parse_gexf_cached(path: Path):
         hit = GRAPH_CACHE.get(key)
         if hit and hit[0] == st.st_size:
             return hit[1]
-    import networkx as nx  # deferred to keep core startup fast
-    G = nx.read_gexf(path)
+    G = parse_gexf(path)
     with GRAPH_LOCK:
         GRAPH_CACHE[key] = (st.st_size, G)
-        while len(GRAPH_CACHE) > 6:
+        while len(GRAPH_CACHE) > 64:
             GRAPH_CACHE.pop(next(iter(GRAPH_CACHE)))
     return G
 
 
 def load_network(path: Path):
-    """Lightweight per-node payload for the client-side force layout + metrics."""
+    """Lightweight per-node payload for the client-side force layout."""
     G = parse_gexf_cached(path)
-    ids = list(G.nodes)
-    idx = {nid: i for i, nid in enumerate(ids)}
-    op = {nid: float(G.nodes[nid].get("opinion", 0.0)) for nid in ids}
-    nodes = []
-    for nid in ids:
-        d = G.nodes[nid]
-        outs = list(G.successors(nid))
-        nbr = round(sum(op[v] for v in outs) / len(outs), 4) if outs else None
-        nodes.append({
-            "op": round(op[nid], 4),
-            "indeg": G.in_degree(nid), "outdeg": G.out_degree(nid),
-            "hub": bool(d.get("target", False)),
-            "bc": round(float(d.get("boundedConfidence", 0.0)), 4),
-            "pp": round(float(d.get("postProb", 0.0)), 4),
-            "nbrOp": nbr,
-        })
-    edges = [[idx[u], idx[v]] for u, v in G.edges()]
-    return {"n": len(nodes), "m": len(edges), "nodes": nodes, "edges": edges}
+    indeg = [0] * len(G["nodes"])
+    outdeg = [0] * len(G["nodes"])
+    for s, t in G["edges"]:
+        outdeg[s] += 1
+        indeg[t] += 1
+    nodes = [{"id": n["id"], "op": rnd(n["op"]), "hyp": n["hyp"],
+              "indeg": indeg[i], "outdeg": outdeg[i]}
+             for i, n in enumerate(G["nodes"])]
+    return {"n": len(nodes), "m": len(G["edges"]), "nodes": nodes,
+            "edges": G["edges"]}
 
 
 def _read_col(path: Path, col: str, caster):
@@ -308,48 +342,34 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
 
 
 def api_network(qs):
-    seed = int(qs.get("seed", ["-1"])[0])
-    net = qs.get("net", ["follow"])[0]
+    rid = qs.get("run", [""])[0]
     want_step = qs.get("step", ["latest"])[0]
     want_structural = qs.get("structural", ["0"])[0] == "1"
-    d = result_dir(seed)
     empty = {"steps": [], "step": None, "nodes": [], "edges": []}
-    if d is None or not (d / "GEXF").is_dir():
-        return empty
-    if net == "repost":
-        sub = d / "GEXF" / "repostNW"
-    else:
-        subs = [p for p in (d / "GEXF").iterdir() if p.is_dir() and p.name != "repostNW"]
-        sub = subs[0] if subs else None
-    if sub is None or not sub.is_dir():
-        return empty
-    snaps = {}
-    for f in sub.glob("*.gexf"):
-        m = re.search(r"step_(\d+)\.gexf$", f.name)
-        if m:
-            snaps[int(m.group(1))] = f
-    if not snaps:
-        return empty
-    steps = sorted(snaps)
-    step = steps[-1] if want_step == "latest" else int(want_step)
-    if step not in snaps:
-        step = steps[-1]
-    candidates = [s for s in reversed(steps) if s <= step] or [steps[-1]]
-    last_err = None
-    for i, s in enumerate(candidates):
-        try:
-            payload = load_network(snaps[s])
-            result = {"steps": steps, "step": s, "stale": i > 0, **payload}
-            if want_structural:
-                try:
-                    result["structural"] = compute_structural(
-                        snaps[s], d / "degrees" / f"degree_result_{s}.csv",
-                        d / "clusterings" / f"clustering_result_{s}.csv")
-                except Exception as e:
-                    result["structuralError"] = f"{type(e).__name__}: {e}"
-            return result
-        except Exception as e:
-            last_err = f"{type(e).__name__}: {e}"
-            continue
-    return {"steps": steps, "step": None, "n": 0, "m": 0, "nodes": [], "edges": [],
-            "error": f"snapshot(s) unreadable (likely still being written): {last_err}"}
+    with LOCK:
+        store = get_store(rid)
+        if store is None:
+            return empty
+        steps = store.network_steps()
+        if not steps:
+            return empty
+        step = steps[-1] if want_step == "latest" else int(want_step)
+        if step not in steps:
+            step = steps[-1]
+        candidates = [s for s in reversed(steps) if s <= step] or [steps[-1]]
+        last_err = None
+        for i, s in enumerate(candidates):
+            try:
+                payload = load_network(store.snapshot_path(s))
+                result = {"steps": steps, "step": s, "stale": i > 0, **payload}
+                if want_structural:
+                    # compute_structural still expects the upstream layout; it is
+                    # rewired to GEXF.bz2 + the echo-chamber catalogue in phase 4.
+                    result["structuralError"] = ("structural metrics are not wired "
+                                                 "to echo-chamber data yet (phase 4)")
+                return result
+            except Exception as e:
+                last_err = f"{type(e).__name__}: {e}"
+                continue
+        return {"steps": steps, "step": None, "n": 0, "m": 0, "nodes": [], "edges": [],
+                "error": f"snapshot(s) unreadable (likely still being written): {last_err}"}
