@@ -1,0 +1,1795 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>run.sh live dashboard</title>
+<style>
+  :root {
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+  }
+  @media (prefers-color-scheme: dark) { :root {
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+  } }
+  :root[data-theme="light"] {
+    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+  }
+  :root[data-theme="dark"] {
+    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+  }
+  * { box-sizing:border-box; margin:0; }
+  body { background:var(--page); color:var(--ink);
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:14px 18px 40px; }
+  h1 { font-size:16px; font-weight:600; }
+  h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  header.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  .grow { flex:1; min-width:140px; }
+  .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
+  .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
+  #ostats { font-size:12px; color:var(--ink2); white-space:nowrap; }
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  button, select { font:12.5px system-ui,sans-serif; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button:hover, select:hover { border-color:var(--muted); }
+  label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
+  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
+  #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
+  #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
+  #seedbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
+    border-radius:14px; padding:3px 8px 3px 6px; font-size:12px; cursor:pointer; user-select:none; }
+  .chip.off { opacity:.38; }
+  .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .chip .st { font-size:11px; }
+  .chip .st.done { color:var(--good); } .chip .st.failed { color:var(--bad); } .chip .st.running { color:var(--warn); }
+  .chip .pct { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
+  .chip .logbtn:hover { color:var(--ink); }
+  details#picker { margin-bottom:10px; font-size:12.5px; }
+  details#picker summary { cursor:pointer; color:var(--ink2); width:fit-content; }
+  #pickerlist { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 14px;
+    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:6px;
+    max-height:260px; overflow-y:auto; }
+  #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .duo, .trio { display:flex; flex-wrap:wrap; gap:12px; }
+  /* Metric charts live in a fixed 2-tier layout instead of free-resize:
+     row 1 = a horizontal carousel of small cards (~4.5 visible, any number),
+     row 2 = up to 2 large "featured" cards. A card's size is set by which row
+     it is in; the ⤢ button on each card moves it between rows (promote to row 2
+     evicts the oldest featured card back to the carousel when row 2 is full). */
+  .carousel-wrap { display:flex; align-items:stretch; gap:6px; margin-bottom:12px; }
+  .carbtn { flex:0 0 auto; border:1px solid var(--border); background:var(--surface);
+    border-radius:8px; cursor:pointer; color:var(--ink2); font-size:18px; padding:0 8px; line-height:1; }
+  .carbtn:hover { background:var(--grid); color:var(--ink); }
+  .carbtn[disabled] { opacity:0.3; cursor:default; }
+  #gridCarousel { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x proximity;
+    scroll-behavior:smooth; flex:1 1 auto; padding-bottom:4px; }
+  #gridCarousel > .metriccard { flex:0 0 clamp(240px, 22%, 340px); scroll-snap-align:start; }
+  #gridFeature { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  #gridFeature:empty { display:none; }
+  #gridFeature > .metriccard { flex:1 1 calc(50% - 6px); min-width:min(100%, 420px); }
+  .metriccard { position:relative; }
+  .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
+    font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
+    z-index:1; background:none; border:none; }
+  .enlargebtn:hover { background:var(--grid); color:var(--ink); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px 6px; }
+  .panel svg { display:block; width:100%; height:auto; }
+  /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone —
+     used for the big section wrappers, which aren't individually resized. */
+  .panel.card { display:flex; flex-direction:column; position:relative;
+    resize:both; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
+  .trio > .panel.card { flex-basis:260px; }
+  .duo > .panel.card { flex-basis:420px; }
+  .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
+  .cardbody canvas { width:100%; height:100%; display:block; }
+  .draghandle { position:absolute; top:6px; right:8px; cursor:grab; color:var(--muted);
+    font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1; }
+  .draghandle:hover { background:var(--grid); color:var(--ink); }
+  .panel.card.dragging { opacity:0.35; }
+  .panel.card.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
+  .panel.card.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
+  .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+  .stattile .lbl { font-size:11px; color:var(--muted); }
+  .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
+  table.bctable { width:100%; border-collapse:collapse; font-size:11.5px; }
+  table.bctable td, table.bctable th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--grid); }
+  table.bctable th { color:var(--muted); font-weight:600; text-align:right; }
+  table.bctable td:first-child, table.bctable th:first-child { text-align:left; }
+  svg text { font:10.5px system-ui,sans-serif; fill:var(--muted); }
+  svg .title { font-size:12px; font-weight:600; fill:var(--ink2); }
+  #tooltip { position:fixed; z-index:10; background:var(--surface); border:1px solid var(--border);
+    border-radius:8px; padding:6px 10px; font-size:11.5px; pointer-events:none;
+    box-shadow:0 4px 14px rgba(0,0,0,.18); max-width:280px; }
+  #tooltip .trow { display:flex; gap:8px; justify-content:space-between; font-variant-numeric:tabular-nums; }
+  #tooltip .trow .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
+  #tooltip .thead { color:var(--muted); margin-bottom:2px; }
+  #logdrawer { position:fixed; top:0; right:0; bottom:0; width:min(560px,90vw); background:var(--surface);
+    border-left:1px solid var(--border); box-shadow:-8px 0 24px rgba(0,0,0,.25); z-index:20;
+    display:flex; flex-direction:column; }
+  #logdrawer[hidden] { display:none; }
+  #logdrawer header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px;
+    border-bottom:1px solid var(--border); font-size:13px; font-weight:600; }
+  #logdrawer pre { flex:1; overflow:auto; margin:0; padding:12px 14px; font:11px/1.5 ui-monospace,Menlo,monospace;
+    color:var(--ink2); white-space:pre-wrap; }
+  .subnote { font-size:11px; color:var(--muted); margin:-2px 0 4px; }
+  .scrubrow { display:flex; gap:8px; align-items:center; margin:2px 0 6px; }
+  .scrubrow input[type=range] { flex:1; accent-color:var(--accent); }
+  .scrubrow button.live { color:var(--accent); border-color:var(--accent); }
+  .scrubrow .subnote { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .leg { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); padding:4px 2px 2px; }
+  .leg span { display:flex; gap:4px; align-items:center; }
+  .leg i { width:10px; height:10px; border-radius:2px; display:inline-block; }
+  #empty { color:var(--muted); padding:40px; text-align:center; }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>run.sh live dashboard</h1>
+  <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
+  <span id="ostats">–</span>
+  <div class="controls">
+    <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
+    <select id="interval" title="refresh interval">
+      <option value="2">2s</option><option value="5" selected>5s</option>
+      <option value="10">10s</option><option value="30">30s</option>
+    </select>
+    <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
+    <label class="ctl"><input type="checkbox" id="showmean"> show mean</label>
+    <button id="resetzoom" hidden>reset zoom</button>
+    <button id="theme" title="toggle theme">&#9681;</button>
+  </div>
+</header>
+
+<div id="banner" hidden></div>
+<div id="seedbar"></div>
+
+<details id="picker"><summary>metrics&hellip;</summary><div id="pickerlist"></div></details>
+
+<main>
+  <div class="carousel-wrap">
+    <button class="carbtn" id="carPrev" title="scroll left" aria-label="scroll left">&lsaquo;</button>
+    <div id="gridCarousel"></div>
+    <button class="carbtn" id="carNext" title="scroll right" aria-label="scroll right">&rsaquo;</button>
+  </div>
+  <div id="gridFeature"></div>
+  <div class="duo" id="topPairRow">
+    <section class="panel card" data-card="plane">
+      <h3>2-D outcome plane
+        <select id="px"></select> &times; <select id="py"></select>
+      </h3>
+      <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = scrub position (zoom window applies); drag the slider to rewind</div>
+      <div class="scrubrow">
+        <button id="planePlay" title="play the trajectory from step 0">&#9654; play</button>
+        <button id="planeLive" title="jump back to the latest step">&#8676; live</button>
+        <input type="range" id="planeScrub" min="0" max="0" value="0" step="1">
+        <span id="planeScrubLabel" class="subnote">&ndash;</span>
+      </div>
+      <div id="plane" class="cardbody"></div>
+    </section>
+    <section class="panel card" data-card="opinion">
+      <h3>opinion distribution over time <select id="opseed"></select></h3>
+      <div class="subnote">density heatmap: per-step share of agents across opinion bins
+        (&minus;1 bottom &harr; +1 top), color = share (results/&hellip;/opinion/opinion_result.csv).</div>
+      <div id="opinion" class="cardbody"></div>
+      <div class="leg" id="opleg"></div>
+    </section>
+  </div>
+  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot" style="margin-top:12px">
+    <h3>network snapshot
+      <select id="netseed"></select>
+      <select id="nettype">
+        <option value="follow">follow graph</option>
+        <option value="repost">repost graph</option>
+      </select>
+      <select id="netstep"><option value="latest">latest</option></select>
+      <label class="ctl">size <select id="netsize"></select></label>
+      <label class="ctl">color <select id="netcolor"></select></label>
+      <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
+      <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
+      <span id="netinfo" class="subnote"></span>
+    </h3>
+    <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber):
+      node radius and color are mapped from the attributes chosen above (default radius &prop; &radic;followers,
+      color = opinion, blue &minus;1 &harr; red +1); ringed = intervened hub.
+      Positions carry over between snapshots, so stepping through time shows the sorting happen.
+      Drag this card's bottom-right corner to resize the canvas.</div>
+    <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
+    <div class="scrubrow">
+      <button id="netPlay" title="play through GEXF snapshots from step 0">&#9654; play</button>
+      <input type="range" id="netScrub" min="0" max="0" value="0" step="1">
+      <span id="netScrubLabel" class="subnote">&ndash;</span>
+    </div>
+    <canvas id="network" class="cardbody" style="border-radius:6px; min-height:550px"></canvas>
+    <div class="leg" id="netleg"></div>
+  </section>
+
+  <section class="panel" style="margin-top:12px">
+    <h3>network structure <span id="structinfo" class="subnote"></span></h3>
+    <div class="subnote">same seed/step as the network snapshot above (undirected, giant-component-only for
+      betweenness/&lambda;<sub>2</sub> &mdash; matches journal.tex's convention; degree distribution and
+      clustering coefficient always describe the follow graph, the only one Java writes per-step CSVs for).
+      Degree panels below plot the empirical CCDF P(X&ge;x) on log-log axes (Clauset/Newman/Shalizi
+      convention); the dashed line, when shown, is the fitted power law for x&ge;x<sub>min</sub>.</div>
+    <div id="degreeGrid" class="trio"></div>
+    <div id="structRow" class="trio" style="margin-top:10px"></div>
+    <div id="qsignEiRow" class="duo" style="margin-top:10px"></div>
+    <div class="subnote" style="margin-top:12px">Echo-chamber diet (Cinelli et&nbsp;al. 2021): each node's own opinion (x)
+      vs. the mean opinion of the accounts it follows (y). A tight positive diagonal = echo chambers
+      (you mostly hear your own side); a shapeless blob = a well-mixed feed. Ringed = intervened hub.</div>
+    <div id="echoScatter" style="margin-top:4px"></div>
+  </section>
+
+  <section class="panel" style="margin-top:12px">
+    <h3>agent behavior &amp; attributes
+      <select id="behSeed"></select>
+    </h3>
+    <div class="subnote">repost depth/rate: posts/repost_cascades.csv, any seed. bounded-confidence /
+      post-prob distributions: GEXF node attributes at the network-snapshot panel's current seed/step
+      (<span id="attrSeedNote"></span>).</div>
+    <div id="repostRow" class="trio"></div>
+    <div id="attrRow" class="duo" style="margin-top:10px"></div>
+  </section>
+</main>
+
+<div id="tooltip" hidden></div>
+<aside id="logdrawer" hidden>
+  <header><span id="logtitle"></span><button id="logclose">&times;</button></header>
+  <pre id="logtext"></pre>
+</aside>
+
+<script>
+"use strict";
+/* ---------- palettes (dataviz skill reference palette, light+dark steps) ---------- */
+const SERIES_LIGHT = ["#2a78d6","#1baf7a","#eda100","#008300","#4a3aa7","#e34948","#e87ba4","#eb6834"];
+const SERIES_DARK  = ["#3987e5","#199e70","#c98500","#008300","#9085e9","#e66767","#d55181","#d95926"];
+/* diverging blue<->red for opinion bins (-1 .. +1), gray midpoint */
+const BINS_LIGHT = ["#256abf","#86b6ef","#b0aea7","#f0a3a2","#e34948"];
+const BINS_DARK  = ["#3987e5","#6da7ec","#77756f","#e88a8a","#e66767"];
+const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
+/* "cRateMean" here is a FAMILY id (see state.summary.families), not a literal
+   results.csv column — rendered as one class-colored chart, not five. */
+const DEFAULT_METRICS = ["cRateMean","disagreement","apparentPolarization",
+                         "unfollow","originalPostCount"];
+const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed"};
+
+const $ = s => document.querySelector(s);
+const store = (k,d) => { try { const v = localStorage.getItem("dash."+k); return v===null?d:JSON.parse(v); } catch(e){ return d; } };
+const save  = (k,v) => localStorage.setItem("dash."+k, JSON.stringify(v));
+
+const state = {
+  summary:null, series:{}, opinion:null, repost:null,
+  metrics: store("metrics", DEFAULT_METRICS),
+  featured: store("featured", []),   // metric ids promoted to row 2 (max 2, oldest first)
+  hidden: new Set(store("hidden", [])),
+  zoom: null, scrub: null, paused:false, busy:false,
+  px: store("px","opinionAssortativity"), py: store("py","bimodalityCoeff"),
+  // shared "detail seed" for single-seed panels: opinion distribution, family
+  // charts, repost behavior. Independent of netState.seed (network snapshot /
+  // structure), which needs its own heavier GEXF-backed fetch.
+  opseed: store("opseed", null),
+  charts: {},   // metric -> chart meta for hover
+  plane: null,
+};
+
+function theme(){ const t=document.documentElement.dataset.theme;
+  if(t) return t; return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }
+function pal(){ return theme()==="dark" ? SERIES_DARK : SERIES_LIGHT; }
+function bins(){ return theme()==="dark" ? BINS_DARK : BINS_LIGHT; }
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+/* ---------- formatting ---------- */
+function fmt(v){ if(v==null||Number.isNaN(v)) return "–";
+  const a=Math.abs(v);
+  if(a>=1e6) return (v/1e6).toFixed(1)+"M";
+  if(a>=1e4) return (v/1e3).toFixed(1)+"k";
+  if(a>=100) return v.toFixed(1);
+  if(a>=1)   return v.toFixed(3);
+  if(a===0)  return "0";
+  return v.toPrecision(3); }
+function fstep(v){ return Math.abs(v)>=1000 ? (v/1000)+"k" : ""+v; }
+function ticks(min,max,n){ if(!(max>min)) return [min];
+  const span=max-min, step0=span/n, mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const norm=step0/mag, step=(norm<1.5?1:norm<3.5?2:norm<7.5?5:10)*mag;
+  const out=[]; for(let v=Math.ceil(min/step)*step; v<=max+1e-9; v+=step) out.push(+v.toPrecision(12));
+  return out; }
+function nearestIdx(arr,x){ let lo=0,hi=arr.length-1;
+  while(hi-lo>1){ const m=(lo+hi)>>1; if(arr[m]<x) lo=m; else hi=m; }
+  return (x-arr[lo] < arr[hi]-x) ? lo : hi; }
+function rollmean(vals,k){ if(k<2) return vals;
+  const out=new Array(vals.length); let sum=0,cnt=0; const q=[];
+  for(let i=0;i<vals.length;i++){ const v=vals[i];
+    q.push(v); if(v!=null&&!Number.isNaN(v)){sum+=v;cnt++;}
+    if(q.length>k){ const o=q.shift(); if(o!=null&&!Number.isNaN(o)){sum-=o;cnt--;} }
+    out[i]=cnt>0?sum/cnt:NaN; }
+  return out; }
+
+/* ---------- data fetch ---------- */
+async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+
+function expandMetric(m){
+  const fam = state.summary && state.summary.families && state.summary.families[m];
+  return fam ? fam : [m];
+}
+
+async function refresh(){
+  // don't tear a card's DOM out from under an in-progress resize/reorder drag
+  if(state.busy || interacting) return; state.busy=true;
+  try{
+    const summary = await jget("/api/summary");
+    state.summary = summary;
+    // Q_sign/EI_index (network-structure panel) and repostShare (behavior panel)
+    // are read directly by those panels regardless of picker state.
+    const cols = new Set([state.px, state.py, "Q_sign", "EI_index", "repostShare"]);
+    for(const m of state.metrics) for(const c of expandMetric(m)) cols.add(c);
+    const s = await jget("/api/series?cols="+encodeURIComponent([...cols].join(","))+"&max=1200");
+    state.series = s.seeds;
+    const seedIds = summary.seeds.map(x=>x.seed);
+    if(state.opseed===null || !seedIds.includes(state.opseed)) state.opseed = seedIds[0] ?? null;
+    if(state.opseed!==null){
+      state.opinion = await jget("/api/opinion?seed="+state.opseed+"&max=800");
+      state.repost = await jget("/api/repost?seed="+state.opseed);
+    }
+    hideBanner("err");
+    renderAll();
+    maybeRefetchNetwork();
+    $("#ostats").textContent = statText() + " · updated " + new Date().toLocaleTimeString();
+  }catch(e){
+    showBanner("err","server unreachable — is dashboard/dashboard.py --serve still running? ("+e.message+")");
+  }finally{ state.busy=false; }
+}
+
+function statText(){
+  const ss=state.summary.seeds;
+  const n=s=>ss.filter(x=>x.status===s).length;
+  return `running ${n("running")} · done ${n("done")} · failed ${n("failed")}`;
+}
+
+/* ---------- banners ---------- */
+function showBanner(cls,html){ const b=$("#banner"); b.className=cls; b.innerHTML=html; b.hidden=false; }
+function hideBanner(cls){ const b=$("#banner"); if(b.className===cls) b.hidden=true; }
+
+/* ---------- seed helpers ---------- */
+function seedList(){ return state.summary ? state.summary.seeds : []; }
+function seedColor(seed){ const ids=seedList().map(s=>s.seed); const i=ids.indexOf(seed);
+  return { color: pal()[i % 8], dash: i>=8 ? "6 4" : null }; }
+function visibleSeeds(){ return seedList().filter(s=>!state.hidden.has(s.seed)); }
+
+/* ---------- render: header/seedbar/picker ---------- */
+function renderAll(){
+  renderHeader(); renderSeedbar(); renderPicker();
+  renderGrid(); renderPlane(); renderOpinion();
+  renderQsignEiCharts(); renderBehavior();
+  $("#resetzoom").hidden = !state.zoom;
+}
+
+function renderHeader(){
+  const ss=seedList();
+  const tot=ss.reduce((a,s)=>a+s.target,0), cur=ss.reduce((a,s)=>a+Math.min(s.step,s.target),0);
+  $("#obar").style.width = tot? (100*cur/tot).toFixed(1)+"%" : "0%";
+  const failed=ss.filter(s=>s.status==="failed");
+  if(failed.length)
+    showBanner("err","&#10007; failed seeds: "+failed.map(s=>`<a href="#" data-logseed="${s.seed}" style="color:inherit">${s.seed}</a>`).join(", ")+" — click to view log");
+  else if(ss.length && ss.every(s=>s.status==="done"))
+    showBanner("ok","&#10003; all "+ss.length+" runs finished");
+  else hideBanner("ok");
+}
+
+function renderSeedbar(){
+  const bar=$("#seedbar"); bar.innerHTML="";
+  if(!seedList().length){ bar.innerHTML='<div id="empty">no runs found in logs/ — start ./run.sh first</div>'; return; }
+  for(const s of seedList()){
+    const {color}=seedColor(s.seed);
+    const chip=document.createElement("div");
+    chip.className="chip"+(state.hidden.has(s.seed)?" off":"");
+    chip.title=s.tag;
+    const pct=s.target? Math.round(100*Math.min(s.step,s.target)/s.target) : 0;
+    chip.innerHTML=`<span class="dot" style="background:${color}"></span>`+
+      `<b>s${s.seed}</b> <span class="st ${s.status}">${STATUS_GLYPH[s.status]}</span>`+
+      `<span class="pct">${pct}%</span><button class="logbtn" title="view log">&#9636;</button>`;
+    chip.addEventListener("click",()=>{ toggleSeed(s.seed); });
+    chip.querySelector(".logbtn").addEventListener("click",ev=>{ ev.stopPropagation(); openLog(s.seed); });
+    bar.appendChild(chip);
+  }
+}
+function toggleSeed(seed){
+  if(state.hidden.has(seed)) state.hidden.delete(seed); else state.hidden.add(seed);
+  save("hidden",[...state.hidden]); renderAll();
+}
+
+function renderPicker(){
+  const cols=state.summary.columns||[];
+  const families=state.summary.families||{};
+  // one entry per plain column plus one per family (base id, "(5 classes)" label)
+  const items=[...cols.map(c=>({id:c,label:c})),
+               ...Object.keys(families).map(b=>({id:b,label:`${b} (5 classes)`}))]
+    .sort((a,b)=>a.label.localeCompare(b.label));
+  const list=$("#pickerlist"); list.innerHTML="";
+  $("#picker > summary").textContent = `metrics… (${state.metrics.length} shown / ${items.length} available)`;
+  for(const it of items){
+    const lab=document.createElement("label");
+    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=state.metrics.includes(it.id);
+    cb.addEventListener("change",()=>{
+      state.metrics = cb.checked ? [...state.metrics,it.id] : state.metrics.filter(m=>m!==it.id);
+      save("metrics",state.metrics); refresh();
+    });
+    lab.append(cb, document.createTextNode(it.label));
+    list.appendChild(lab);
+  }
+  const reset=document.createElement("button");
+  reset.textContent="reset to defaults"; reset.style.gridColumn="1/-1"; reset.style.width="fit-content";
+  reset.addEventListener("click",()=>{ state.metrics=[...DEFAULT_METRICS]; save("metrics",state.metrics); refresh(); });
+  list.appendChild(reset);
+  /* plane axis selects (plain columns only — a 2-D plane axis must be a single scalar) */
+  for(const [sel,key] of [["#px","px"],["#py","py"]]){
+    const el=$(sel); const prev=state[key]; el.innerHTML="";
+    for(const c of cols){ const o=document.createElement("option"); o.value=o.textContent=c; el.appendChild(o); }
+    el.value = cols.includes(prev)?prev:cols[0]||"";
+    el.onchange=()=>{ state[key]=el.value; save(key,el.value); refresh(); };
+  }
+  /* detail-seed selects: opinion distribution + agent-behavior panel, kept in sync */
+  for(const selId of ["#opseed","#behSeed"]){
+    const os=$(selId); os.innerHTML="";
+    for(const s of seedList()){ const o=document.createElement("option"); o.value=s.seed; o.textContent="seed "+s.seed; os.appendChild(o); }
+    os.value=state.opseed;
+    os.onchange=()=>{ state.opseed=+os.value; save("opseed",state.opseed); refresh(); };
+  }
+}
+
+/* ---------- series extraction ---------- */
+function seriesFor(metric){
+  const out=[];
+  for(const s of visibleSeeds()){
+    const e=state.series[String(s.seed)]; if(!e) continue;
+    let steps,vals;
+    if(e.aux && e.aux[metric]){ steps=e.aux[metric].step; vals=e.aux[metric].values; }
+    else if(e.cols[metric]){ steps=e.step; vals=e.cols[metric]; }
+    else continue;
+    if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
+      let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
+      if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
+    if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
+    const {color,dash}=seedColor(s.seed);
+    out.push({seed:s.seed, status:s.status, steps, vals, color, dash});
+  }
+  if($("#showmean").checked && out.length>=2){
+    /* arbitrary (currently-visible) seed mean: align every series onto the
+       longest one's step grid via nearest-value lookup (same snapping the
+       hover tooltip already does), then average ignoring gaps per point. */
+    const ref=out.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
+    const vals=ref.steps.map((st,i)=>{
+      let sum=0,cnt=0;
+      for(const s of out){ if(!s.steps.length) continue;
+        const v=s.vals[nearestIdx(s.steps,st)];
+        if(v!=null&&!Number.isNaN(v)){ sum+=v; cnt++; } }
+      return cnt? sum/cnt : null;
+    });
+    out.push({seed:"mean", status:"mean( "+out.length+" seeds )", steps:ref.steps, vals,
+               color:cssVar("--ink"), dash:"1 3", isMean:true});
+  }
+  return out;
+}
+
+/* ---------- resizable + reorderable cards ----------
+   Most charts live in a `.panel.card`: a native-CSS-resizable box (drag the
+   bottom-right corner) whose width/height persist to localStorage per card id,
+   plus a small drag handle to reorder within its row (also persisted).
+   EXCEPTION: the metric charts do NOT use this — they use a fixed 2-tier layout
+   (carousel row + featured row, see renderGrid/makeMetricCard); size is set by
+   which row a card is in, not by dragging. Two kinds of card groups:
+   - dynamic (degree trio, structstats trio, qsignei/repostpair/attrpair duos):
+     the container is fully torn down and rebuilt every render, so order lives in
+     a plain array (cardOrder.<key> in localStorage for the fixed groups) that
+     the render function iterates.
+   - static (2-D plane / opinion pair, network snapshot): these keep their
+     bespoke HTML (selects, scrubbers, legends) and are never torn down, so a
+     drag just physically reorders the DOM nodes; restoreStaticOrder() replays
+     that on page load. */
+const DEFAULT_ORDER = {
+  degree: ["in", "out", "total"],
+  structstats: ["rwc", "dip", "clustering", "betweenness", "lambda2", "giant"],
+  qsignei: ["qsign", "ei"],
+  repostpair: ["depth", "virality", "share"],
+  attrpair: ["bc", "pp"],
+};
+function getOrder(key){
+  const saved=store("cardOrder."+key, null), def=DEFAULT_ORDER[key];
+  if(!saved) return def.slice();
+  const out=saved.filter(id=>def.includes(id));
+  for(const id of def) if(!out.includes(id)) out.push(id);
+  return out;
+}
+function saveOrder(key, order){ save("cardOrder."+key, order); }
+
+// true while a resize or reorder drag is in flight, so a poll-triggered
+// rebuild (renderGrid etc. tear down and recreate their cards from scratch)
+// can't rip the DOM out from under an in-progress native resize gesture.
+let interacting=false;
+
+function applyCardSize(el, id){
+  const sz=store("size."+id, null);
+  if(sz && sz.w) el.style.width=sz.w+"px";
+  if(sz && sz.h) el.style.height=sz.h+"px";
+}
+function watchCardSize(el, id, onResize){
+  if(el._sizeObserved) return;
+  el._sizeObserved=true;
+  let t=null;
+  const ro=new ResizeObserver(()=>{
+    interacting=true;
+    clearTimeout(t);
+    t=setTimeout(()=>{
+      save("size."+id, {w:Math.round(el.offsetWidth), h:Math.round(el.offsetHeight)});
+      if(onResize) onResize();
+      interacting=false;
+    }, 250);
+  });
+  ro.observe(el);
+}
+
+function clearDropMarks(){
+  document.querySelectorAll(".drop-before,.drop-after").forEach(el=>el.classList.remove("drop-before","drop-after"));
+}
+let dragCtx=null;
+function attachDrag(container, card, handle, groupKey, onReorder){
+  handle.addEventListener("dragstart", e=>{
+    interacting=true;
+    dragCtx={groupKey, el:card};
+    card.classList.add("dragging");
+    e.dataTransfer.effectAllowed="move";
+    e.dataTransfer.setData("text/plain", card.dataset.card||"");
+  });
+  handle.addEventListener("dragend", ()=>{
+    card.classList.remove("dragging"); clearDropMarks(); dragCtx=null; interacting=false;
+  });
+  card.addEventListener("dragover", e=>{
+    if(!dragCtx || dragCtx.groupKey!==groupKey || dragCtx.el===card) return;
+    e.preventDefault();
+    const r=card.getBoundingClientRect();
+    const before=(e.clientX-r.left) < r.width/2;
+    clearDropMarks(); card.classList.add(before?"drop-before":"drop-after");
+  });
+  card.addEventListener("drop", e=>{
+    if(!dragCtx || dragCtx.groupKey!==groupKey || dragCtx.el===card) return;
+    e.preventDefault();
+    const r=card.getBoundingClientRect();
+    const before=(e.clientX-r.left) < r.width/2;
+    container.insertBefore(dragCtx.el, before?card:card.nextSibling);
+    clearDropMarks();
+    const order=[...container.children].filter(c=>c.dataset && c.dataset.card).map(c=>c.dataset.card);
+    onReorder(order);
+  });
+}
+/** Build a fresh `.panel.card` (drag handle + `.cardbody`), wire resize
+ * persistence and reorder-drag, and return {card, body} for the caller to
+ * append and fill with a chart. */
+function makeCard(container, id, groupKey, onReorder){
+  const card=document.createElement("div");
+  card.className="panel card"; card.dataset.card=id;
+  const handle=document.createElement("span");
+  handle.className="draghandle"; handle.textContent="✦"; handle.draggable=true;
+  handle.title="drag to reorder · drag corner to resize";
+  card.appendChild(handle);
+  const body=document.createElement("div"); body.className="cardbody";
+  card.appendChild(body);
+  applyCardSize(card, id);
+  watchCardSize(card, id);
+  attachDrag(container, card, handle, groupKey, onReorder);
+  return {card, body};
+}
+/** Same wiring for a card whose HTML already exists (static panels). */
+function initStaticCard(el, id, groupKey, container, onReorder){
+  if(el.dataset.cardInit) return;
+  el.dataset.cardInit="1";
+  el.classList.add("card");
+  if(!el.dataset.card) el.dataset.card=id;
+  let handle=null;
+  if(groupKey){
+    handle=document.createElement("span");
+    handle.className="draghandle"; handle.draggable=true; handle.textContent="✦";
+    handle.title="drag to reorder · drag corner to resize";
+    el.insertBefore(handle, el.firstChild);
+  }
+  applyCardSize(el, id);
+  watchCardSize(el, id, id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); }) : null);
+  if(groupKey) attachDrag(container, el, handle, groupKey, onReorder);
+}
+function restoreStaticOrder(container, groupKey){
+  const order=store("cardOrder."+groupKey, null);
+  if(!order) return;
+  for(const id of order){
+    const el=container.querySelector(`:scope > [data-card="${id}"]`);
+    if(el) container.appendChild(el);
+  }
+}
+function initStaticCards(){
+  const topRow=$("#topPairRow");
+  if(topRow){
+    restoreStaticOrder(topRow, "top1");
+    for(const el of topRow.querySelectorAll(":scope > [data-card]")){
+      initStaticCard(el, el.dataset.card, "top1", topRow, order=>saveOrder("top1", order));
+    }
+  }
+  const netSection=$("#netsnapshotSection");
+  if(netSection) initStaticCard(netSection, "netsnapshot", null, null, null);
+}
+
+/* ---------- line-chart grid ---------- */
+const LC={W:420,H:230,L:46,R:10,T:22,B:26};
+/* Move a metric between the carousel (row 1) and the featured row (row 2).
+   Promoting when row 2 is full evicts the oldest featured card (front of the
+   list) back to the carousel; demoting just drops it from the featured list. */
+function toggleFeature(metric){
+  let f=state.featured.slice();
+  if(f.includes(metric)) f=f.filter(m=>m!==metric);
+  else { f.push(metric); while(f.length>2) f.shift(); }
+  state.featured=f; save("featured",f);
+  renderGrid();
+}
+/** Lightweight metric card: no free-resize, no reorder-drag — just a body and an
+ *  ⤢/⤡ button that promotes/demotes between the two rows. */
+function makeMetricCard(container, metric, isFeatured){
+  const card=document.createElement("div");
+  card.className="panel metriccard"; card.dataset.card=metric;
+  const btn=document.createElement("button");
+  btn.className="enlargebtn"; btn.textContent=isFeatured?"⤡":"⤢";
+  btn.title=isFeatured?"shrink back to the carousel":"enlarge into the featured row";
+  btn.addEventListener("click",()=>toggleFeature(metric));
+  card.appendChild(btn);
+  const body=document.createElement("div"); body.className="cardbody";
+  card.appendChild(body);
+  container.appendChild(card);
+  return body;
+}
+function renderGrid(){
+  const car=$("#gridCarousel"), feat=$("#gridFeature");
+  const sl=car?car.scrollLeft:0;            // preserve carousel scroll across rebuilds
+  car.innerHTML=""; feat.innerHTML=""; state.charts={};
+  const families=state.summary.families||{};
+  // featured = promoted metrics still selected in the picker, in promotion order
+  const featured=state.featured.filter(m=>state.metrics.includes(m));
+  if(featured.length!==state.featured.length){ state.featured=featured; save("featured",featured); }
+  const draw=(body,metric)=>{ if(families[metric]) drawFamilyChart(body,metric,families[metric]);
+                              else drawLineChart(body,metric); };
+  for(const metric of featured) draw(makeMetricCard(feat, metric, true), metric);
+  for(const metric of state.metrics){ if(featured.includes(metric)) continue;
+    draw(makeMetricCard(car, metric, false), metric); }
+  car.scrollLeft=sl;
+  updateCarBtns();
+}
+function updateCarBtns(){
+  const car=$("#gridCarousel"), prev=$("#carPrev"), next=$("#carNext");
+  if(!car||!prev||!next) return;
+  const max=car.scrollWidth-car.clientWidth-1;
+  prev.disabled = car.scrollLeft<=0;
+  next.disabled = car.scrollLeft>=max;
+}
+
+/* Family metrics (cRateMean_0..4 etc): one seed (state.opseed), one line per
+   opinion class, colored with the diverging opinion-bin palette so it reads
+   consistently with the opinion-distribution panel. */
+function drawFamilyChart(host, base, subcols){
+  const e=state.opseed!=null ? state.series[String(state.opseed)] : null;
+  const B=bins();
+  let S=[];
+  if(e){
+    for(let cls=0;cls<5;cls++){
+      const col=subcols[cls];
+      let steps=e.step, vals=e.cols[col];
+      if(!vals) continue;
+      if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
+        let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
+        if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
+      if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
+      S.push({seed:"class "+cls, cls, steps, vals, color:B[cls], dash:null});
+    }
+  }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
+    if(v==null||Number.isNaN(v)) continue;
+    if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
+    if(v<y0)y0=v; if(v>y1)y1=v; }
+  const title=`${base} — seed ${state.opseed??"–"}`;
+  if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
+  if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
+  const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
+  const ys=v=>LC.H-LC.B-(v-y0)/(y1-y0)*(LC.H-LC.T-LC.B);
+  let g="";
+  for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
+  let paths="";
+  for(const s of S){
+    let d="",pen=false;
+    const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(s.steps.length/maxpts));
+    for(let i=0;i<s.steps.length;i+=k){ const v=s.vals[i];
+      if(v==null||Number.isNaN(v)){pen=false;continue;}
+      d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round"/>`;
+  }
+  host.innerHTML=
+    `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
+      <text class="title" x="10" y="15">${title}</text>${g}
+      <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
+      ${paths}
+      <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+    </svg>`;
+  const svg=host.querySelector("svg");
+  svg.addEventListener("mousemove",evt=>{
+    const px=svgX(svg,evt);
+    if(px<LC.L||px>LC.W-LC.R){ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); return; }
+    const step=x0+(px-LC.L)/(LC.W-LC.L-LC.R)*(x1-x0);
+    let snapX=px, rows=[];
+    for(const s of S){ if(!s.steps.length) continue;
+      const i=nearestIdx(s.steps,step); rows.push({cls:s.cls,color:s.color,v:s.vals[i],step:s.steps[i]});
+      snapX=xs(s.steps[i]); }
+    const xh=svg.querySelector(".xh"); xh.setAttribute("x1",snapX); xh.setAttribute("x2",snapX); xh.setAttribute("visibility","visible");
+    showTip(evt, `<div class="thead">${base} @ step ${fstep(Math.round(rows[0]?.step??step))}</div>`+
+      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${BIN_LABELS[r.cls]}</span><span>${fmt(r.v)}</span></div>`).join(""));
+  });
+  svg.addEventListener("mouseleave",()=>{ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); });
+}
+function drawLineChart(host, metric){
+  const S=seriesFor(metric);
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
+    if(v==null||Number.isNaN(v)) continue;
+    if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
+    if(v<y0)y0=v; if(v>y1)y1=v; }
+  if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${metric}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
+  if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
+  const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
+  const ys=v=>LC.H-LC.B-(v-y0)/(y1-y0)*(LC.H-LC.T-LC.B);
+  let g="";
+  for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
+  let paths="";
+  for(const s of S){
+    let d="",pen=false;
+    const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(s.steps.length/maxpts));
+    for(let i=0;i<s.steps.length;i+=k){ const v=s.vals[i];
+      if(v==null||Number.isNaN(v)){pen=false;continue;}
+      d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?3:2}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} stroke-linejoin="round"/>`;
+  }
+  host.innerHTML=
+    `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
+      <text class="title" x="10" y="15">${metric}</text>${g}
+      <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
+      ${paths}
+      <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
+      <rect class="zoomrect" y="${LC.T}" height="${LC.H-LC.T-LC.B}" fill="var(--accent)" opacity="0.15" visibility="hidden"/>
+    </svg>`;
+  const svg=host.querySelector("svg");
+  state.charts[metric]={svg,S,x0,x1,xs,ys};
+  attachLineInteraction(svg, metric);
+}
+
+function svgX(svg, evt){ const r=svg.getBoundingClientRect(); return (evt.clientX-r.left)/r.width*LC.W; }
+function attachLineInteraction(svg, metric){
+  let dragStart=null;
+  svg.addEventListener("mousemove",evt=>{
+    const c=state.charts[metric]; if(!c) return;
+    const px=svgX(svg,evt);
+    if(dragStart!==null){
+      const r=svg.querySelector(".zoomrect");
+      r.setAttribute("x",Math.min(dragStart,px)); r.setAttribute("width",Math.abs(px-dragStart));
+      r.setAttribute("visibility","visible"); hideTip(); return;
+    }
+    if(px<LC.L||px>LC.W-LC.R){ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); return; }
+    const step=c.x0+(px-LC.L)/(LC.W-LC.L-LC.R)*(c.x1-c.x0);
+    const xh=svg.querySelector(".xh");
+    let rows=[],snapX=px;
+    for(const s of c.S){ if(!s.steps.length) continue;
+      const i=nearestIdx(s.steps,step); const v=s.vals[i];
+      rows.push({seed:s.seed,color:s.color,v,step:s.steps[i],isMean:s.isMean});
+      snapX=c.xs(s.steps[i]); }
+    xh.setAttribute("x1",snapX); xh.setAttribute("x2",snapX); xh.setAttribute("visibility","visible");
+    rows.sort((a,b)=>(b.v??-Infinity)-(a.v??-Infinity));
+    const more=rows.length>12? rows.length-12:0; if(more) rows=rows.slice(0,12);
+    showTip(evt, `<div class="thead">${metric} @ step ${fstep(Math.round(rows[0]?.step??step))}</div>`+
+      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${r.isMean?"mean":"s"+r.seed}</span><span>${fmt(r.v)}</span></div>`).join("")+
+      (more?`<div class="thead">… +${more} more</div>`:""));
+  });
+  svg.addEventListener("mouseleave",()=>{ hideTip();
+    const xh=svg.querySelector(".xh"); if(xh) xh.setAttribute("visibility","hidden"); });
+  svg.addEventListener("mousedown",evt=>{ dragStart=svgX(svg,evt); evt.preventDefault(); });
+  window.addEventListener("mouseup",evt=>{
+    if(dragStart===null) return;
+    const c=state.charts[metric]; const px=svgX(svg,evt);
+    const r=svg.querySelector(".zoomrect"); if(r) r.setAttribute("visibility","hidden");
+    if(c && Math.abs(px-dragStart)>8){
+      const toStep=p=>c.x0+(Math.min(Math.max(p,LC.L),LC.W-LC.R)-LC.L)/(LC.W-LC.L-LC.R)*(c.x1-c.x0);
+      const a=toStep(dragStart), b=toStep(px);
+      state.zoom=[Math.min(a,b),Math.max(a,b)]; dragStart=null; renderAll(); return;
+    }
+    dragStart=null;
+  });
+  svg.addEventListener("dblclick",()=>{ state.zoom=null; renderAll(); });
+}
+
+/* ---------- 2-D outcome plane ---------- */
+const PL={W:480,H:380,L:52,R:14,T:14,B:34};
+function renderPlane(){
+  const host=$("#plane");
+  const X=state.px, Y=state.py;
+  const sx=seriesMap(X), sy=seriesMap(Y);
+  const traj=[];
+  for(const s of visibleSeeds()){
+    const a=sx.get(s.seed), b=sy.get(s.seed); if(!a||!b) continue;
+    /* align on common steps (Q_sign has its own sparser steps) */
+    const pts=[];
+    for(let i=0;i<a.steps.length;i++){
+      const j=b.steps===a.steps? i : (b.steps.length?nearestIdx(b.steps,a.steps[i]):-1);
+      if(j<0) continue;
+      const xv=a.vals[i], yv=b.vals[j];
+      if(xv==null||yv==null||Number.isNaN(xv)||Number.isNaN(yv)) continue;
+      pts.push([xv,yv,a.steps[i]]);
+    }
+    if(pts.length>1){ const {color,dash}=seedColor(s.seed); traj.push({seed:s.seed,pts,color,dash}); }
+  }
+  const scrubEl=$("#planeScrub"), liveBtn=$("#planeLive"), label=$("#planeScrubLabel");
+  if(!traj.length){
+    host.innerHTML=`<svg viewBox="0 0 ${PL.W} ${PL.H}"><text x="${PL.W/2}" y="${PL.H/2}" text-anchor="middle">no data</text></svg>`;
+    scrubEl.min=0; scrubEl.max=0; scrubEl.value=0; scrubEl.disabled=true; label.textContent="–";
+    liveBtn.classList.add("live"); state.planeRange=null;
+    return;
+  }
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const t of traj) for(const [xv,yv] of t.pts){
+    if(xv<x0)x0=xv; if(xv>x1)x1=xv; if(yv<y0)y0=yv; if(yv>y1)y1=yv; }
+  if(x0===x1){x0-=1;x1+=1;} if(y0===y1){y0-=1;y1+=1;}
+  const xp=(x1-x0)*0.07, ypd=(y1-y0)*0.07; x0-=xp;x1+=xp;y0-=ypd;y1+=ypd;
+  const xs=v=>PL.L+(v-x0)/(x1-x0)*(PL.W-PL.L-PL.R);
+  const ys=v=>PL.H-PL.B-(v-y0)/(y1-y0)*(PL.H-PL.T-PL.B);
+
+  /* time scrub: rewind the trajectory endpoint without rescaling the axes above */
+  let smin=Infinity,smax=-Infinity;
+  for(const t of traj) for(const p of t.pts){ if(p[2]<smin)smin=p[2]; if(p[2]>smax)smax=p[2]; }
+  scrubEl.min=smin; scrubEl.max=smax; scrubEl.disabled=(smin>=smax); state.planeRange=[smin,smax];
+  const live=(state.scrub===null||state.scrub>=smax);
+  const cutoff=live?smax:Math.max(smin,state.scrub);
+  scrubEl.value=cutoff;
+  label.textContent=(live?"latest — step ":"step ")+fstep(cutoff);
+  liveBtn.classList.toggle("live",live);
+  const visTraj=traj.map(t=>({...t,pts:t.pts.filter(p=>p[2]<=cutoff)})).filter(t=>t.pts.length);
+
+  let g="";
+  for(const t of ticks(y0,y1,5)) g+=`<line x1="${PL.L}" x2="${PL.W-PL.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)"/><text x="${PL.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  for(const t of ticks(x0,x1,6)) g+=`<line y1="${PL.T}" y2="${PL.H-PL.B}" x1="${xs(t).toFixed(1)}" x2="${xs(t).toFixed(1)}" stroke="var(--grid)"/><text x="${xs(t).toFixed(1)}" y="${PL.H-14}" text-anchor="middle">${fmt(t)}</text>`;
+  let marks="",ends=[];
+  for(const t of visTraj){
+    const NSEG=14, n=t.pts.length;
+    for(let s=0;s<NSEG;s++){
+      const i0=Math.floor(s*(n-1)/NSEG), i1=Math.max(i0+1,Math.floor((s+1)*(n-1)/NSEG));
+      let d="";
+      for(let i=i0;i<=i1&&i<n;i++) d+=(i===i0?"M":"L")+xs(t.pts[i][0]).toFixed(1)+" "+ys(t.pts[i][1]).toFixed(1);
+      marks+=`<path d="${d}" fill="none" stroke="${t.color}" stroke-width="2" stroke-opacity="${(0.12+0.88*(s+1)/NSEG).toFixed(2)}" ${t.dash?`stroke-dasharray="${t.dash}"`:""}/>`;
+    }
+    const last=t.pts[n-1];
+    marks+=`<circle cx="${xs(last[0]).toFixed(1)}" cy="${ys(last[1]).toFixed(1)}" r="4.5" fill="${t.color}" stroke="var(--surface)" stroke-width="2"/>`;
+    ends.push({seed:t.seed,color:t.color,x:xs(last[0]),y:ys(last[1]),xv:last[0],yv:last[1],step:last[2]});
+  }
+  host.innerHTML=
+    `<svg viewBox="0 0 ${PL.W} ${PL.H}">
+      ${g}
+      <line x1="${PL.L}" x2="${PL.W-PL.R}" y1="${PL.H-PL.B}" y2="${PL.H-PL.B}" stroke="var(--axis)"/>
+      <line x1="${PL.L}" x2="${PL.L}" y1="${PL.T}" y2="${PL.H-PL.B}" stroke="var(--axis)"/>
+      <text x="${(PL.L+PL.W-PL.R)/2}" y="${PL.H-2}" text-anchor="middle">${X}</text>
+      <text transform="rotate(-90 11 ${(PL.T+PL.H-PL.B)/2})" x="11" y="${(PL.T+PL.H-PL.B)/2}" text-anchor="middle">${Y}</text>
+      ${marks}
+    </svg>`;
+  const svg=host.querySelector("svg");
+  svg.addEventListener("mousemove",evt=>{
+    const r=svg.getBoundingClientRect();
+    const mx=(evt.clientX-r.left)/r.width*PL.W, my=(evt.clientY-r.top)/r.height*PL.H;
+    let best=null,bd=400;
+    for(const e of ends){ const d=(e.x-mx)**2+(e.y-my)**2; if(d<bd){bd=d;best=e;} }
+    if(best) showTip(evt,`<div class="thead"><span class="dot" style="background:${best.color}"></span> seed ${best.seed} @ step ${fstep(best.step)}</div>`+
+      `<div class="trow"><span>${X}</span><span>${fmt(best.xv)}</span></div><div class="trow"><span>${Y}</span><span>${fmt(best.yv)}</span></div>`);
+    else hideTip();
+  });
+  svg.addEventListener("mouseleave",hideTip);
+}
+function seriesMap(metric){
+  const m=new Map();
+  for(const s of seriesFor(metric)) m.set(s.seed,s);
+  return m;
+}
+
+/* ---------- opinion distribution (density heatmap) ----------
+   x = step, y = opinion bin (-1 bottom .. +1 top), cell color = per-step share
+   of agents in that bin (viridis). Preserves bimodality (two bright bands) that a
+   quantile/mean view would hide. Bin count is read from the CSV header
+   (Const.NUM_OF_BINS_OF_OPINION_FOR_WRITER), not fixed here. */
+function renderOpinion(){
+  const host=$("#opinion"), leg=$("#opleg");
+  const o=state.opinion;
+  if(!o||!o.step||!o.step.length||!o.bins.length||o.bins.some(b=>!b.length)){
+    host.innerHTML=`<svg viewBox="0 0 ${PL.W} ${PL.H}"><text x="${PL.W/2}" y="${PL.H/2}" text-anchor="middle">no data</text></svg>`;
+    leg.innerHTML=""; return; }
+  let steps=o.step, layers=o.bins;
+  if(state.zoom){ const [z0,z1]=state.zoom;
+    const i0=Math.max(0,steps.findIndex(v=>v>=z0)); let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
+    if(i1>i0){ steps=steps.slice(i0,i1+1); layers=layers.map(b=>b.slice(i0,i1+1)); } }
+  const disp=layers.length;             // bin resolution as written in the CSV
+  const n=steps.length;
+  // rows[b] = counts for bin b (row 0 = most negative opinion)
+  const rows=layers.map(b=>b.slice());
+  // per-step shares + global max share (fixed color scale => comparable over time)
+  let maxShare=0;
+  const shares=rows.map(()=>new Array(n));
+  for(let i=0;i<n;i++){ let tot=0; for(let b=0;b<disp;b++) tot+=rows[b][i];
+    for(let b=0;b<disp;b++){ const s=tot?rows[b][i]/tot:0; shares[b][i]=s; if(s>maxShare) maxShare=s; } }
+  maxShare=maxShare||1;
+  const x0=steps[0], x1=steps[n-1]||1;
+  const xs=v=>PL.L+(v-x0)/(x1-x0||1)*(PL.W-PL.L-PL.R);
+  const H=(PL.H-PL.B)-PL.T, rowH=H/disp;
+  const yOp=op=>(PL.H-PL.B)-((op+1)/2)*H;        // opinion in [-1,1] -> y
+  // decimate columns so cell width stays around 1px
+  const k=Math.max(1,Math.ceil(n/(PL.W-PL.L-PL.R)));
+  const D=[]; for(let i=0;i<n;i+=k) D.push(i); if(D[D.length-1]!==n-1) D.push(n-1);
+  let cells="";
+  for(let p=0;p<D.length;p++){ const i=D[p], xc=xs(steps[i]);
+    const xl=p===0?PL.L:(xs(steps[D[p-1]])+xc)/2;
+    const xr=p===D.length-1?PL.W-PL.R:(xc+xs(steps[D[p+1]]))/2;
+    const w=Math.max(0.6,xr-xl)+0.5;
+    for(let b=0;b<disp;b++){ const yt=(PL.H-PL.B)-(b+1)*rowH;
+      cells+=`<rect x="${xl.toFixed(1)}" y="${yt.toFixed(1)}" width="${w.toFixed(1)}" height="${(rowH+0.5).toFixed(1)}" fill="${seqColor(shares[b][i]/maxShare)}"/>`; }
+  }
+  let g="";
+  for(const op of [-1,-0.5,0,0.5,1]) g+=`<text x="${PL.L-5}" y="${(yOp(op)+3.5).toFixed(1)}" text-anchor="end">${op>0?"+"+op:op}</text>`;
+  for(const t of ticks(x0,x1,6)) g+=`<text x="${xs(t).toFixed(1)}" y="${PL.H-14}" text-anchor="middle">${fstep(t)}</text>`;
+  host.innerHTML=
+    `<svg viewBox="0 0 ${PL.W} ${PL.H}" style="cursor:crosshair">${cells}${g}
+      <text transform="translate(12,${(PL.T+H/2).toFixed(1)}) rotate(-90)" text-anchor="middle">opinion</text>
+      <line x1="${PL.L}" x2="${PL.W-PL.R}" y1="${PL.H-PL.B}" y2="${PL.H-PL.B}" stroke="var(--axis)"/>
+      <text x="${(PL.L+PL.W-PL.R)/2}" y="${PL.H-2}" text-anchor="middle">step</text>
+      <line class="xh" y1="${PL.T}" y2="${PL.H-PL.B}" stroke="var(--ink)" stroke-dasharray="3 3" visibility="hidden"/>
+    </svg>`;
+  // legend: viridis colorbar for share, 0 .. maxShare
+  const grad=[0,.25,.5,.75,1].map(t=>seqColor(t)).join(",");
+  leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">share 0%`+
+    `<i style="display:inline-block;width:110px;height:10px;border-radius:2px;background:linear-gradient(90deg,${grad})"></i>`+
+    `${(100*maxShare).toFixed(0)}%</span>`;
+  const svg=host.querySelector("svg");
+  svg.addEventListener("mousemove",evt=>{
+    const r=svg.getBoundingClientRect();
+    const px=(evt.clientX-r.left)/r.width*PL.W;
+    if(px<PL.L||px>PL.W-PL.R){ hideTip(); return; }
+    const step=x0+(px-PL.L)/(PL.W-PL.L-PL.R)*(x1-x0);
+    const i=nearestIdx(steps,step);
+    const xh=svg.querySelector(".xh");
+    xh.setAttribute("x1",xs(steps[i])); xh.setAttribute("x2",xs(steps[i])); xh.setAttribute("visibility","visible");
+    let rowsHtml="";
+    for(let b=disp-1;b>=0;b--){ const lo=(-1+b*2/disp), hi=(-1+(b+1)*2/disp);
+      const lbl=`[${lo.toFixed(1)},${hi.toFixed(1)}${b===disp-1?"]":")"}`;
+      rowsHtml+=`<div class="trow"><span><span class="dot" style="background:${seqColor(shares[b][i]/maxShare)}"></span>${lbl}</span><span>${(100*shares[b][i]).toFixed(1)}%</span></div>`; }
+    showTip(evt,`<div class="thead">seed ${state.opseed} @ step ${fstep(steps[i])}</div>`+rowsHtml);
+  });
+  svg.addEventListener("mouseleave",()=>{ hideTip();
+    const xh=svg.querySelector(".xh"); if(xh) xh.setAttribute("visibility","hidden"); });
+}
+
+/* ---------- network snapshot: live force layout on canvas ----------
+   After github.com/soramame0518/Social-Media-Echo-Chamber (D3 force demo):
+   many-body repulsion + link springs + centering, RdBu-style diverging node
+   color over opinion in [-1,1], r ~ sqrt(degree), animated tick loop.
+   Reimplemented dependency-free on canvas (n=1000, m~10k needs it); repulsion
+   uses a coarse-grid approximation instead of Barnes-Hut for compactness. */
+const netState={ seed:store("netseed",null), type:store("nettype","follow"),
+  step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
+  data:null, loading:false, sim:null, hover:-1 };
+
+/* ---- configurable node encoding ----
+   every value below is available per-node in the /api/network payload. "size"
+   picks a numeric attr; "color" picks either a numeric attr (rendered with a
+   user-editable 3-stop gradient: low / mid / high) or a categorical attr
+   (rendered from a user-editable palette, one swatch per category). */
+const NODE_ATTRS = {
+  op:     {label:"opinion",               get:n=>n.op, fixedDomain:[-1,1]},
+  indeg:  {label:"followers (in-degree)", get:n=>n.indeg},
+  outdeg: {label:"following (out-degree)",get:n=>n.outdeg},
+  total:  {label:"total degree",          get:n=>n.indeg+n.outdeg},
+  pp:     {label:"post probability",      get:n=>n.pp},
+  bc:     {label:"bounded confidence",    get:n=>n.bc},
+  opsign: {label:"opinion sign (−/0/+)", categorical:true, cats:["neg","neu","pos"],
+           cat:n=> n.op<-0.05?"neg" : n.op>0.05?"pos" : "neu"},
+  hub:    {label:"intervened hub",        categorical:true, cats:["non-hub","hub"],
+           cat:n=> n.hub?"hub":"non-hub"},
+};
+const SIZE_KEYS  = ["indeg","outdeg","total","pp","bc","uniform"];
+const COLOR_KEYS = ["op","indeg","outdeg","total","pp","bc","opsign","hub"];
+const GRAD_DEFAULT = ["#2a78d6","#b3b1a9","#e34948"];   // low / mid / high
+
+function opColor(v){ /* diverging blue -1 <-> gray 0 <-> red +1 (hover-tip fallback) */
+  const dark=theme()==="dark";
+  const neg=dark?[57,135,229]:[42,120,214], mid=dark?[119,117,111]:[176,174,167], pos=dark?[230,103,103]:[227,73,72];
+  const t=Math.max(-1,Math.min(1,v??0));
+  const a=t<0?neg:pos, k=Math.abs(t);
+  const c=mid.map((m,i)=>Math.round(m+(a[i]-m)*k));
+  return `rgb(${c[0]},${c[1]},${c[2]})`; }
+
+/* fixed viridis 5-stop sequential ramp — used by the opinion-distribution heatmap */
+const SEQ_STOPS=[[68,1,84],[59,82,139],[33,145,140],[94,201,98],[253,231,37]];
+function seqColor(t){
+  t=Math.max(0,Math.min(1,t)); const f=t*(SEQ_STOPS.length-1), i=Math.min(SEQ_STOPS.length-2,Math.floor(f)), g=f-i;
+  const a=SEQ_STOPS[i], b=SEQ_STOPS[i+1];
+  return `rgb(${Math.round(a[0]+(b[0]-a[0])*g)},${Math.round(a[1]+(b[1]-a[1])*g)},${Math.round(a[2]+(b[2]-a[2])*g)})`; }
+
+/* ---- user-editable color scales ---- */
+function hex2rgb(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+function getGradStops(){ const g=store("netgrad",GRAD_DEFAULT); return (Array.isArray(g)&&g.length===3)?g:GRAD_DEFAULT.slice(); }
+function getCatPalette(key){
+  const cats=NODE_ATTRS[key].cats, base=theme()==="dark"?SERIES_DARK:SERIES_LIGHT;
+  const def=cats.map((_,i)=>base[i%base.length]);
+  const saved=store("netcat."+key,null);
+  return (Array.isArray(saved)&&saved.length===cats.length)?saved:def;
+}
+/* 3-stop gradient low(0)->mid(.5)->high(1); stops passed as rgb triples */
+function gradColor(t,g){ t=Math.max(0,Math.min(1,t));
+  let a,b,u; if(t<0.5){a=g[0];b=g[1];u=t*2;}else{a=g[1];b=g[2];u=(t-0.5)*2;}
+  return `rgb(${Math.round(a[0]+(b[0]-a[0])*u)},${Math.round(a[1]+(b[1]-a[1])*u)},${Math.round(a[2]+(b[2]-a[2])*u)})`; }
+
+function colorDomain(key){
+  const a=NODE_ATTRS[key]; if(a.fixedDomain) return a.fixedDomain.slice();
+  const nodes=netState.data?netState.data.nodes:[];
+  let lo=Infinity,hi=-Infinity;
+  for(const nd of nodes){ const v=a.get(nd); if(v<lo)lo=v; if(v>hi)hi=v; }
+  if(!(hi>lo)){ lo=0; hi=1; } return [lo,hi];
+}
+/* fill s.r[] from the chosen size attribute (area-proportional: r ~ sqrt(value)) */
+function sizeNodes(s,d){
+  const RMIN=2, RMAX=11, key=netState.sizeBy;
+  if(key==="uniform"){ for(let i=0;i<s.n;i++) s.r[i]=4.5; return; }
+  const get=NODE_ATTRS[key].get;
+  let vmax=0; for(const nd of d.nodes){ const v=Math.abs(get(nd)); if(v>vmax) vmax=v; }
+  vmax=vmax||1;
+  for(let i=0;i<s.n;i++) s.r[i]=RMIN+(RMAX-RMIN)*Math.sqrt(Math.abs(get(d.nodes[i]))/vmax);
+}
+/* fill s.col[] from the chosen color attribute (recompute on theme/attr/scale change) */
+function colorNodes(s,d){
+  const key=netState.colorBy, a=NODE_ATTRS[key];
+  if(!s.col||s.col.length!==s.n) s.col=new Array(s.n);
+  if(a.categorical){
+    const pal=getCatPalette(key), cats=a.cats;
+    for(let i=0;i<s.n;i++){ const idx=cats.indexOf(a.cat(d.nodes[i])); s.col[i]=pal[idx<0?0:idx]; }
+  } else {
+    const g=getGradStops().map(hex2rgb), dom=colorDomain(key), span=(dom[1]-dom[0])||1;
+    for(let i=0;i<s.n;i++) s.col[i]=gradColor((a.get(d.nodes[i])-dom[0])/span, g);
+  }
+}
+function updateNetLegend(){
+  const leg=$("#netleg"); if(!leg) return;
+  const key=netState.colorBy, a=NODE_ATTRS[key]; let html="";
+  if(a.categorical){
+    const pal=getCatPalette(key);
+    html=a.cats.map((c,i)=>`<span><i style="background:${pal[i]};border-radius:50%"></i>${c}</span>`).join("");
+  } else {
+    const [lo,hi]=colorDomain(key), g=getGradStops();
+    html=`<span style="color:var(--muted)">${a.label}</span><span>${fmt(lo)}</span>`+
+         `<span><i style="width:64px;height:10px;border-radius:2px;background:linear-gradient(to right,${g[0]},${g[1]},${g[2]})"></i></span>`+
+         `<span>${fmt(hi)}</span>`;
+  }
+  leg.innerHTML=html+
+    `<span style="margin-left:12px"><i style="background:none;border:2px solid var(--ink2);border-radius:50%"></i>hub (ringed)</span>`+
+    ($("#netcross").checked?`<span><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"");
+}
+/* color-scale editor: 3 pickers for a gradient attr, one per category otherwise */
+function renderColorControls(){
+  const host=$("#netcolorctl"); if(!host) return;
+  const key=netState.colorBy, a=NODE_ATTRS[key];
+  if(a.categorical){
+    const pal=getCatPalette(key);
+    host.innerHTML=`<span class="subnote">palette</span>`+
+      a.cats.map((c,i)=>`<label class="ctl">${c}<input type="color" data-cat="${i}" value="${pal[i]}"></label>`).join("");
+  } else {
+    const [lo,hi]=colorDomain(key), g=getGradStops();
+    host.innerHTML=`<span class="subnote">gradient</span>`+
+      `<label class="ctl">low ${fmt(lo)}<input type="color" data-grad="0" value="${g[0]}"></label>`+
+      `<label class="ctl">mid<input type="color" data-grad="1" value="${g[1]}"></label>`+
+      `<label class="ctl">high ${fmt(hi)}<input type="color" data-grad="2" value="${g[2]}"></label>`;
+  }
+  host.querySelectorAll("input[type=color]").forEach(inp=>{
+    inp.addEventListener("input",()=>{
+      if(inp.dataset.grad!=null){ const g=getGradStops(); g[+inp.dataset.grad]=inp.value; save("netgrad",g); }
+      else { const pal=getCatPalette(key); pal[+inp.dataset.cat]=inp.value; save("netcat."+key,pal); }
+      const s=netState.sim,dd=netState.data; if(s&&dd) colorNodes(s,dd);
+      updateNetLegend(); if(s&&!s.raf) drawNet();
+    });
+  });
+}
+
+function maybeRefetchNetwork(){
+  /* snapshots land every 5000 steps; refetch "latest" only when a newer one can exist */
+  if(netState.loading) return;
+  if(!netState.data){ fetchNetwork(); return; }
+  if(netState.step!=="latest") return;
+  const s=seedList().find(v=>v.seed===netState.seed);
+  if(s && netState.data.step!=null && s.step>=netState.data.step+5000) fetchNetwork();
+}
+
+async function fetchNetwork(){
+  if(netState.loading || !seedList().length) return;
+  const ids=seedList().map(s=>s.seed);
+  if(netState.seed===null || !ids.includes(netState.seed)) netState.seed=ids[0];
+  netState.loading=true;
+  $("#netinfo").textContent="loading…";
+  try{
+    // structural=1: also compute degree/clustering/betweenness/lambda2 for this
+    // snapshot (cached server-side by file size — first fetch of a new snapshot
+    // costs a few seconds for betweenness_centrality, repeats are instant).
+    const d=await jget(`/api/network?seed=${netState.seed}&net=${netState.type}&step=${netState.step}&structural=1`);
+    if(d.error){
+      /* newest snapshot is mid-write while the run is live; server already fell back
+         to an older complete one if it could. Keep showing that and retry on the
+         normal poll cycle rather than treating this as a hard failure. */
+      $("#netinfo").textContent = (d.step!=null? `step ${fstep(d.step)} (stale) · ` : "")+d.error;
+      if(d.step==null) return;
+    }
+    netState.data=d;
+    $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (log_gexf=false, or run hasn't reached step 5000)"
+      : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
+    renderNetControls();
+    startSim();
+    renderStructural();
+    renderBehavior();
+  }catch(e){ $("#netinfo").textContent="dashboard server unreachable: "+e.message; }
+  finally{ netState.loading=false; }
+}
+function renderNetControls(){
+  const ns=$("#netseed");
+  if(ns.options.length!==seedList().length){
+    ns.innerHTML=""; for(const s of seedList()){ const o=document.createElement("option");
+      o.value=s.seed; o.textContent="seed "+s.seed; ns.appendChild(o); } }
+  ns.value=netState.seed;
+  $("#nettype").value=netState.type;
+  const st=$("#netstep"), d=netState.data;
+  const wanted=["latest"].concat(d&&d.steps?d.steps.map(String):[]);
+  if([...st.options].map(o=>o.value).join()!==wanted.join()){
+    st.innerHTML=""; for(const v of wanted){ const o=document.createElement("option");
+      o.value=v; o.textContent=v==="latest"?"latest":"step "+fstep(+v); st.appendChild(o); } }
+  st.value=netState.step;
+  fillAttrSelect($("#netsize"), SIZE_KEYS, netState.sizeBy);
+  fillAttrSelect($("#netcolor"), COLOR_KEYS, netState.colorBy);
+  renderColorControls();
+  updateNetLegend();
+  renderNetScrub();
+}
+/* time-sequence bar over the available GEXF snapshot steps */
+function netSteps(){ const d=netState.data; return (d&&Array.isArray(d.steps))?d.steps:[]; }
+function renderNetScrub(){
+  const el=$("#netScrub"), lab=$("#netScrubLabel"); if(!el) return;
+  const steps=netSteps();
+  if(steps.length<1){ el.min=0; el.max=0; el.value=0; el.disabled=true; lab.textContent="–"; return; }
+  el.min=0; el.max=steps.length-1; el.step=1; el.disabled=(steps.length<2);
+  let idx=steps.indexOf(netState.data.step); if(idx<0) idx=steps.length-1;
+  el.value=idx;
+  lab.textContent=`step ${fstep(steps[idx])} (${idx+1}/${steps.length})`;
+}
+/* one <option> per attribute key; "uniform" is a size-only pseudo-attr */
+function fillAttrSelect(sel, keys, current){
+  if([...sel.options].map(o=>o.value).join()!==keys.join()){
+    sel.innerHTML="";
+    for(const k of keys){ const o=document.createElement("option");
+      o.value=k; o.textContent=(k==="uniform"?"uniform":NODE_ATTRS[k].label); sel.appendChild(o); }
+  }
+  sel.value=current;
+}
+
+function startSim(){
+  const d=netState.data, cv=$("#network");
+  const W=cv.clientWidth||900, H=cv.clientHeight||640;
+  const dpr=devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(!d||!d.nodes.length){ ctx.clearRect(0,0,W,H);
+    ctx.fillStyle=cssVar("--muted"); ctx.font="12px system-ui"; ctx.textAlign="center";
+    ctx.fillText("no snapshot",W/2,H/2); netState.sim=null; return; }
+  const n=d.nodes.length;
+  const key=netState.seed+"/"+netState.type;
+  let s=netState.sim;
+  if(!s || s.n!==n || s.key!==key){
+    /* fresh graph: seed x by opinion so the camps take shape immediately */
+    s={ n, key, W, H, alpha:1,
+        x:new Float32Array(n), y:new Float32Array(n),
+        vx:new Float32Array(n), vy:new Float32Array(n),
+        r:new Float32Array(n), deg:new Float32Array(n), raf:0 };
+    for(let i=0;i<n;i++){
+      s.x[i]=W/2 + (d.nodes[i].op||0)*W*0.22 + (Math.random()-0.5)*W*0.25;
+      s.y[i]=H/2 + (Math.random()-0.5)*H*0.8;
+    }
+  } else { s.alpha=Math.max(s.alpha,0.35); s.W=W; s.H=H; } /* same graph: reheat, keep positions */
+  for(let i=0;i<n;i++){ s.deg[i]=0; }
+  for(const [u,v] of d.edges){ s.deg[u]++; s.deg[v]++; }
+  sizeNodes(s,d);          /* radius from the chosen size attribute */
+  colorNodes(s,d);         /* fill s.col[] from the chosen color attribute */
+  netState.sim=s;
+  if(!s.raf) loop();
+}
+
+function simTick(s,d){
+  const {n,x,y,vx,vy,deg}=s, a=s.alpha;
+  /* link springs (d3-style: distance 14, strength 1/min(deg), degree-biased split) */
+  const DIST=14;
+  for(const [u,v] of d.edges){
+    let dx=x[v]+vx[v]-x[u]-vx[u], dy=y[v]+vy[v]-y[u]-vy[u];
+    let l=Math.sqrt(dx*dx+dy*dy)||1e-6;
+    const k=(l-DIST)/l * a / Math.min(deg[u],deg[v]);
+    const bias=deg[u]/(deg[u]+deg[v]);
+    vx[v]-=dx*k*bias; vy[v]-=dy*k*bias;
+    vx[u]+=dx*k*(1-bias); vy[u]+=dy*k*(1-bias);
+  }
+  /* many-body repulsion, coarse 12x12 grid approximation (exact in own+adjacent cells) */
+  const G=12, CHARGE=-30;
+  let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+  for(let i=0;i<n;i++){ if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i]; if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i]; }
+  const cw=(mxx-mnx)/G||1, ch=(mxy-mny)/G||1;
+  const cell=new Array(G*G).fill(null).map(()=>[]), cmx=new Float32Array(G*G), cmy=new Float32Array(G*G), cm=new Float32Array(G*G);
+  const ci=i=>{ const gx=Math.min(G-1,Math.max(0,Math.floor((x[i]-mnx)/cw))),
+                      gy=Math.min(G-1,Math.max(0,Math.floor((y[i]-mny)/ch))); return gy*G+gx; };
+  for(let i=0;i<n;i++){ const c=ci(i); cell[c].push(i); cmx[c]+=x[i]; cmy[c]+=y[i]; cm[c]++; }
+  for(let c=0;c<G*G;c++) if(cm[c]){ cmx[c]/=cm[c]; cmy[c]/=cm[c]; }
+  for(let i=0;i<n;i++){
+    const c=ci(i), gx=c%G, gy=(c-gx)/G;
+    let fx=0, fy=0;
+    for(let c2=0;c2<G*G;c2++){
+      if(!cm[c2]) continue;
+      const gx2=c2%G, gy2=(c2-gx2)/G;
+      if(Math.abs(gx2-gx)<=1 && Math.abs(gy2-gy)<=1){
+        for(const j of cell[c2]){ if(j===i) continue;
+          let dx=x[i]-x[j], dy=y[i]-y[j]; let q=dx*dx+dy*dy;
+          if(q<1){ dx=(Math.random()-0.5); dy=(Math.random()-0.5); q=1; }
+          const w=-CHARGE*a/q; fx+=dx*w; fy+=dy*w; }
+      } else {
+        let dx=x[i]-cmx[c2], dy=y[i]-cmy[c2]; const q=dx*dx+dy*dy||1;
+        const w=-CHARGE*a*cm[c2]/q; fx+=dx*w; fy+=dy*w;
+      }
+    }
+    vx[i]+=fx; vy[i]+=fy;
+  }
+  /* centering + integrate + velocity decay. No hard wall clamp: clamping made
+     nodes pile against the borders. drawNet() instead fits the whole layout
+     into ~90% of the canvas, so absolute spread never matters visually. */
+  let sx=0, sy=0;
+  for(let i=0;i<n;i++){ sx+=x[i]; sy+=y[i]; }
+  sx=sx/n-s.W/2; sy=sy/n-s.H/2;
+  for(let i=0;i<n;i++){
+    vx[i]*=0.6; vy[i]*=0.6;
+    x[i]+=vx[i]-sx*0.08; y[i]+=vy[i]-sy*0.08;
+  }
+  s.alpha*=0.985;
+}
+
+function drawNet(){
+  const s=netState.sim, d=netState.data, cv=$("#network");
+  if(!s||!d) return;
+  const ctx=cv.getContext("2d");
+  ctx.clearRect(0,0,s.W,s.H);
+  const cross=$("#netcross").checked;
+  const {x,y}=s;
+  /* fit the current layout bbox into ~90% of the canvas (centered), so nodes
+     never collect on the walls whatever the simulation's absolute spread is.
+     Node radii stay in screen px; only positions are scaled. */
+  const view=fitView(s); s.view=view;
+  const {k,ox,oy}=view, PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
+  ctx.lineWidth=0.5; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=0.4;
+  ctx.beginPath();
+  for(const [u,v] of d.edges){
+    if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
+    ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
+  }
+  ctx.stroke();
+  if(cross){
+    ctx.lineWidth=0.9; ctx.strokeStyle=cssVar("--warn"); ctx.globalAlpha=0.75;
+    ctx.beginPath();
+    for(const [u,v] of d.edges){
+      if(d.nodes[u].op*d.nodes[v].op<0){ ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v)); }
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+  const ink=cssVar("--ink"), surf=cssVar("--surface");
+  for(let pass=0;pass<2;pass++) for(let i=0;i<s.n;i++){
+    const nd=d.nodes[i];
+    if((pass===1)!==nd.hub) continue;      /* hubs drawn on top */
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i],0,6.2832);
+    ctx.fillStyle=(s.col&&s.col[i])||opColor(nd.op); ctx.fill();
+    if(nd.hub){ ctx.lineWidth=2; ctx.strokeStyle=ink; ctx.stroke(); }
+  }
+  if(netState.hover>=0){
+    const i=netState.hover;
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]+2.5,0,6.2832);
+    ctx.lineWidth=2; ctx.strokeStyle=ink; ctx.stroke();
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]+4.5,0,6.2832);
+    ctx.lineWidth=1.5; ctx.strokeStyle=surf; ctx.stroke();
+  }
+}
+/* map layout bbox -> ~90% of canvas, centered; k capped so a degenerate
+   (near-collapsed) layout can't blow up. Shared by draw + hover hit-testing. */
+function fitView(s){
+  const {x,y,n}=s;
+  let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+  for(let i=0;i<n;i++){ if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i]; if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i]; }
+  const spanX=(mxx-mnx)||1, spanY=(mxy-mny)||1;
+  const k=Math.min(6, 0.9*Math.min(s.W/spanX, s.H/spanY));
+  return {k, ox:s.W/2-(mnx+mxx)/2*k, oy:s.H/2-(mny+mxy)/2*k};
+}
+
+function loop(){
+  const s=netState.sim;
+  if(!s){ return; }
+  if(s.alpha>0.005){ simTick(s,netState.data); drawNet();
+    s.raf=requestAnimationFrame(loop);
+  } else { drawNet(); s.raf=0; }
+}
+
+/* ---------- network-structure panel: degree/clustering/betweenness/lambda2/Q_sign/EI ---------- */
+function statTile(label,value){ return `<div class="stattile"><div class="lbl">${label}</div><div class="val">${value}</div></div>`; }
+
+function renderStructural(){
+  const d=netState.data, s=d && d.structural;
+  const dg=$("#degreeGrid"); dg.innerHTML="";
+  const row=$("#structRow"); row.innerHTML="";
+  const info=$("#structinfo");
+  drawEchoScatter($("#echoScatter"), d && d.nodes);  // only needs op/nbrOp, not structural
+  if(!s){
+    info.textContent = d && d.structuralError ? ("structural: not available — "+d.structuralError) : "";
+    dg.innerHTML = `<div class="subnote">no structural data for this snapshot yet.</div>`;
+    renderQsignEiCharts();
+    return;
+  }
+  info.textContent = `computed on step ${fstep(d.step)} · ${netState.type} graph`;
+
+  const degLabel={in:"in-degree (followers)", out:"out-degree (following)", total:"total degree"};
+  for(const key of getOrder("degree")){
+    const {card,body}=makeCard(dg, key, "degree", o=>saveOrder("degree",o));
+    dg.appendChild(card);
+    drawDegreeChart(body, degLabel[key], s.degree && s.degree[key], s.degreeFit && s.degreeFit[key]);
+  }
+
+  for(const key of getOrder("structstats")){
+    const {card,body}=makeCard(row, key, "structstats", o=>saveOrder("structstats",o));
+    row.appendChild(card);
+    if(key==="rwc"){
+      const r=s.rwc;
+      if(r && r.rwc!=null){
+        body.innerHTML=statTile("Random Walk Controversy (opinion sides)", fmt(r.rwc))+
+          `<div class="subnote" style="margin-top:6px">1 = segregated echo chambers, 0 = well-mixed, &lt;0 = walks cross more than they stay.
+           p<sub>XX</sub>=${fmt(r.pXX)} p<sub>YY</sub>=${fmt(r.pYY)} · sides ${r.sideX}/${r.sideY}, k=${r.k} hubs (Garimella et&nbsp;al. 2018, giant comp.)</div>`;
+      } else {
+        const why = r && r.unavailable==="one-sided" ? "all nodes on one opinion side"
+                  : r && r.unavailable==="too-few" ? `giant component too small (n=${r.n})`
+                  : r && r.detail ? r.detail : "not available";
+        body.innerHTML=statTile("Random Walk Controversy (opinion sides)", "–")+
+          `<div class="subnote" style="margin-top:6px;color:var(--muted)">${why}</div>`;
+      }
+    } else if(key==="dip"){
+      const dp=s.dip;
+      if(dp && dp.dip!=null){
+        const sig = dp.p<0.05;
+        body.innerHTML=statTile("Hartigan dip (opinion multimodality)", fmt(dp.dip))+
+          `<div class="subnote" style="margin-top:6px">p=${fmt(dp.p)} vs uniform null (B=${dp.B}, n=${dp.n}) —
+           <span style="color:${sig?'var(--warn)':'var(--muted)'}">${sig?'multimodal (reject unimodality)':'unimodal (n.s.)'}</span>.
+           Complements bimodalityCoeff; unlike it, not fooled by skew.</div>`;
+      } else {
+        body.innerHTML=statTile("Hartigan dip (opinion multimodality)", "–")+
+          `<div class="subnote" style="margin-top:6px;color:var(--muted)">${dp && dp.detail ? dp.detail : (dp && dp.unavailable==="degenerate" ? `too few opinions (n=${dp.n})` : "not available")}</div>`;
+      }
+    } else if(key==="clustering"){
+      body.innerHTML=statTile("mean clustering coeff.", s.clustering && s.clustering.mean!=null ? fmt(s.clustering.mean) : "–");
+      const chart=document.createElement("div"); chart.style.marginTop="6px"; body.appendChild(chart);
+      drawHistChart(chart, (s.clustering && s.clustering.values) || [], 0, 1, 15);
+    } else if(key==="betweenness"){
+      const bwTop=(s.betweenness && s.betweenness.top) || [];
+      body.innerHTML=statTile("mean betweenness (giant comp.)", s.betweenness && s.betweenness.mean!=null ? fmt(s.betweenness.mean) : "–") +
+        `<table class="bctable" style="margin-top:6px"><thead><tr><th>node</th><th>betweenness</th></tr></thead><tbody>`+
+        (bwTop.length ? bwTop.map(t=>`<tr><td>${t.id}${t.hub?" &#9673;":""}</td><td>${fmt(t.value)}</td></tr>`).join("")
+                      : `<tr><td colspan="2" style="text-align:center;color:var(--muted)">–</td></tr>`)+
+        `</tbody></table>`;
+    } else if(key==="lambda2"){
+      body.innerHTML=statTile("&lambda;<sub>2</sub> algebraic connectivity (giant comp.)", s.lambda2!=null ? fmt(s.lambda2) : "–");
+    } else if(key==="giant"){
+      body.innerHTML=statTile("giant component fraction", s.giantComponentFrac!=null ? (100*s.giantComponentFrac).toFixed(1)+"%" : "–");
+    }
+  }
+
+  renderQsignEiCharts();
+}
+
+function renderQsignEiCharts(){
+  const host=$("#qsignEiRow"); if(!host) return;
+  host.innerHTML="";
+  const spec={
+    qsign: ["Q_sign (modularity, undirected sign-modularity)", "Q_sign", true],
+    ei: ["E-I index (echo chamber; +1=all cross-camp, -1=all same-camp)", "EI_index", false],
+  };
+  for(const key of getOrder("qsignei")){
+    const {card,body}=makeCard(host, key, "qsignei", o=>saveOrder("qsignei",o));
+    host.appendChild(card);
+    const [title,col,isAux]=spec[key];
+    drawMiniSeedChart(body, title, col, isAux);
+  }
+}
+function drawMiniSeedChart(host, title, col, isAux){
+  const seed=netState.seed, e=(seed!=null && state.series) ? state.series[String(seed)] : null;
+  let steps=[], vals=[];
+  if(e){
+    if(isAux && e.aux && e.aux[col]){ steps=e.aux[col].step; vals=e.aux[col].values; }
+    else if(e.cols && e.cols[col]){ steps=e.step; vals=e.cols[col]; }
+  }
+  const S = steps.length ? [{steps,vals,color:cssVar("--accent")}] : [];
+  drawSimpleSeries(host, `${title} — seed ${seed??"–"}`, S);
+}
+
+/* Non-interactive single/few-line chart (no hover/zoom) for the confirmatory
+   mini-panels — structural/behavior data is snapshot- or bucket-scoped, not
+   the primary drag-to-zoom analysis surface the main metric grid is. */
+function drawSimpleSeries(host, title, S){
+  let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
+    if(v==null||Number.isNaN(v)) continue;
+    if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
+    if(v<y0)y0=v; if(v>y1)y1=v; }
+  if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
+  if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
+  const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
+  const ys=v=>LC.H-LC.B-(v-y0)/(y1-y0)*(LC.H-LC.T-LC.B);
+  let g="";
+  for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
+  let paths="";
+  for(const s of S){
+    let d="",pen=false;
+    for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
+      if(v==null||Number.isNaN(v)){pen=false;continue;}
+      d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+  }
+  host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text>${g}
+    <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
+    ${paths}</svg>`;
+}
+
+/* Linear histogram (values already bounded, e.g. clustering coeff in [0,1]) */
+function drawHistChart(host, values, lo, hi, nbins){
+  const HG={W:260,H:120,L:28,R:8,T:8,B:18};
+  const arr=(values||[]).filter(v=>v!=null && !Number.isNaN(v));
+  if(!arr.length){ host.innerHTML=`<svg viewBox="0 0 ${HG.W} ${HG.H}"><text x="${HG.W/2}" y="${HG.H/2}" text-anchor="middle" font-size="10" fill="var(--muted)">no data</text></svg>`; return; }
+  const counts=new Array(nbins).fill(0), w=(hi-lo)/nbins;
+  for(const v of arr){ let b=Math.floor((v-lo)/w); b=Math.max(0,Math.min(nbins-1,b)); counts[b]++; }
+  const maxC=Math.max(...counts,1), bw=(HG.W-HG.L-HG.R)/nbins;
+  let bars="";
+  for(let i=0;i<nbins;i++){
+    const h=(counts[i]/maxC)*(HG.H-HG.T-HG.B);
+    bars+=`<rect x="${(HG.L+i*bw+0.5).toFixed(1)}" y="${(HG.H-HG.B-h).toFixed(1)}" width="${Math.max(0,bw-1).toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent)" opacity="0.8"/>`;
+  }
+  host.innerHTML=`<svg viewBox="0 0 ${HG.W} ${HG.H}">${bars}
+    <line x1="${HG.L}" x2="${HG.L}" y1="${HG.T}" y2="${HG.H-HG.B}" stroke="var(--axis)"/>
+    <line x1="${HG.L}" x2="${HG.W-HG.R}" y1="${HG.H-HG.B}" y2="${HG.H-HG.B}" stroke="var(--axis)"/>
+    <text x="${HG.L-3}" y="${HG.T+7}" font-size="9" text-anchor="end" fill="var(--muted)">${maxC}</text>
+    <text x="${HG.L-3}" y="${HG.H-HG.B}" font-size="9" text-anchor="end" fill="var(--muted)">0</text>
+    <text x="${HG.L}" y="${HG.H-4}" font-size="9" fill="var(--muted)">${lo}</text>
+    <text x="${HG.W-HG.R}" y="${HG.H-4}" font-size="9" text-anchor="end" fill="var(--muted)">${hi}</text>
+  </svg>`;
+}
+
+/* Degree distribution: empirical CCDF on log-log axes (Clauset/Newman/Shalizi
+   convention — avoids the binning artifacts of a raw histogram, and a power
+   law's CCDF is itself a straight line in log-log, which is exactly what the
+   fit-plausibility overlay needs to be checkable by eye). */
+const DG={W:260,H:190,L:32,R:8,T:18,B:22};
+function drawDegreeChart(host, label, values, fit){
+  const arr=(values||[]).filter(v=>v>0).slice().sort((a,b)=>a-b);
+  if(!arr.length){ host.innerHTML=`<svg viewBox="0 0 ${DG.W} ${DG.H}"><text class="title" x="8" y="13">${label}</text><text x="${DG.W/2}" y="${DG.H/2}" text-anchor="middle" font-size="10" fill="var(--muted)">no data</text></svg>`; return; }
+  const n=arr.length;
+  const pts=[];
+  for(let i=0;i<n;i++){ if(i>0 && arr[i]===arr[i-1]) continue; pts.push([arr[i], (n-i)/n]); }
+  const xMin=arr[0], xMax=arr[n-1];
+  const lx=v=>Math.log10(Math.max(v,1)), ly=v=>Math.log10(Math.max(v,1/n));
+  const lx0=lx(xMin), lx1=lx(Math.max(xMax,xMin+1));
+  const ly0=ly(1/n); // most negative (bottom); ly(1)=0 is top
+  const sx=v=>DG.L+(lx(v)-lx0)/((lx1-lx0)||1)*(DG.W-DG.L-DG.R);
+  const sy=v=>DG.T+(0-ly(v))/((0-ly0)||1)*(DG.H-DG.T-DG.B);
+  let d="",pen=false;
+  for(const [xv,yv] of pts){ d+=(pen?"L":"M")+sx(xv).toFixed(1)+" "+sy(yv).toFixed(1); pen=true; }
+  let fitPath="";
+  if(fit && fit.xmin){
+    const anchor = pts.find(p=>p[0]>=fit.xmin) || pts[pts.length-1];
+    let fd="";
+    for(let i=0;i<=20;i++){
+      const xv=fit.xmin*Math.pow(Math.max(xMax,fit.xmin*1.01)/fit.xmin, i/20);
+      const yv=anchor[1]*Math.pow(xv/anchor[0], -(fit.alpha-1));
+      if(yv<=0) continue;
+      fd+=(i===0?"M":"L")+sx(xv).toFixed(1)+" "+sy(yv).toFixed(1);
+    }
+    fitPath=`<path d="${fd}" fill="none" stroke="${fit.plausible?"var(--warn)":"var(--muted)"}" stroke-width="1.5" stroke-dasharray="4 3"/>`;
+  }
+  // vs-lognormal is the Clauset-Shalizi-Newman rival heavy tail: beating the
+  // exponential is weak evidence, so also show whether the power law is favored
+  // over (R_ln>0) or indistinguishable from (large p_ln) a lognormal.
+  let lnNote="";
+  if(fit && fit.R_lognormal!=null){
+    lnNote = (fit.p_lognormal!=null && fit.p_lognormal>0.10)
+      ? ` · <span style="color:var(--muted)">vs lognormal: indistinguishable (p=${fit.p_lognormal})</span>`
+      : (fit.R_lognormal>0
+          ? ` · <span style="color:var(--good)">favored over lognormal (R=${fit.R_lognormal})</span>`
+          : ` · <span style="color:var(--warn)">lognormal fits better (R=${fit.R_lognormal})</span>`);
+  }
+  const fitNote = (fit && fit.alpha!=null)
+    ? `&alpha;=${fit.alpha} x<sub>min</sub>=${fit.xmin} ${fit.plausible?'<span style="color:var(--good)">&#10003; power-law-like</span>':'<span style="color:var(--muted)">&#10007; not favored vs. exponential</span>'}${lnNote}`
+    : (fit && fit.unavailable==="error")
+      ? `<span style="color:var(--warn)">fit failed${fit.n!=null?` (n=${fit.n})`:""}: ${fit.detail||"compute error"}</span>`
+      : `<span style="color:var(--muted)">fit unavailable (n&lt;20 nonzero${fit&&fit.n!=null?`, n=${fit.n}`:""})</span>`;
+  let yTicks="";
+  for(let k=0;k>=Math.floor(ly0);k--){
+    const yy=sy(Math.pow(10,k));
+    yTicks+=`<line x1="${DG.L-2}" x2="${DG.L}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="var(--axis)"/>`+
+      `<text x="${DG.L-3}" y="${(yy+3).toFixed(1)}" font-size="8" text-anchor="end" fill="var(--muted)">${k===0?"1":"1e"+k}</text>`;
+  }
+  host.innerHTML=`<svg viewBox="0 0 ${DG.W} ${DG.H}">
+      <text class="title" x="8" y="13">${label}</text>
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.75"/>
+      ${fitPath}
+      <line x1="${DG.L}" x2="${DG.L}" y1="${DG.T}" y2="${DG.H-DG.B}" stroke="var(--axis)"/>
+      <line x1="${DG.L}" x2="${DG.W-DG.R}" y1="${DG.H-DG.B}" y2="${DG.H-DG.B}" stroke="var(--axis)"/>
+      ${yTicks}
+      <text x="${DG.L}" y="${DG.H-6}" font-size="9" fill="var(--muted)">${xMin}</text>
+      <text x="${DG.W-DG.R}" y="${DG.H-6}" font-size="9" text-anchor="end" fill="var(--muted)">${xMax}</text>
+    </svg>
+    <div class="subnote" style="margin-top:2px">${fitNote}</div>`;
+}
+
+/* Echo-chamber scatter: own opinion (x) vs mean opinion of followees (y), both
+   in [-1,1]. Positive diagonal = echo chambers, blob = well-mixed. Pure
+   client-side from the network payload (op + server-computed nbrOp). */
+function drawEchoScatter(host, nodes){
+  if(!host) return;
+  const ES={W:520,H:300,L:44,R:12,T:12,B:34};
+  const pts=(nodes||[]).filter(n=>n.nbrOp!=null && n.op!=null);
+  if(!pts.length){ host.innerHTML=`<svg viewBox="0 0 ${ES.W} ${ES.H}" style="width:100%;max-width:${ES.W}px"><text x="${ES.W/2}" y="${ES.H/2}" text-anchor="middle" font-size="11" fill="var(--muted)">no follow-graph diet data for this snapshot</text></svg>`; return; }
+  const sx=v=>ES.L+(v+1)/2*(ES.W-ES.L-ES.R);   /* opinion domain fixed [-1,1] */
+  const sy=v=>ES.H-ES.B-(v+1)/2*(ES.H-ES.T-ES.B);
+  /* Pearson r between own and neighborhood opinion */
+  let n=pts.length, mx=0, my=0;
+  for(const p of pts){ mx+=p.op; my+=p.nbrOp; } mx/=n; my/=n;
+  let sxy=0, sxx=0, syy=0;
+  for(const p of pts){ const a=p.op-mx, b=p.nbrOp-my; sxy+=a*b; sxx+=a*a; syy+=b*b; }
+  const r=(sxx>0&&syy>0)? sxy/Math.sqrt(sxx*syy) : NaN;
+  let grid="";
+  for(const t of [-1,-0.5,0,0.5,1]){
+    grid+=`<line x1="${sx(t).toFixed(1)}" x2="${sx(t).toFixed(1)}" y1="${ES.T}" y2="${ES.H-ES.B}" stroke="var(--grid)" stroke-width="1"/>`+
+      `<line x1="${ES.L}" x2="${ES.W-ES.R}" y1="${sy(t).toFixed(1)}" y2="${sy(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>`+
+      `<text x="${sx(t).toFixed(1)}" y="${ES.H-ES.B+14}" text-anchor="middle" font-size="9" fill="var(--muted)">${t}</text>`+
+      `<text x="${ES.L-6}" y="${(sy(t)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--muted)">${t}</text>`;
+  }
+  const diag=`<line x1="${sx(-1)}" y1="${sy(-1)}" x2="${sx(1)}" y2="${sy(1)}" stroke="var(--axis)" stroke-width="1.25" stroke-dasharray="5 4"/>`;
+  let dots="", hubs="";
+  for(const p of pts){
+    const c=opColor(p.op), cx=sx(p.op).toFixed(1), cy=sy(p.nbrOp).toFixed(1);
+    if(p.hub) hubs+=`<circle cx="${cx}" cy="${cy}" r="5" fill="${c}" stroke="var(--ink)" stroke-width="2"/>`;
+    else dots+=`<circle cx="${cx}" cy="${cy}" r="2.6" fill="${c}" fill-opacity="0.6"/>`;
+  }
+  host.innerHTML=`<svg viewBox="0 0 ${ES.W} ${ES.H}" style="width:100%;max-width:${ES.W}px">
+    ${grid}${diag}${dots}${hubs}
+    <line x1="${ES.L}" x2="${ES.L}" y1="${ES.T}" y2="${ES.H-ES.B}" stroke="var(--axis)"/>
+    <line x1="${ES.L}" x2="${ES.W-ES.R}" y1="${ES.H-ES.B}" y2="${ES.H-ES.B}" stroke="var(--axis)"/>
+    <text x="${(ES.L+(ES.W-ES.R))/2}" y="${ES.H-2}" text-anchor="middle" font-size="10" fill="var(--ink2)">own opinion</text>
+    <text transform="translate(11,${(ES.T+(ES.H-ES.B))/2}) rotate(-90)" text-anchor="middle" font-size="10" fill="var(--ink2)">mean opinion of accounts followed</text>
+    </svg>
+    <div class="subnote" style="margin-top:2px">Pearson r(own, diet) = <b>${Number.isNaN(r)?"–":fmt(r)}</b> over ${n} nodes that follow &ge;1 account · dashed = y=x</div>`;
+}
+
+$("#network").addEventListener("mousemove",evt=>{
+  const s=netState.sim, d=netState.data;
+  if(!s||!d){ return; }
+  const r=$("#network").getBoundingClientRect();
+  const mx=evt.clientX-r.left, my=evt.clientY-r.top;
+  const v=s.view||fitView(s);   /* same layout->screen transform drawNet uses */
+  let best=-1, bd=170;
+  for(let i=0;i<s.n;i++){ const q=(v.ox+s.x[i]*v.k-mx)**2+(v.oy+s.y[i]*v.k-my)**2; if(q<bd){bd=q;best=i;} }
+  if(best!==netState.hover){ netState.hover=best; if(!s.raf) drawNet(); }
+  if(best>=0){ const nd=d.nodes[best];
+    showTip(evt,`<div class="thead">node ${best}${nd.hub?" · <b>hub</b>":""}</div>`+
+      `<div class="trow"><span>opinion</span><span>${fmt(nd.op)}</span></div>`+
+      `<div class="trow"><span>followers (in)</span><span>${nd.indeg}</span></div>`+
+      `<div class="trow"><span>following (out)</span><span>${nd.outdeg}</span></div>`+
+      (nd.bc!=null?`<div class="trow"><span>bounded confidence</span><span>${fmt(nd.bc)}</span></div>`:"")+
+      (nd.pp!=null?`<div class="trow"><span>post prob</span><span>${fmt(nd.pp)}</span></div>`:""));
+  } else hideTip();
+});
+$("#network").addEventListener("mouseleave",()=>{ hideTip();
+  if(netState.hover>=0){ netState.hover=-1; if(netState.sim&&!netState.sim.raf) drawNet(); } });
+$("#netseed").addEventListener("change",e=>{ stopNetPlay(); netState.seed=+e.target.value; save("netseed",netState.seed); fetchNetwork(); });
+$("#nettype").addEventListener("change",e=>{ stopNetPlay(); netState.type=e.target.value; save("nettype",netState.type); fetchNetwork(); });
+$("#netstep").addEventListener("change",e=>{ stopNetPlay(); netState.step=e.target.value; save("netstep",netState.step); fetchNetwork(); });
+$("#netsize").addEventListener("change",e=>{ netState.sizeBy=e.target.value; save("netsize",netState.sizeBy);
+  const s=netState.sim,d=netState.data; if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); } });
+$("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; save("netcolor",netState.colorBy);
+  renderColorControls();
+  const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d); updateNetLegend(); if(s&&!s.raf) drawNet(); });
+$("#netcross").checked=store("netcross",false);
+$("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").checked); renderNetControls();
+  if(netState.sim&&!netState.sim.raf) drawNet(); });
+$("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
+  if(s){ s.alpha=1; if(!s.raf) loop(); } });
+
+/* ---- network snapshot time-sequence playback ---- */
+let netPlayTimer=null;
+$("#netScrub").addEventListener("input",e=>{ stopNetPlay();
+  const steps=netSteps(), i=+e.target.value;
+  if(steps[i]!=null){ netState.step=String(steps[i]); save("netstep",netState.step); fetchNetwork(); } });
+$("#netPlay").addEventListener("click",()=>{ netPlayTimer?stopNetPlay():startNetPlay(); });
+function startNetPlay(){
+  const steps=netSteps(); if(steps.length<2) return;
+  const b=$("#netPlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
+  let i=0;                                   /* begin at the earliest snapshot */
+  netState.step=String(steps[0]); save("netstep",netState.step); fetchNetwork();
+  netPlayTimer=setInterval(()=>{
+    const st=netSteps(); i++;
+    if(i>=st.length){ stopNetPlay(); return; }
+    netState.step=String(st[i]); save("netstep",netState.step); fetchNetwork();
+  }, 1800);   /* first pass is gated by fetch/relayout; snapshots cache server-side after */
+}
+function stopNetPlay(){ if(netPlayTimer){ clearInterval(netPlayTimer); netPlayTimer=null; }
+  const b=$("#netPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
+
+/* ---------- agent behavior & attributes panel ---------- */
+function autoRange(values){
+  const vals=(values||[]).filter(v=>v!=null && !Number.isNaN(v));
+  if(!vals.length) return [0,1];
+  let lo=Math.min(...vals), hi=Math.max(...vals);
+  if(lo===hi){ lo-=0.5; hi+=0.5; }
+  const pad=(hi-lo)*0.06;
+  return [lo-pad, hi+pad];
+}
+
+function renderBehavior(){
+  const seed=state.opseed;
+  $("#attrSeedNote").textContent =
+    `bc/postProb currently from seed ${netState.seed??"–"}`+
+    (netState.data && netState.data.step!=null ? ` @ step ${fstep(netState.data.step)}` : "");
+
+  const repostHost=$("#repostRow"); repostHost.innerHTML="";
+  for(const key of getOrder("repostpair")){
+    const {card,body}=makeCard(repostHost, key, "repostpair", o=>saveOrder("repostpair",o));
+    repostHost.appendChild(card);
+    if(key==="depth"){
+      const r=state.repost;
+      const S=(r && r.step && r.step.length) ? [{steps:r.step, vals:r.meanDepth, color:cssVar("--accent")}] : [];
+      drawSimpleSeries(body, `mean repost depth (1000-step buckets) — seed ${seed??"–"}`, S);
+    } else if(key==="virality"){
+      const r=state.repost;
+      const S=(r && r.step && r.step.length && r.structVirality) ? [{steps:r.step, vals:r.structVirality, color:cssVar("--accent")}] : [];
+      drawSimpleSeries(body, `mean structural virality (Goel 2015; 1=broadcast) — seed ${seed??"–"}`, S);
+    } else {
+      const e=seed!=null ? state.series[String(seed)] : null;
+      const vals=e && e.cols && e.cols.repostShare;
+      const S=(vals && e.step.length) ? [{steps:e.step, vals, color:cssVar("--accent")}] : [];
+      drawSimpleSeries(body, `repost share of content — seed ${seed??"–"}`, S);
+    }
+  }
+
+  const nodes = netState.data && netState.data.nodes;
+  const attrHost=$("#attrRow"); attrHost.innerHTML="";
+  const attrSpec={ bc: ["bc", "bounded confidence distribution"], pp: ["pp", "post probability distribution"] };
+  for(const key of getOrder("attrpair")){
+    const {card,body}=makeCard(attrHost, key, "attrpair", o=>saveOrder("attrpair",o));
+    attrHost.appendChild(card);
+    const [field,label]=attrSpec[key];
+    const vals = nodes ? nodes.map(n=>n[field]).filter(v=>v!=null) : [];
+    const [lo,hi]=autoRange(vals);
+    body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">${label} (seed ${netState.seed??"–"})</div>`;
+    const chart=document.createElement("div"); body.appendChild(chart);
+    drawHistChart(chart, vals, lo, hi, 20);
+  }
+}
+
+/* ---------- tooltip ---------- */
+function showTip(evt,html){
+  const t=$("#tooltip"); t.innerHTML=html; t.hidden=false;
+  const pad=14, w=t.offsetWidth, h=t.offsetHeight;
+  let x=evt.clientX+pad, y=evt.clientY+pad;
+  if(x+w>innerWidth-8) x=evt.clientX-w-pad;
+  if(y+h>innerHeight-8) y=evt.clientY-h-pad;
+  t.style.left=x+"px"; t.style.top=y+"px";
+}
+function hideTip(){ $("#tooltip").hidden=true; }
+
+/* ---------- log drawer ---------- */
+let logSeed=null;
+async function openLog(seed){
+  logSeed=seed;
+  $("#logdrawer").hidden=false;
+  $("#logtitle").textContent=`logs/run_${seed}.log`;
+  await loadLog();
+}
+async function loadLog(){
+  if(logSeed===null) return;
+  try{
+    const r=await fetch("/api/log?seed="+logSeed+"&lines=300");
+    const txt=await r.text();
+    const pre=$("#logtext");
+    const stick = pre.scrollTop+pre.clientHeight >= pre.scrollHeight-20;
+    pre.textContent=txt;
+    if(stick) pre.scrollTop=pre.scrollHeight;
+  }catch(e){ $("#logtext").textContent="(failed to load log: "+e.message+")"; }
+}
+$("#logclose").addEventListener("click",()=>{ $("#logdrawer").hidden=true; logSeed=null; });
+document.addEventListener("click",ev=>{
+  const a=ev.target.closest("[data-logseed]");
+  if(a){ ev.preventDefault(); openLog(+a.dataset.logseed); }
+});
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"&&!$("#logdrawer").hidden){ $("#logdrawer").hidden=true; logSeed=null; } });
+
+/* ---------- controls ---------- */
+$("#pause").addEventListener("click",()=>{
+  state.paused=!state.paused;
+  $("#pause").innerHTML=state.paused?"&#9654; resume":"&#9208; pause";
+});
+$("#interval").value=String(store("interval",5));
+$("#interval").addEventListener("change",()=>{ save("interval",+$("#interval").value); schedule(); });
+$("#smooth").checked=store("smooth",false);
+$("#smooth").addEventListener("change",()=>{ save("smooth",$("#smooth").checked); renderAll(); });
+$("#showmean").checked=store("showmean",false);
+$("#showmean").addEventListener("change",()=>{ save("showmean",$("#showmean").checked); renderAll(); });
+$("#resetzoom").addEventListener("click",()=>{ state.zoom=null; renderAll(); });
+/* ---- metric carousel (row 1) scroll controls ---- */
+(function(){
+  const car=$("#gridCarousel"), prev=$("#carPrev"), next=$("#carNext");
+  if(!car) return;
+  const page=dir=>car.scrollBy({left:dir*car.clientWidth*0.85, behavior:"smooth"});
+  prev.addEventListener("click",()=>page(-1));
+  next.addEventListener("click",()=>page(1));
+  car.addEventListener("scroll",updateCarBtns,{passive:true});
+  window.addEventListener("resize",updateCarBtns);
+})();
+$("#planeScrub").addEventListener("input",e=>{ stopPlanePlay(); state.scrub=+e.target.value; renderPlane(); });
+$("#planeLive").addEventListener("click",()=>{ stopPlanePlay(); state.scrub=null; renderPlane(); });
+/* ---- 2-D plane trajectory playback (reveal from step 0 to latest) ---- */
+let planePlayTimer=null;
+$("#planePlay").addEventListener("click",()=>{ planePlayTimer?stopPlanePlay():startPlanePlay(); });
+function startPlanePlay(){
+  const r=state.planeRange; if(!r||!(r[1]>r[0])) return;
+  const b=$("#planePlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
+  const dur=6000, tick=80, inc=(r[1]-r[0])*tick/dur;
+  state.scrub=r[0]; renderPlane();
+  planePlayTimer=setInterval(()=>{
+    const rr=state.planeRange; if(!rr){ stopPlanePlay(); return; }
+    state.scrub=(state.scrub==null?rr[0]:state.scrub)+inc;
+    if(state.scrub>=rr[1]){ state.scrub=null; renderPlane(); stopPlanePlay(); return; }  /* end -> live */
+    renderPlane();
+  }, tick);
+}
+function stopPlanePlay(){ if(planePlayTimer){ clearInterval(planePlayTimer); planePlayTimer=null; }
+  const b=$("#planePlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
+$("#theme").addEventListener("click",()=>{
+  const cur=theme(), next=cur==="dark"?"light":"dark";
+  document.documentElement.dataset.theme=next; save("theme",next); renderAll();
+  if(netState.sim&&netState.data) colorNodes(netState.sim,netState.data);
+  renderNetControls(); if(netState.sim&&!netState.sim.raf) drawNet();
+});
+const savedTheme=store("theme",null);
+if(savedTheme) document.documentElement.dataset.theme=savedTheme;
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
+
+/* ---------- main loop ---------- */
+let timer=null;
+function schedule(){
+  if(timer) clearInterval(timer);
+  timer=setInterval(()=>{ if(!state.paused){ refresh(); loadLog(); } }, (+$("#interval").value)*1000);
+}
+initStaticCards();
+refresh(); schedule();
+</script>
+</body>
+</html>
