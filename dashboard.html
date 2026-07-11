@@ -740,17 +740,47 @@ function drawFamilyChart(host, base, subcols){
 }
 function drawLineChart(host, metric){
   const S=seriesFor(metric);
+  const trans = v => {
+    if (v == null || Number.isNaN(v)) return v;
+    if (metric === "apparentPolarization") {
+      const C = 0.02; // linear threshold near 0
+      const abs = Math.abs(v);
+      if (abs <= C) return v;
+      return Math.sign(v) * C * (1 + Math.log(abs / C));
+    }
+    return v;
+  };
+
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
+  let yMinOrig=Infinity, yMaxOrig=-Infinity;
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
     if(v==null||Number.isNaN(v)) continue;
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
-    if(v<y0)y0=v; if(v>y1)y1=v; }
+    if(v<yMinOrig)yMinOrig=v; if(v>yMaxOrig)yMaxOrig=v;
+    const tv = trans(v);
+    if(tv<y0)y0=tv; if(tv>y1)y1=tv; }
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${metric}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
   if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
   const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
-  const ys=v=>LC.H-LC.B-(v-y0)/(y1-y0)*(LC.H-LC.T-LC.B);
+  const ys=v=>LC.H-LC.B-(trans(v)-y0)/(y1-y0)*(LC.H-LC.T-LC.B);
+
   let g="";
-  for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
+  let yTicks;
+  if (metric === "apparentPolarization") {
+    const candidates = [
+      -2.0, -1.5, -1.0, -0.8, -0.6, -0.4, -0.3, -0.2, -0.1, -0.05, -0.02, -0.01,
+      0.0,
+      0.01, 0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0, 1.5, 2.0
+    ];
+    yTicks = candidates.filter(t => t >= yMinOrig && t <= yMaxOrig);
+    if (yTicks.length < 3) {
+      yTicks = ticks(yMinOrig, yMaxOrig, 4);
+    }
+  } else {
+    yTicks = ticks(y0, y1, 4);
+  }
+
+  for(const t of yTicks) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
   for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
   let paths="";
   for(const s of S){
@@ -761,9 +791,10 @@ function drawLineChart(host, metric){
       d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
     paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?3:2}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} stroke-linejoin="round"/>`;
   }
+  const titleText = metric === "apparentPolarization" ? "apparentPolarization (symlog)" : metric;
   host.innerHTML=
     `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
-      <text class="title" x="10" y="15">${metric}</text>${g}
+      <text class="title" x="10" y="15">${titleText}</text>${g}
       <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
       ${paths}
       <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
