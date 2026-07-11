@@ -1643,14 +1643,16 @@ function startNetPlay(){
 function stopNetPlay(){ if(netPlayTimer){ clearInterval(netPlayTimer); netPlayTimer=null; }
   const b=$("#netPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
 
-/* ---------- agent behavior & attributes panel ---------- */
-function autoRange(values){
+function autoRange(values, clampMin=null, clampMax=null){
   const vals=(values||[]).filter(v=>v!=null && !Number.isNaN(v));
-  if(!vals.length) return [0,1];
+  if(!vals.length) return [clampMin??0, clampMax??1];
   let lo=Math.min(...vals), hi=Math.max(...vals);
   if(lo===hi){ lo-=0.5; hi+=0.5; }
   const pad=(hi-lo)*0.06;
-  return [lo-pad, hi+pad];
+  let rLo = lo-pad, rHi = hi+pad;
+  if(clampMin!==null) rLo = Math.max(clampMin, rLo);
+  if(clampMax!==null) rHi = Math.min(clampMax, rHi);
+  return [rLo, rHi];
 }
 
 function renderBehavior(){
@@ -1682,12 +1684,14 @@ function renderBehavior(){
   const nodes = netState.data && netState.data.nodes;
   const attrHost=$("#attrRow"); attrHost.innerHTML="";
   const attrSpec={ bc: ["bc", "bounded confidence distribution"], pp: ["pp", "post probability distribution"] };
+  const clampLimits = { bc: [0.2, 1.0], pp: [0.0, 1.0] };
   for(const key of getOrder("attrpair")){
     const {card,body}=makeCard(attrHost, key, "attrpair", o=>saveOrder("attrpair",o));
     attrHost.appendChild(card);
     const [field,label]=attrSpec[key];
     const vals = nodes ? nodes.map(n=>n[field]).filter(v=>v!=null) : [];
-    const [lo,hi]=autoRange(vals);
+    const limits = clampLimits[key] || [null, null];
+    const [lo,hi]=autoRange(vals, limits[0], limits[1]);
     body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">${label} (seed ${netState.seed??"–"})</div>`;
     const chart=document.createElement("div"); body.appendChild(chart);
     drawHistChart(chart, vals, lo, hi, 20);
