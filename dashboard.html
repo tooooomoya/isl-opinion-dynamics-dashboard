@@ -93,7 +93,7 @@
   /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone —
      used for the big section wrappers, which aren't individually resized. */
   .panel.card { display:flex; flex-direction:column; position:relative;
-    resize:both; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
+    resize:vertical; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
   .trio > .panel.card { flex-basis:260px; }
   .duo > .panel.card { flex-basis:420px; }
   .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
@@ -525,7 +525,6 @@ let interacting=false;
 
 function applyCardSize(el, id){
   const sz=store("size."+id, null);
-  if(sz && sz.w) el.style.width=sz.w+"px";
   if(sz && sz.h) el.style.height=sz.h+"px";
 }
 function watchCardSize(el, id, onResize){
@@ -536,7 +535,7 @@ function watchCardSize(el, id, onResize){
     interacting=true;
     clearTimeout(t);
     t=setTimeout(()=>{
-      save("size."+id, {w:Math.round(el.offsetWidth), h:Math.round(el.offsetHeight)});
+      save("size."+id, {h:Math.round(el.offsetHeight)});
       if(onResize) onResize();
       interacting=false;
     }, 250);
