@@ -25,6 +25,7 @@ COLORS = [
 # (echo-chamber catalogue; "label" is what the metric picker displays.)
 METRICS = {
     "modularity": {"label": "modularity (Q)", "source": "modularity"},
+    "modularity_mean": {"label": "modularity (Leiden)", "source": "modularity"},
     "communities": {"label": "communities", "source": "modularity"},
     "active_users": {"label": "active users", "source": "active_users"},
     "triangles": {"label": "triangles", "source": "triangles"},
@@ -36,6 +37,7 @@ METRICS = {
     "effective_mu_SUPPRESSION": {"label": "effective mu (SUP)", "source": "effective_mu"},
     "effective_mu_AMPLIFICATION": {"label": "effective mu (AMP)", "source": "effective_mu"},
     "effective_mu_INDIFFERENCE": {"label": "effective mu (IND)", "source": "effective_mu"},
+    "EI_index": {"label": "E-I index", "source": "network_ei"},
 }
 DEFAULT_METRICS = ["modularity", "opinion_var", "opinion_mean",
                    "diversity_bias_mean", "screen_diversity_mean", "active_users"]
@@ -189,6 +191,7 @@ class RunStore:
         self.tri = CsvTail(self.dir / "data" / "triangle_closures.csv")
         self._xz_cache = {}     # source -> (stat_key, parsed)
         self._traj_cache = None  # (stat_key, parsed) for the full per-agent opinion matrix
+        self._ei_cache = None   # (n_snapshots, {"step":..., "EI_index":...})
         # Dynamically discovered metrics: filename -> {tail, x_col, value_cols}.
         # value_cols is None until the header has been read and the file has
         # passed the exclusion rules; kind distinguishes plain/xz for a later phase.
@@ -593,6 +596,35 @@ class RunStore:
             out["hist"].append(opinion_histogram(ops))
         return out
 
+    def ei_series(self):
+        """Snapshot-cadence E-I index: (cross-camp − same-camp) / total edges,
+        camp = sign of opinion. Cached on snapshot count since GEXF snapshots
+        are only ever appended to, never rewritten."""
+        from . import analysis  # deferred: analysis imports core at module level
+        steps = self.network_steps()
+        key = len(steps)
+        if self._ei_cache and self._ei_cache[0] == key:
+            return self._ei_cache[1]
+        out_steps, out_vals = [], []
+        for s in steps:
+            try:
+                parsed = analysis.parse_gexf_cached(self.snapshot_path(s))
+            except Exception:
+                continue    # snapshot still being written; skip it
+            camp = [1 if (n["op"] is None or n["op"] >= 0) else -1 for n in parsed["nodes"]]
+            cross = internal = 0
+            for a, b in parsed["edges"]:
+                if camp[a] == camp[b]:
+                    internal += 1
+                else:
+                    cross += 1
+            total = cross + internal
+            out_steps.append(s)
+            out_vals.append((cross - internal) / total if total else None)
+        result = {"step": out_steps, "EI_index": out_vals}
+        self._ei_cache = (key, result)
+        return result
+
     # -- per-agent opinion trajectories (Phase 4 / R5) -----------------------
 
     def _traj_load(self):
@@ -693,12 +725,15 @@ class RunStore:
         source = spec["source"]
         steps, values = [], []
         if source == "modularity":
-            col = "modularity_mean" if name == "modularity" else "communities"
+            col = "communities" if name == "communities" else "modularity_mean"
             steps, values = self.main.column("step"), self.main.column(col)
         elif source == "active_users":
             steps, values = self.active.column("step"), self.active.column("active_count")
         elif source == "triangles":
             steps, values = self.tri.column("time"), self.tri.column("triangle_count")
+        elif source == "network_ei":
+            live = self.ei_series()
+            steps, values = live["step"], live.get(name, [])
         elif source in XZ_SOURCES:
             if self.is_done():
                 parsed = self._xz_load(source)

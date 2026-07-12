@@ -44,7 +44,7 @@
     display:flex; flex-direction:column; height:100vh; min-height:100vh; overflow:visible; }
   h1 { font-size:16px; font-weight:600; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  header.top { display:flex; gap:16px; align-items:center; margin-bottom:6px; flex:none; }
+  header.top { display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:center; margin-bottom:6px; flex:none; }
   .titleblock { display:flex; flex-direction:column; gap:2px; min-width:220px; }
   .titleline { display:flex; gap:4px; align-items:baseline; white-space:nowrap; }
   .titleline .muted { color:var(--muted); font-weight:500; }
@@ -74,16 +74,13 @@
   #sidebar { background:transparent; border:0; border-radius:0; padding:0;
     box-shadow:none; top:0; max-height:100%; }
   #sidebar .sidebar-content > h3, #sidebar #pickerCount { display:none; }
-  .sidebar.collapsed { flex:0 0 30px; width:30px; padding:10px 4px; overflow:hidden; }
-  .sidebar.collapsed .sidebar-content { display:none; }
-  .sidebar-toggle { display:block; width:100%; margin-bottom:8px; }
-  .sidebar.collapsed .sidebar-toggle { margin-bottom:0; }
   .sidebar-content h3 { margin-bottom:6px; }
   .sidebar-content h3:not(:first-child) { margin-top:12px; }
   .sidebar-content label.ctl { display:flex; margin-bottom:4px; }
-  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:6px; flex:none; }
+  #banner { border-radius:8px; padding:8px 12px; font-size:13px; flex:none; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
+  header.top #banner { margin:0; text-align:center; }
   #runscard { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; flex:none; padding:9px 12px 10px; }
   .runs-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .runs-title { display:flex; align-items:baseline; gap:6px; font-weight:600; color:var(--ink); }
@@ -106,6 +103,14 @@
   .chip.running .pct { color:var(--warn); }
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
+  /* compact runs display: shrinks the seed chips and scrub row for a smaller footprint */
+  #runscard.compact { padding:5px 10px 6px; gap:4px; }
+  #runscard.compact .runs-title { font-size:11px; }
+  #runscard.compact #seedbar { gap:3px; }
+  #runscard.compact .chip { padding:1px 5px 1px 4px; font-size:10px; gap:3px; }
+  #runscard.compact .chip .dot { width:6px; height:6px; }
+  #runscard.compact .chip .pct + .pct { display:none; }
+  #runscard.compact .scrubrow { gap:6px; }
   #pickerCount { margin-bottom:6px; }
   #pickerSearch { width:100%; margin:0 0 8px; color:var(--ink); background:var(--surface);
     border:1px solid var(--border); border-radius:8px; padding:7px 9px; font:12.5px system-ui,sans-serif; }
@@ -247,7 +252,11 @@
      so the card itself is just the canvas filling the tab's full remaining
      height/width — no compact/expanded toggle needed any more. */
   #netsnapshotSection { flex:1 1 auto; min-width:0; min-height:0; resize:none; }
-  .tabpanel[data-tabpanel="network"] > .layout { flex:1 1 auto; min-height:0; align-items:stretch; }
+  /* the structural-metrics section below .layout can grow tall with real data;
+     without a floor here the snapshot canvas gets squeezed to 0 height inside
+     this fixed-viewport column, so it keeps a floor and the tab scrolls instead. */
+  .tabpanel[data-tabpanel="network"] { overflow-y:auto; }
+  .tabpanel[data-tabpanel="network"] > .layout { flex:1 1 auto; min-height:50vh; align-items:stretch; }
   .tabpanel[data-tabpanel="network"] main { height:100%; }
   .tabpanel[data-tabpanel="network"] #netsnapshotSection { display:flex; flex-direction:column; overflow:hidden; }
   #network { flex:1 1 auto; min-width:0; min-height:0; width:100%; height:100%; display:block; }
@@ -296,6 +305,7 @@
     <div class="titleline"><h1>Echo Chamber</h1><span class="muted">/ Live dashboard</span></div>
     <div class="statusline" id="runStatus"><span class="dot"></span><span>loading runs...</span></div>
   </div>
+  <div id="banner" hidden></div>
   <div class="controls">
     <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
     <label class="ctl"><input type="checkbox" id="showmean"> show band</label>
@@ -311,11 +321,11 @@
   </div>
 </header>
 
-<div id="banner" hidden></div>
 <div class="panel" id="runscard">
   <div class="runs-head">
     <div class="runs-title">Runs <span id="runsCount" class="subnote">0 runs</span></div>
     <div class="runs-actions">
+      <button id="runsCompact" title="toggle compact runs display" aria-pressed="false">compact</button>
       <button id="cursorPlay" title="play the global step cursor from the earliest step">&#9654; play</button>
       <button id="cursorLive" title="jump back to the latest step">&#8676; live</button>
     </div>
@@ -373,7 +383,6 @@
 <div class="tabpanel" data-tabpanel="network">
 <div class="layout">
 <aside id="netsidebar" class="sidebar">
-  <button id="netsidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
   <div id="netsidebarContent" class="sidebar-content">
     <section class="net-control-card">
     <h3>snapshot</h3>
@@ -422,8 +431,8 @@
 </main>
 </div>
 
-  <!-- structural metrics stay hidden until they are wired to echo-chamber data (phase 4) -->
-  <section class="panel" style="margin-top:12px" hidden>
+  <!-- structural metrics wired to echo-chamber data (phase 4, Unit B) -->
+  <section class="panel" style="margin-top:12px">
     <h3>network structure <span id="structinfo" class="subnote"></span></h3>
     <div class="subnote">same seed/step as the network snapshot above (undirected, giant-component-only for
       betweenness/&lambda;<sub>2</sub> &mdash; matches journal.tex's convention; degree distribution and
@@ -578,6 +587,8 @@ async function refresh(){
     initialHide();
     const cols = new Set([state.px, state.py]);
     for(const m of state.metrics) for(const c of expandMetric(m)) cols.add(c);
+    cols.add("modularity_mean");
+    cols.add("EI_index");
     // series are fetched for the visible runs only: a data root can hold many
     // runs, and done-run series come from whole-file xz reads server-side.
     const vis = visibleSeeds().map(s=>s.run);
@@ -692,7 +703,8 @@ function renderAll(){
   if(state.tab==="timeseries"){ renderGrid(); }
   else if(state.tab==="opinion"){ renderOpinion(); renderPlane(); }
   else if(state.tab==="network"){ syncNetworkToCursor(); }
-  // network-structure + behavior panels stay hidden (no echo-chamber data yet)
+  // network-structure panel renders via fetchNetwork()'s renderStructural() call;
+  // behavior panel stays hidden (no echo-chamber data for it)
   $("#resetzoom").hidden = !state.zoom;
 }
 
@@ -737,6 +749,13 @@ function onCursorChange(){
   else if(state.tab==="opinion"){ renderOpinion(); renderPlane(); }
   else if(state.tab==="network"){ syncNetworkToCursor(); }
 }
+function setRunsCompact(compact){
+  $("#runscard").classList.toggle("compact", compact);
+  $("#runsCompact").setAttribute("aria-pressed", compact);
+  save("runsCompact", compact);
+}
+$("#runsCompact").addEventListener("click",()=>{ setRunsCompact(!$("#runscard").classList.contains("compact")); });
+setRunsCompact(store("runsCompact", false));
 $("#cursorScrub").addEventListener("input",e=>{ stopCursorPlay(); state.cursor=+e.target.value; onCursorChange(); });
 $("#cursorLive").addEventListener("click",()=>{ stopCursorPlay(); state.cursor=null; onCursorChange(); });
 let cursorPlayTimer=null;
@@ -2086,7 +2105,7 @@ async function fetchNetwork(){
   netState.loading=true;
   setNetInfoBadges(["loading..."]);
   try{
-    const d=await jget(`/api/network?run=${encodeURIComponent(netState.seed)}&step=${netState.step}`);
+    const d=await jget(`/api/network?run=${encodeURIComponent(netState.seed)}&step=${netState.step}&structural=1`);
     if(d.error){
       /* newest snapshot is mid-write while the run is live; server already fell back
          to an older complete one if it could. Keep showing that and retry on the
@@ -2095,6 +2114,7 @@ async function fetchNetwork(){
       if(d.step==null) return;
     }
     netState.data=d;
+    renderStructural();
     const steps=Array.isArray(d.steps)?d.steps:[], idx=steps.indexOf(d.step);
     const idxTxt=idx>=0?` (${idx+1}/${steps.length})`:"";
     if(d.step==null) setNetInfoBadges(["no GEXF snapshots found yet"]);
@@ -2500,8 +2520,8 @@ function renderQsignEiCharts(){
   const host=$("#qsignEiRow"); if(!host) return;
   host.innerHTML="";
   const spec={
-    qsign: ["Q_sign (modularity, undirected sign-modularity)", "Q_sign", true],
-    ei: ["E-I index (echo chamber; +1=all cross-camp, -1=all same-camp)", "EI_index", false],
+    qsign: ["modularity (Leiden)", "modularity_mean", true],
+    ei: ["E-I index (echo chamber; +1=all cross-camp, -1=all same-camp)", "EI_index", true],
   };
   for(const key of getOrder("qsignei")){
     const {card,body}=makeCard(host, key, "qsignei", o=>saveOrder("qsignei",o));
@@ -2967,30 +2987,6 @@ $("#theme").addEventListener("click",()=>{
 const savedTheme=store("theme",null);
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
-
-/* ---------- sidebar collapse/expand (network only) ---------- */
-const SIDEBAR_NARROW_BP = 900;
-function applySidebarCollapsed(sidebarSel, toggleSel, collapsed){
-  $(sidebarSel).classList.toggle("collapsed", collapsed);
-  const btn=$(toggleSel);
-  btn.textContent = collapsed ? "»" : "«";
-  btn.title = collapsed ? "open sidebar" : "collapse sidebar";
-  btn.setAttribute("aria-label", btn.title);
-}
-function setSidebarCollapsed(sidebarSel, toggleSel, storeKey, collapsed){
-  applySidebarCollapsed(sidebarSel, toggleSel, collapsed);
-  save(storeKey, collapsed);
-  renderAll(); // charts need to redraw for the new main-column width
-}
-function initSidebarCollapse(sidebarSel, toggleSel, storeKey){
-  $(toggleSel).addEventListener("click", ()=>{
-    setSidebarCollapsed(sidebarSel, toggleSel, storeKey, !$(sidebarSel).classList.contains("collapsed"));
-  });
-  const saved=store(storeKey,null);
-  const collapsed = saved===null ? innerWidth<SIDEBAR_NARROW_BP : saved;
-  applySidebarCollapsed(sidebarSel, toggleSel, collapsed);
-}
-initSidebarCollapse("#netsidebar","#netsidebarToggle","netsidebar");
 
 /* ---------- main loop ---------- */
 let timer=null;

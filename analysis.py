@@ -74,11 +74,16 @@ def load_network(path: Path):
     G = parse_gexf_cached(path)
     indeg = [0] * len(G["nodes"])
     outdeg = [0] * len(G["nodes"])
+    nbr_sum = [0.0] * len(G["nodes"])
     for s, t in G["edges"]:
         outdeg[s] += 1
         indeg[t] += 1
+        op = G["nodes"][t]["op"]
+        if op is not None:
+            nbr_sum[s] += op
     nodes = [{"id": n["id"], "op": rnd(n["op"]), "hyp": n["hyp"],
-              "indeg": indeg[i], "outdeg": outdeg[i]}
+              "indeg": indeg[i], "outdeg": outdeg[i],
+              "nbrOp": rnd(nbr_sum[i] / outdeg[i]) if outdeg[i] else None}
              for i, n in enumerate(G["nodes"])]
     return {"n": len(nodes), "m": len(G["edges"]), "nodes": nodes,
             "edges": G["edges"]}
@@ -281,16 +286,24 @@ STRUCT_CACHE = {}
 STRUCT_LOCK = threading.Lock()
 
 
-def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
-    """Snapshot-level structural metrics from follow/repost graph + Java outputs."""
-    st = os.stat(gexf_path)
-    key = str(gexf_path)
-    with STRUCT_LOCK:
-        hit = STRUCT_CACHE.get(key)
-        if hit and hit[0] == st.st_size:
-            return hit[1]
+def _compute_structural_impl(gexf_path: Path):
     import networkx as nx
-    G = parse_gexf_cached(gexf_path)
+    Gd = parse_gexf_cached(gexf_path)
+
+    G = nx.DiGraph()
+    for n in Gd["nodes"]:
+        G.add_node(n["id"], opinion=n["op"] if n["op"] is not None else 0.0)
+    for s, t in Gd["edges"]:
+        G.add_edge(Gd["nodes"][s]["id"], Gd["nodes"][t]["id"])
+
+    indeg = [0] * len(Gd["nodes"])
+    outdeg = [0] * len(Gd["nodes"])
+    for s, t in Gd["edges"]:
+        outdeg[s] += 1
+        indeg[t] += 1
+    degree = {"in": indeg, "out": outdeg, "total": [a + b for a, b in zip(indeg, outdeg)]}
+    degree_fit = {k: fit_powerlaw(v) for k, v in degree.items()}
+
     Gu = G.to_undirected()
     giant_frac, lambda2, bc_mean, bc_top = None, None, None, []
     rwc = None
@@ -307,33 +320,39 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
             bc_vals = list(bc.values())
             bc_mean = round(sum(bc_vals) / len(bc_vals), 6) if bc_vals else None
             top = sorted(bc.items(), key=lambda kv: -kv[1])[:10]
-            bc_top = [{"id": nid, "value": round(v, 6), "hub": bool(G.nodes[nid].get("target", False))}
-                      for nid, v in top]
+            bc_top = [{"id": nid, "value": round(v, 6), "hub": False} for nid, v in top]
         rwc = compute_rwc(Gg)
 
-    opinions = [float(G.nodes[nid].get("opinion", 0.0)) for nid in G.nodes]
-    dip = dip_diagnostics(opinions)
-
-    degree = {
-        "in": _read_col(degree_csv, "inDegree", int),
-        "out": _read_col(degree_csv, "outDegree", int),
-    }
-    if degree["in"] is not None and degree["out"] is not None:
-        degree["total"] = [a + b for a, b in zip(degree["in"], degree["out"])]
-    degree_fit = {k: fit_powerlaw(v) for k, v in degree.items()}
-
-    clustering_vals = _read_col(clustering_csv, "clusteringCoefficient", float)
+    clustering_map = nx.clustering(Gu)
+    clustering_vals = list(clustering_map.values())
     clustering = {
         "values": clustering_vals,
         "mean": round(sum(clustering_vals) / len(clustering_vals), 6) if clustering_vals else None,
     }
 
-    payload = {
+    opinions = [float(G.nodes[nid].get("opinion", 0.0)) for nid in G.nodes]
+    dip = dip_diagnostics(opinions)
+
+    return {
         "giantComponentFrac": giant_frac, "lambda2": lambda2,
         "betweenness": {"mean": bc_mean, "top": bc_top},
         "degree": degree, "degreeFit": degree_fit, "clustering": clustering,
         "rwc": rwc, "dip": dip,
     }
+
+
+def compute_structural(gexf_path: Path):
+    """Snapshot-level structural metrics from the follow/repost graph (GEXF only)."""
+    st = os.stat(gexf_path)
+    key = str(gexf_path)
+    with STRUCT_LOCK:
+        hit = STRUCT_CACHE.get(key)
+        if hit and hit[0] == st.st_size:
+            return hit[1]
+    try:
+        payload = _compute_structural_impl(gexf_path)
+    except Exception as e:
+        return {"structuralError": f"{type(e).__name__}: {e}"[:200]}
     with STRUCT_LOCK:
         STRUCT_CACHE[key] = (st.st_size, payload)
         while len(STRUCT_CACHE) > 8:
@@ -363,10 +382,11 @@ def api_network(qs):
                 payload = load_network(store.snapshot_path(s))
                 result = {"steps": steps, "step": s, "stale": i > 0, **payload}
                 if want_structural:
-                    # compute_structural still expects the upstream layout; it is
-                    # rewired to GEXF.bz2 + the echo-chamber catalogue in phase 4.
-                    result["structuralError"] = ("structural metrics are not wired "
-                                                 "to echo-chamber data yet (phase 4)")
+                    structural = compute_structural(store.snapshot_path(s))
+                    if "structuralError" in structural:
+                        result["structuralError"] = structural["structuralError"]
+                    else:
+                        result["structural"] = structural
                 return result
             except Exception as e:
                 last_err = f"{type(e).__name__}: {e}"
