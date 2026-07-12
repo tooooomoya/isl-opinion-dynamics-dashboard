@@ -49,6 +49,8 @@ RESCAN_EVERY = 15.0          # seconds between run-discovery scans
 STALL_AFTER = 60.0           # no file update for this long => "stalled"
 OPINION_BINS = 10            # histogram bins over [-1, 1]
 DEFAULT_TARGET_STEPS = 40000
+TRAJ_MAX_STEPS = 300          # default per-agent opinion-trajectory decimation
+TRAJ_MAX_AGENTS = 2000        # above this, agents are subsampled (equal stride)
 
 DERIVED = {
     "opinion_std": (("opinion_var",), lambda v: math.sqrt(v) if v >= 0 else None),
@@ -161,6 +163,7 @@ class RunStore:
         self.active = CsvTail(self.dir / "data" / "active_users.csv")
         self.tri = CsvTail(self.dir / "data" / "triangle_closures.csv")
         self._xz_cache = {}     # source -> (stat_key, parsed)
+        self._traj_cache = None  # (stat_key, parsed) for the full per-agent opinion matrix
 
     # -- metadata / status ---------------------------------------------------
 
@@ -383,6 +386,85 @@ class RunStore:
             out["hist"].append(opinion_histogram(ops))
         return out
 
+    # -- per-agent opinion trajectories (Phase 4 / R5) -----------------------
+
+    def _traj_load(self):
+        """Whole-file per-agent opinion matrix for a done run, from the same
+        opinions.csv.xz the heatmap reads. Kept in its own mtime-keyed cache
+        (not _xz_cache) since _xz_parse deliberately discards per-agent values
+        to keep the aggregate-stats cache small."""
+        path = self.dir / "data" / "opinions.csv.xz"
+        try:
+            st = path.stat()
+        except OSError:
+            return None
+        key = (st.st_size, st.st_mtime)
+        if self._traj_cache and self._traj_cache[0] == key:
+            return self._traj_cache[1]
+        try:
+            header, rows = read_xz_csv(path)
+        except (OSError, lzma.LZMAError, EOFError):
+            return None
+        every = self._snapshot_every(rows)
+        try:
+            ids = [int(h) for h in header[1:]]
+        except ValueError:
+            ids = list(range(len(header) - 1))
+        n_agents = len(ids)
+        steps = []
+        agents = [[] for _ in ids]
+        for row in rows:
+            try:
+                idx = int(float(row[0]))
+                ops = [float(c) for c in row[1:]]
+            except ValueError:
+                continue
+            if len(ops) != n_agents:
+                continue    # malformed/truncated row; keep columns aligned
+            steps.append(idx * every)
+            for j, v in enumerate(ops):
+                agents[j].append(v)
+        parsed = {"step": steps, "agents": agents, "ids": ids}
+        self._traj_cache = (key, parsed)
+        return parsed
+
+    def gexf_trajectory_data(self):
+        """Snapshot-cadence per-agent opinion trajectories from GEXF (running
+        runs). Nodes are matched across snapshots by id (a node can be briefly
+        absent from a payload without desyncing the other agents' columns)."""
+        from . import analysis  # deferred: analysis imports core at module level
+        steps = []
+        agents = []
+        id_to_idx = {}
+        for s in self.network_steps():
+            try:
+                parsed = analysis.parse_gexf_cached(self.snapshot_path(s))
+            except Exception:
+                continue    # snapshot still being written; skip it
+            nodes = [n for n in parsed["nodes"] if n["op"] is not None]
+            if not nodes:
+                continue
+            col = len(steps)
+            steps.append(s)
+            for n in nodes:
+                idx = id_to_idx.get(n["id"])
+                if idx is None:
+                    idx = len(agents)
+                    id_to_idx[n["id"]] = idx
+                    agents.append([None] * col)
+                arr = agents[idx]
+                while len(arr) < col:
+                    arr.append(None)
+                arr.append(n["op"])
+        total = len(steps)
+        for arr in agents:
+            while len(arr) < total:
+                arr.append(None)
+        return {"step": steps, "agents": agents, "ids": list(id_to_idx)}
+
+    def trajectory_data(self):
+        return self._traj_load() if self.is_done() else self.gexf_trajectory_data()
+
     # -- series ---------------------------------------------------------------
 
     def metric_series(self, name):
@@ -568,6 +650,38 @@ def api_opinion(qs):
         bins = [[h[b] for h in hists] for b in range(OPINION_BINS)]
         return {"step": [int(parsed["step"][i]) for i in idx], "bins": bins,
                 "live": not st.is_done()}
+
+
+def api_trajectories(qs):
+    """Per-agent opinion trajectories (Phase 4 / R5): wide {step, agents, ids}
+    payload for the opinion tab's default canvas view. Decimated server-side
+    on both axes so the response stays within a few MB even for long, large-n
+    runs; the client is told how many agents it's actually seeing."""
+    rid = qs.get("run", [""])[0]
+    max_steps = int(qs.get("max_steps", [str(TRAJ_MAX_STEPS)])[0])
+    with LOCK:
+        poll_all()
+        st = get_store(rid)
+        empty = {"step": [], "agents": [], "ids": [], "shown": 0, "total": 0, "live": False}
+        if st is None:
+            return empty
+        parsed = st.trajectory_data()
+        if not parsed or not parsed.get("step") or not parsed.get("agents"):
+            return {**empty, "live": not st.is_done()}
+        steps, agents, ids = parsed["step"], parsed["agents"], parsed["ids"]
+        idx = decimate(list(range(len(steps))), max_steps)
+        total = len(agents)
+        agent_sel = list(range(total))
+        if total > TRAJ_MAX_AGENTS:
+            stride = math.ceil(total / TRAJ_MAX_AGENTS)
+            agent_sel = agent_sel[::stride]
+        return {
+            "step": [int(steps[i]) for i in idx],
+            "agents": [[rnd(agents[a][i]) for i in idx] for a in agent_sel],
+            "ids": [ids[a] for a in agent_sel],
+            "shown": len(agent_sel), "total": total,
+            "live": not st.is_done(),
+        }
 
 
 def api_repost(qs):

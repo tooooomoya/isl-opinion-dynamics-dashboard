@@ -35,6 +35,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(core.api_series(qs))
             elif u.path == "/api/opinion":
                 self._json(core.api_opinion(qs))
+            elif u.path == "/api/trajectories":
+                self._json(core.api_trajectories(qs))
             elif u.path == "/api/repost":
                 self._json(core.api_repost(qs))
             elif u.path == "/api/network":

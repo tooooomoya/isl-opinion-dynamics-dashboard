@@ -27,10 +27,11 @@
   }
   * { box-sizing:border-box; margin:0; }
   body { background:var(--page); color:var(--ink);
-    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:14px 18px 40px; }
+    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:10px 14px;
+    display:flex; flex-direction:column; height:100vh; overflow-y:auto; overflow-x:hidden; }
   h1 { font-size:16px; font-weight:600; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  header.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  header.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; flex:none; }
   .grow { flex:1; min-width:140px; }
   .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
   .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
@@ -40,20 +41,22 @@
   button:hover, select:hover { border-color:var(--muted); }
   label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
   /* sidebar + main body 2-column layout (collapsible; see #sidebarToggle) */
-  .layout { display:flex; align-items:flex-start; gap:16px; }
-  .layout > main { flex:1 1 0; min-width:0; }
-  #sidebar { flex:0 0 240px; width:240px; box-sizing:border-box; background:var(--surface);
+  .layout { display:flex; align-items:flex-start; gap:16px; flex:1 1 auto; min-height:0; }
+  .layout > main { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; }
+  .sidebar { flex:0 0 240px; width:240px; box-sizing:border-box; background:var(--surface);
     border:1px solid var(--border); border-radius:10px; padding:10px 12px;
     position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; }
-  #sidebar.collapsed { flex:0 0 30px; width:30px; padding:10px 4px; overflow:hidden; }
-  #sidebar.collapsed .sidebar-content { display:none; }
+  .sidebar.collapsed { flex:0 0 30px; width:30px; padding:10px 4px; overflow:hidden; }
+  .sidebar.collapsed .sidebar-content { display:none; }
   .sidebar-toggle { display:block; width:100%; margin-bottom:8px; }
-  #sidebar.collapsed .sidebar-toggle { margin-bottom:0; }
+  .sidebar.collapsed .sidebar-toggle { margin-bottom:0; }
   .sidebar-content h3 { margin-bottom:6px; }
-  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
+  .sidebar-content h3:not(:first-child) { margin-top:12px; }
+  .sidebar-content label.ctl { display:flex; margin-bottom:4px; }
+  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:6px; flex:none; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
-  #seedbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  #seedbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; flex:none; }
   .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
     border-radius:14px; padding:3px 8px 3px 6px; font-size:12px; cursor:pointer; user-select:none; }
   .chip.off { opacity:.38; }
@@ -74,10 +77,11 @@
      container width) instead of a fixed carousel+featured-row layout. A
      card's size is set by whether it carries .featured; the ⤢ button on each
      card toggles that (at most 2 featured at once, oldest evicted first). */
-  #gridWrap { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
-  #gridWrap > .metriccard { flex:1 1 clamp(260px, 31%, 380px); }
-  #gridWrap > .metriccard.featured { flex:1 1 calc(50% - 6px); min-width:min(100%, 420px); }
-  .metriccard { position:relative; }
+  #gridWrap { display:grid; gap:10px; flex:1 1 auto; min-height:0; }
+  .metriccard { position:relative; min-width:0; min-height:0; overflow:hidden; }
+  #gridWrap .metriccard { display:flex; flex-direction:column; }
+  #gridWrap .metriccard .cardbody { flex:1 1 auto; min-height:0; display:flex; overflow:hidden; }
+  #gridWrap .metriccard svg { width:100%; height:100%; }
   .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
     z-index:1; background:none; border:none; }
@@ -106,7 +110,7 @@
   .panel.card.dragging { opacity:0.35; }
   .panel.card.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
   .panel.card.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
-  .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+  .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
   /* header stat tiles: running/done/stalled/updated, always visible above the tabs */
@@ -119,12 +123,22 @@
   /* tabs: 3-way split (time series / opinion / network), the rest of the
      always-visible header (title, stat tiles, controls, banner, chips) stays
      outside the tabpanels below. */
-  .tabnav { display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+  .tabnav { display:flex; gap:4px; margin-bottom:6px; border-bottom:1px solid var(--border); flex:none; }
   .tabbtn { background:none; border:none; border-bottom:2px solid transparent; border-radius:0;
     padding:7px 14px; font:13px system-ui,sans-serif; color:var(--ink2); cursor:pointer; }
   .tabbtn:hover { color:var(--ink); border-color:var(--muted); }
   .tabbtn.active { color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
+  .tabpanel { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
   .tabpanel[hidden] { display:none; }
+  /* opinion / outcome tab (Phase 3): left = opinion trajectories/heatmap (~60%),
+     right = 2-D outcome plane (~40%), both fitted to the tab's full height.
+     Manual card resize (and its persisted size) is disabled here — a stored
+     size would otherwise fight the flex split. */
+  .tabpanel[data-tabpanel="opinion"] { flex-direction:row; gap:12px; }
+  .tabpanel[data-tabpanel="opinion"] > [data-card="opinion"].panel.card { flex:3 1 0; }
+  .tabpanel[data-tabpanel="opinion"] > [data-card="plane"].panel.card { flex:2 1 0; }
+  .tabpanel[data-tabpanel="opinion"] > .panel.card { resize:none; min-width:0; min-height:0; }
+  .tabpanel[data-tabpanel="opinion"] #plane svg { width:100%; height:100%; }
   table.bctable { width:100%; border-collapse:collapse; font-size:11.5px; }
   table.bctable td, table.bctable th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--grid); }
   table.bctable th { color:var(--muted); font-weight:600; text-align:right; }
@@ -146,7 +160,7 @@
   #logdrawer pre { flex:1; overflow:auto; margin:0; padding:12px 14px; font:11px/1.5 ui-monospace,Menlo,monospace;
     color:var(--ink2); white-space:pre-wrap; }
   .subnote { font-size:11px; color:var(--muted); margin:-2px 0 4px; }
-  .scrubrow { display:flex; gap:8px; align-items:center; margin:2px 0 6px; }
+  .scrubrow { display:flex; gap:8px; align-items:center; margin:2px 0 4px; flex:none; }
   .scrubrow[hidden] { display:none; }
   .scrubrow input[type=range] { flex:1; accent-color:var(--accent); }
   .scrubrow button.live { color:var(--accent); border-color:var(--accent); }
@@ -172,14 +186,10 @@
     font-size:10px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
   .colorbar-row .cb-chips { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
   .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
-  /* network snapshot: compact (default, ~2/3 width, canvas ~350px) vs expanded
-     (full width, canvas ~550px) — see #netExpand. Controls/description stay
-     visible in both modes; only the card's overall footprint changes. */
-  #netsnapshotSection { width:66%; }
-  #netsnapshotSection.expanded { width:100%; }
-  #netsnapshotSection #network { min-height:350px; }
-  #netsnapshotSection.expanded #network { min-height:550px; }
-  .net-expand-btn { margin-left:auto; }
+  /* network snapshot (Phase 4): controls live in the dedicated #netsidebar now,
+     so the card itself is just the canvas filling the tab's full remaining
+     height/width — no compact/expanded toggle needed any more. */
+  #netsnapshotSection { flex:1 1 auto; min-width:0; min-height:0; resize:none; }
   #empty { color:var(--muted); padding:40px; text-align:center; }
   /* in-page color picker (replaces the OS-native <input type=color> dialog,
      whose position/layout a web page cannot control): centered modal with an
@@ -241,13 +251,13 @@
 
 <nav class="tabnav" id="tabnav">
   <button class="tabbtn" data-tab="timeseries">time series</button>
-  <button class="tabbtn" data-tab="opinion">opinion</button>
+  <button class="tabbtn" data-tab="opinion">opinion / outcome</button>
   <button class="tabbtn" data-tab="network">network</button>
 </nav>
 
 <div class="tabpanel" data-tabpanel="timeseries">
 <div class="layout">
-<aside id="sidebar">
+<aside id="sidebar" class="sidebar">
   <button id="sidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
   <div id="sidebarContent" class="sidebar-content">
     <h3>display metrics</h3>
@@ -257,6 +267,22 @@
 </aside>
 <main>
   <div id="gridWrap"></div>
+</main>
+</div>
+</div>
+
+<div class="tabpanel" data-tabpanel="opinion">
+  <section class="panel card" data-card="opinion">
+    <h3>opinion <select id="opseed"></select>
+      <select id="opview">
+        <option value="traj">trajectories</option>
+        <option value="heat">heatmap</option>
+      </select>
+    </h3>
+    <div class="subnote" id="opsubnote"></div>
+    <div id="opinion" class="cardbody"></div>
+    <div class="leg" id="opleg"></div>
+  </section>
   <section class="panel card" data-card="plane">
     <h3>2-D outcome plane
       <select id="px"></select> &times; <select id="py"></select>
@@ -264,52 +290,53 @@
     <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = global cursor position (zoom window applies)</div>
     <div id="plane" class="cardbody"></div>
   </section>
-</main>
-</div>
-</div>
-
-<div class="tabpanel" data-tabpanel="opinion">
-  <section class="panel card" data-card="opinion">
-    <h3>opinion distribution over time <select id="opseed"></select></h3>
-    <div class="subnote">density heatmap: per-step share of agents across opinion bins
-      (&minus;1 bottom &harr; +1 top), color = share (done runs: opinions.csv.xz;
-      running runs: rebuilt from GEXF snapshots at snapshot cadence).</div>
-    <div id="opinion" class="cardbody"></div>
-    <div class="leg" id="opleg"></div>
-  </section>
 </div>
 
 <div class="tabpanel" data-tabpanel="network">
-  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
-    <h3>network snapshot
-      <select id="netseed"></select>
-      <select id="nettype" hidden>
-        <option value="follow">follow graph</option>
-        <option value="repost">repost graph</option>
-      </select>
-      <select id="netstep"><option value="latest">latest</option></select>
-      <label class="ctl">size <select id="netsize"></select></label>
-      <label class="ctl">color <select id="netcolor"></select></label>
-      <label class="ctl">layout <select id="netlayout">
-        <option value="force">force</option>
-        <option value="forceAtlas2">ForceAtlas2</option>
-      </select></label>
-      <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
-      <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
-      <span id="netinfo" class="subnote"></span>
-      <button id="netExpand" class="net-expand-btn" title="expand snapshot">&#10530;</button>
-    </h3>
+<div class="layout">
+<aside id="netsidebar" class="sidebar">
+  <button id="netsidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
+  <div id="netsidebarContent" class="sidebar-content">
+    <h3>snapshot</h3>
+    <label class="ctl">seed <select id="netseed"></select></label>
+    <select id="nettype" hidden>
+      <option value="follow">follow graph</option>
+      <option value="repost">repost graph</option>
+    </select>
+    <label class="ctl">step <select id="netstep"><option value="latest">latest</option></select></label>
+
+    <h3>appearance</h3>
+    <label class="ctl">size <select id="netsize"></select></label>
+    <label class="ctl">color <select id="netcolor"></select></label>
+    <div id="netcolorbar" class="colorbar-row"></div>
+    <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
+
+    <h3>layout</h3>
+    <label class="ctl">layout <select id="netlayout">
+      <option value="force">force</option>
+      <option value="forceAtlas2">ForceAtlas2</option>
+    </select></label>
+    <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
+    <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
+    <label class="ctl" title="experimental: convex hull per opinion-sign group"><input type="checkbox" id="nethull"> hull (experimental)</label>
+
+    <h3>about</h3>
     <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber):
       node radius and color are mapped from the attributes chosen above (default radius &prop; &radic;in-degree,
       color = opinion, red &minus;1 &harr; blue +1).
       Positions carry over between snapshots, so stepping through time shows the sorting happen.
       Wheel to zoom, drag the background to pan (double-click resets), drag a node to pin it while the
-      layout runs. Drag this card's bottom-right corner to resize the canvas.</div>
-    <div id="netcolorbar" class="colorbar-row"></div>
-    <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
+      layout runs.</div>
+  </div>
+</aside>
+<main>
+  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
+    <h3>network snapshot <span id="netinfo" class="subnote"></span></h3>
     <canvas id="network" class="cardbody" style="border-radius:6px"></canvas>
     <div class="leg" id="netleg"></div>
   </section>
+</main>
+</div>
 
   <!-- structural metrics stay hidden until they are wired to echo-chamber data (phase 4) -->
   <section class="panel" style="margin-top:12px" hidden>
@@ -401,6 +428,7 @@ const state = {
   // charts. Independent of netState.seed (network snapshot), which needs its
   // own heavier GEXF-backed fetch. Run ids are data/-relative paths.
   opseed: store("opseed", null),
+  opview: store("opview", "traj"),   // opinion tab display: "traj" (default, R5) | "heat" (legacy)
   charts: {},   // metric -> chart meta for hover
   plane: null,
   pinned: new Set(),   // seed ids pinned (highlighted) via chip dot click
@@ -476,6 +504,10 @@ async function refresh(){
     state.lastUpdate = new Date();
     renderAll();
     if(state.tab==="network") maybeRefetchNetwork();
+    // trajectories are the heavier of the two opinion-tab payloads (per-agent,
+    // not per-bin), so — unlike the heatmap fetch above — they're only polled
+    // while the opinion tab is actually visible (R5 / constraints section).
+    if(state.tab==="opinion") maybeRefetchTrajectories();
   }catch(e){
     showBanner("err","server unreachable — is scripts/dashboard/dashboard.py --serve still running? ("+e.message+")");
   }finally{ state.busy=false; }
@@ -561,8 +593,8 @@ function metricLabel(m){ const l=state.summary && state.summary.labels; return (
 function renderAll(){
   state.cursorRange = computeCursorRange();
   renderHeader(); renderSeedbar(); renderPicker(); renderCursorRow();
-  if(state.tab==="timeseries"){ renderGrid(); renderPlane(); }
-  else if(state.tab==="opinion"){ renderOpinion(); }
+  if(state.tab==="timeseries"){ renderGrid(); }
+  else if(state.tab==="opinion"){ renderOpinion(); renderPlane(); }
   else if(state.tab==="network"){ syncNetworkToCursor(); }
   // network-structure + behavior panels stay hidden (no echo-chamber data yet)
   $("#resetzoom").hidden = !state.zoom;
@@ -605,7 +637,8 @@ function renderCursorRow(){
    (data hasn't changed — only the cursor position has). */
 function onCursorChange(){
   renderCursorRow();
-  if(state.tab==="timeseries"){ renderGrid(); renderPlane(); }
+  if(state.tab==="timeseries"){ renderGrid(); }
+  else if(state.tab==="opinion"){ renderOpinion(); renderPlane(); }
   else if(state.tab==="network"){ syncNetworkToCursor(); }
 }
 $("#cursorScrub").addEventListener("input",e=>{ stopCursorPlay(); state.cursor=+e.target.value; onCursorChange(); });
@@ -655,8 +688,8 @@ function applyTab(){
   onTabActivated(state.tab);
 }
 function onTabActivated(tab){
-  if(tab==="timeseries"){ renderGrid(); renderPlane(); }
-  else if(tab==="opinion"){ renderOpinion(); }
+  if(tab==="timeseries"){ renderGrid(); }
+  else if(tab==="opinion"){ maybeRefetchTrajectories(); renderOpinion(); renderPlane(); }
   else if(tab==="network"){
     if(!netState.data){ fetchNetwork(); return; }
     // the cursor may have moved while this tab was hidden (line/plane tabs
@@ -844,10 +877,9 @@ function watchCardSize(el, id, onResize){
     interacting=true;
     clearTimeout(t);
     t=setTimeout(()=>{
-      // el._skipSizeSave(): checked at save-time (not via a timer) so a resize
-      // that isn't a deliberate compact-mode drag — e.g. the network-snapshot
-      // card while in expanded mode, which always forces full width/tall
-      // canvas via CSS — never clobbers the saved compact size.
+      // el._skipSizeSave(): checked at save-time (not via a timer), so a
+      // resize triggered by CSS/flex fit (not a deliberate manual drag) —
+      // e.g. plane/opinion/netsnapshot, all viewport-fit — is never persisted.
       if(!el._skipSizeSave || !el._skipSizeSave())
         save("size."+id, {w:Math.round(el.offsetWidth), h:Math.round(el.offsetHeight)});
       if(onResize) onResize();
@@ -907,8 +939,11 @@ function makeCard(container, id, groupKey, onReorder){
   attachDrag(container, card, handle, groupKey, onReorder);
   return {card, body};
 }
-/** Same wiring for a card whose HTML already exists (static panels). */
-function initStaticCard(el, id, groupKey, container, onReorder){
+/** Same wiring for a card whose HTML already exists (static panels).
+ * `fitViewport` skips the persisted manual-resize width/height (CSS flex
+ * drives the card's size instead) — used for the opinion/plane pair, which
+ * must stay viewport-fit inside the opinion tab's left/right split (Phase 3). */
+function initStaticCard(el, id, groupKey, container, onReorder, fitViewport){
   if(el.dataset.cardInit) return;
   el.dataset.cardInit="1";
   el.classList.add("card");
@@ -920,22 +955,27 @@ function initStaticCard(el, id, groupKey, container, onReorder){
     handle.title="drag to reorder · drag corner to resize";
     el.insertBefore(handle, el.firstChild);
   }
-  applyCardSize(el, id);
-  watchCardSize(el, id, id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); }) : null);
+  if(!fitViewport) applyCardSize(el, id);
+  // the network snapshot and (canvas-backed) opinion-trajectory cards both need
+  // an explicit repaint on resize — canvas has no CSS-viewBox auto-scaling like
+  // the SVG-based cards do, so its backing buffer would otherwise stay stale.
+  const onResize = id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); })
+    : id==="opinion" ? (()=>renderOpinion()) : null;
+  watchCardSize(el, id, onResize);
   if(groupKey) attachDrag(container, el, handle, groupKey, onReorder);
 }
-/* plane (time-series tab) and opinion (opinion tab) are now solo cards in
-   separate tabpanels (R3 split them out of the old shared row), so neither
-   has a reorder-drag group anymore — just resize persistence. */
+/* plane and opinion are both solo cards (no reorder-drag group) inside the
+   opinion tabpanel's left/right split (Phase 3); resize:none in CSS plus
+   fitViewport here keeps a stale localStorage size from overriding the flex fit. */
 function initStaticCards(){
   const planeEl=document.querySelector('[data-card="plane"]');
-  if(planeEl) initStaticCard(planeEl, "plane", null, null, null);
+  if(planeEl){ planeEl._skipSizeSave=()=>true; initStaticCard(planeEl, "plane", null, null, null, true); }
   const opinionEl=document.querySelector('[data-card="opinion"]');
-  if(opinionEl) initStaticCard(opinionEl, "opinion", null, null, null);
+  if(opinionEl){ opinionEl._skipSizeSave=()=>true; initStaticCard(opinionEl, "opinion", null, null, null, true); }
   const netSection=$("#netsnapshotSection");
   if(netSection){
-    netSection._skipSizeSave=()=>netExpanded;
-    initStaticCard(netSection, "netsnapshot", null, null, null);
+    netSection._skipSizeSave=()=>true;
+    initStaticCard(netSection, "netsnapshot", null, null, null, true);
   }
 }
 
@@ -966,6 +1006,12 @@ function renderGrid(){
   const order=[...featured, ...state.metrics.filter(m=>!featured.includes(m))];
   const keep=new Set(order);
   for(const el of [...wrap.children]) if(!keep.has(el.dataset.card)) el.remove();
+  // column count from selection size only (R2 threshold table) — featured
+  // cards span 2x2 within that grid rather than changing the column count.
+  const n=order.length;
+  const cols=n<=2 ? Math.max(n,1) : n<=6 ? 3 : n<=8 ? 4 : Math.ceil(n/3);
+  wrap.style.gridTemplateColumns=`repeat(${cols}, 1fr)`;
+  wrap.style.gridAutoRows="1fr";
   const draw=(body,metric)=>{ if(families[metric]) drawFamilyChart(body,metric,families[metric]);
                               else drawLineChart(body,metric); };
   for(const metric of order){
@@ -982,6 +1028,8 @@ function renderGrid(){
       card.appendChild(body);
     }
     card.classList.toggle("featured", isFeatured);
+    card.style.gridColumn = (isFeatured && cols>=2) ? "span 2" : "";
+    card.style.gridRow = (isFeatured && cols>=2) ? "span 2" : "";
     const btn=card.querySelector(".enlargebtn");
     btn.textContent=isFeatured?"⤡":"⤢";
     btn.title=isFeatured?"shrink back to normal size":"enlarge this card";
@@ -1295,12 +1343,33 @@ function seriesMap(metric){
   return m;
 }
 
+/* ---------- opinion tab dispatcher (R5) ----------
+   Default view is per-agent trajectories (renderOpinionTraj, canvas); the
+   density heatmap (renderOpinionHeat, SVG) stays as a fallback toggle. Both
+   render into the same #opinion/#opleg pair, so switching modes just
+   replaces that pair's contents wholesale — no teardown bookkeeping needed. */
+function renderOpinion(){
+  const note=$("#opsubnote");
+  if(state.opview==="heat"){
+    note.textContent="density heatmap: per-step share of agents across opinion bins "
+      +"(−1 bottom ↔ +1 top), color = share (done runs: opinions.csv.xz; "
+      +"running runs: rebuilt from GEXF snapshots at snapshot cadence).";
+    renderOpinionHeat();
+  } else {
+    note.textContent="per-agent opinion trajectories (x = step, y = opinion), one faint line per "
+      +"agent — density shows through overlap. Line color = that agent's final opinion, on the "
+      +"same scale as the network view's color gradient (done runs: opinions.csv.xz; running runs: "
+      +"rebuilt from GEXF snapshots at snapshot cadence).";
+    renderOpinionTraj();
+  }
+}
+
 /* ---------- opinion distribution (density heatmap) ----------
    x = step, y = opinion bin (-1 bottom .. +1 top), cell color = per-step share
    of agents in that bin (viridis). Preserves bimodality (two bright bands) that a
    quantile/mean view would hide. Bin count is read from the CSV header
    (Const.NUM_OF_BINS_OF_OPINION_FOR_WRITER), not fixed here. */
-function renderOpinion(){
+function renderOpinionHeat(){
   const host=$("#opinion"), leg=$("#opleg");
   const o=state.opinion;
   if(!o||!o.step||!o.step.length||!o.bins.length||o.bins.some(b=>!b.length)){
@@ -1369,6 +1438,133 @@ function renderOpinion(){
     const xh=svg.querySelector(".xh"); if(xh) xh.setAttribute("visibility","hidden"); });
 }
 
+/* ---------- opinion trajectories (R5, default opinion-tab view) ----------
+   One faint canvas polyline per agent (x=step, y=opinion in [-1,1]); a
+   thousand overlapping low-alpha lines read as a density field without an
+   SVG DOM per point. Line color is fixed to that agent's *final* observed
+   opinion (not time-varying) so a single line stays visually trackable end
+   to end — it uses the same editable gradient as the network view's "color
+   by opinion" (getGradStops()/opColor-style mapping), so editing the
+   gradient there also restyles this view (on its next redraw). Only fetched
+   while the opinion tab is active (see maybeRefetchTrajectories()); the
+   fetch itself is decimated server-side (core.api_trajectories). */
+const trajState = { run:null, data:null, loading:false, hover:-1 };
+const TRAJ_MAX_STEPS=300;
+
+async function fetchTrajectories(){
+  if(trajState.loading) return;
+  const rid=state.opseed; if(rid==null) return;
+  trajState.loading=true;
+  try{
+    const d=await jget(`/api/trajectories?run=${encodeURIComponent(rid)}&max_steps=${TRAJ_MAX_STEPS}`);
+    trajState.data=d; trajState.run=rid; trajState.hover=-1;
+  }catch(e){ /* leave any stale data showing; refresh()'s banner already reports server errors */ }
+  finally{ trajState.loading=false; }
+  if(state.tab==="opinion" && state.opview==="traj") renderOpinion();
+}
+/* mirrors maybeRefetchNetwork(): fetch once per run selection, then keep
+   refetching a running run (new GEXF snapshots may have appeared) but leave
+   a done run's (immutable) data alone once loaded. */
+function maybeRefetchTrajectories(){
+  if(state.opview!=="traj") return;
+  if(trajState.loading) return;
+  const rid=state.opseed; if(rid==null) return;
+  if(!trajState.data || trajState.run!==rid){ fetchTrajectories(); return; }
+  const s=seedList().find(v=>v.run===rid);
+  if(s && s.status!=="done") fetchTrajectories();
+}
+
+function renderOpinionTraj(){
+  const host=$("#opinion"), leg=$("#opleg");
+  const d=trajState.data;
+  if(!d || !d.step || !d.step.length || !d.agents || !d.agents.length){
+    host.innerHTML=`<div class="subnote" style="padding:24px;text-align:center">`
+      +(trajState.loading?"loading…":"no data")+`</div>`;
+    leg.innerHTML=""; return;
+  }
+  let cv=host.querySelector("canvas");
+  if(!cv){ host.innerHTML=""; cv=document.createElement("canvas"); cv.style.cssText="width:100%;height:100%;display:block;cursor:crosshair"; host.appendChild(cv); }
+  const W=host.clientWidth||480, H=host.clientHeight||320, dpr=devicePixelRatio||1;
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const steps=d.step, n=d.agents.length;
+  const L=42,R=10,T=10,B=24;
+  const x0=steps[0], x1=steps[steps.length-1]||1;
+  const xs=v=>L+(v-x0)/((x1-x0)||1)*(W-L-R);
+  const ys=op=>(H-B)-((op+1)/2)*(H-T-B);
+  const stops=getGradStops();
+  const finalColor=vals=>{ for(let i=vals.length-1;i>=0;i--) if(vals[i]!=null) return gradColor((vals[i]+1)/2,stops);
+    return gradColor(0.5,stops); };
+  // low opacity, auto-scaled down as agent count grows (R5: ~5-15%)
+  const alpha=Math.max(0.05,Math.min(0.15, 60/n));
+  ctx.lineWidth=1;
+  for(let a=0;a<n;a++){
+    const vals=d.agents[a];
+    ctx.strokeStyle=finalColor(vals); ctx.globalAlpha=alpha;
+    ctx.beginPath(); let started=false;
+    for(let i=0;i<vals.length;i++){ const v=vals[i];
+      if(v==null){ started=false; continue; }
+      const px=xs(steps[i]), py=ys(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  ctx.strokeStyle=cssVar("--axis");
+  ctx.beginPath(); ctx.moveTo(L,H-B); ctx.lineTo(W-R,H-B); ctx.stroke();
+  ctx.fillStyle=cssVar("--ink2"); ctx.font="11px system-ui,sans-serif";
+  ctx.textAlign="center";
+  for(const t of ticks(x0,x1,6)) ctx.fillText(fstep(t), xs(t), H-7);
+  ctx.textAlign="right";
+  for(const op of [-1,-0.5,0,0.5,1]) ctx.fillText(op>0?"+"+op:""+op, L-6, ys(op)+4);
+
+  // global time cursor (R4)
+  if(state.cursor!=null){
+    const cx=xs(Math.max(x0,Math.min(x1,state.cursor)));
+    ctx.save(); ctx.strokeStyle=cssVar("--ink"); ctx.setLineDash([3,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(cx,T); ctx.lineTo(cx,H-B); ctx.stroke(); ctx.restore();
+  }
+
+  // hover-highlighted agent redrawn on top at full opacity/weight
+  if(trajState.hover>=0 && trajState.hover<n){
+    const vals=d.agents[trajState.hover];
+    ctx.strokeStyle=finalColor(vals); ctx.lineWidth=2; ctx.globalAlpha=1;
+    ctx.beginPath(); let started=false;
+    for(let i=0;i<vals.length;i++){ const v=vals[i];
+      if(v==null){ started=false; continue; }
+      const px=xs(steps[i]), py=ys(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  const grad=[0,.25,.5,.75,1].map(t=>gradColor(t,stops)).join(",");
+  leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">final opinion &minus;1`
+    +`<i style="display:inline-block;width:110px;height:10px;border-radius:2px;background:linear-gradient(90deg,${grad})"></i>+1</span>`
+    +(d.total>d.shown?` <span class="subnote">showing ${d.shown} of ${d.total} agents (subsampled)</span>`:``)
+    +(d.live?` <span class="subnote">live — GEXF snapshot cadence</span>`:``);
+
+  cv.onmousemove=evt=>{
+    const r=cv.getBoundingClientRect();
+    const mx=evt.clientX-r.left, my=evt.clientY-r.top;
+    if(mx<L||mx>W-R||my<T||my>H-B){ if(trajState.hover!==-1){ trajState.hover=-1; renderOpinionTraj(); } hideTip(); return; }
+    const step=x0+(mx-L)/(W-L-R)*(x1-x0);
+    const i=nearestIdx(steps,step);
+    let best=-1, bestD=12;
+    for(let a=0;a<n;a++){ const v=d.agents[a][i]; if(v==null) continue;
+      const dd=Math.abs(ys(v)-my); if(dd<bestD){ bestD=dd; best=a; } }
+    if(best!==trajState.hover){ trajState.hover=best; renderOpinionTraj(); return; } // redraw supersedes this tooltip pass
+    if(best>=0){
+      showTip(evt,`<div class="thead">agent ${d.ids[best]} @ step ${fstep(steps[i])}</div>`
+        +`<div class="trow"><span>opinion</span><span>${fmt(d.agents[best][i])}</span></div>`);
+    } else hideTip();
+  };
+  cv.onmouseleave=()=>{ hideTip(); if(trajState.hover!==-1){ trajState.hover=-1; renderOpinionTraj(); } };
+}
+
 /* ---------- network snapshot: live force layout on canvas ----------
    After github.com/soramame0518/Social-Media-Echo-Chamber (D3 force demo):
    many-body repulsion + link springs + centering, RdBu-style diverging node
@@ -1379,31 +1575,6 @@ const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
   layout:store("netlayout","force"),
   data:null, loading:false, sim:null, hover:-1 };
-
-/* compact (default, ~2/3 width, canvas ~350px) vs expanded (full width, canvas
-   ~550px) display mode for the network snapshot card. Controls and the
-   description stay visible in both modes — only the card's footprint changes.
-   Always starts compact (not persisted across reloads — user preference).
-   The card's own resize-drag size (localStorage "size.netsnapshot") is only
-   ever saved while compact — see el._skipSizeSave in watchCardSize() — so
-   toggling to expanded (or resizing while expanded) can't clobber it. */
-let netExpanded = false;
-function applyNetExpand(){
-  const el=$("#netsnapshotSection"); if(!el) return;
-  el.classList.toggle("expanded", netExpanded);
-  const btn=$("#netExpand");
-  if(btn){ btn.textContent=netExpanded?"⤡":"⤢";
-    btn.title=netExpanded?"collapse snapshot":"expand snapshot"; }
-  // let the CSS default (compact) / .expanded (full-width) rule take over;
-  // a saved manual-resize width, if any, is restored by setNetExpanded() below.
-  if(netExpanded){ el.style.width=""; el.style.height=""; }
-}
-function setNetExpanded(on){
-  netExpanded=on;
-  const el=$("#netsnapshotSection"); if(!el) return;
-  applyNetExpand();
-  if(!on) applyCardSize(el, "netsnapshot");
-}
 
 /* ---- configurable node encoding ----
    every value below is available per-node in the /api/network payload. "size"
@@ -1958,6 +2129,7 @@ function drawNet(){
   const ctx=cv.getContext("2d");
   ctx.clearRect(0,0,s.W,s.H);
   const cross=$("#netcross").checked;
+  const hull=$("#nethull").checked;
   const {x,y}=s;
   /* fit the current layout bbox into ~90% of the canvas (centered), so nodes
      never collect on the walls whatever the simulation's absolute spread is.
@@ -1968,7 +2140,8 @@ function drawNet(){
   const k=base.k*s.uz, ox=base.ox*s.uz+s.upx, oy=base.oy*s.uz+s.upy;
   s.view={k,ox,oy};
   const PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
-  ctx.lineWidth=0.5; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=0.4;
+  if(hull) drawCommunityHulls(ctx, s, d, PX, PY);
+  ctx.lineWidth=0.5; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=cross?0.15:0.4;
   ctx.beginPath();
   for(const [u,v] of d.edges){
     if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
@@ -1985,10 +2158,12 @@ function drawNet(){
   }
   ctx.globalAlpha=1;
   const ink=cssVar("--ink"), surf=cssVar("--surface");
+  ctx.lineWidth=0.4; ctx.strokeStyle="#000";
   for(let i=0;i<s.n;i++){
     const nd=d.nodes[i];
     ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i],0,6.2832);
     ctx.fillStyle=(s.col&&s.col[i])||opColor(nd.op); ctx.fill();
+    ctx.stroke();
   }
   if(netState.hover>=0){
     const i=netState.hover;
@@ -1997,6 +2172,51 @@ function drawNet(){
     ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]+4.5,0,6.2832);
     ctx.lineWidth=1.5; ctx.strokeStyle=surf; ctx.stroke();
   }
+}
+/* Experimental (R6): convex hull per opinion-sign group, drawn as a background
+   layer. No real community detection is wired into the network payload yet
+   (only per-node opinion), so this uses opinion sign (+/-) as the grouping
+   proxy — same split cross-cutting-edge highlighting already uses. Isolated
+   here behind the single #nethull toggle so it can be deleted cleanly if it
+   doesn't earn its keep. */
+function convexHull(pts){
+  if(pts.length<3) return pts.slice();
+  const s=pts.slice().sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
+  const cross=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);
+  const lower=[];
+  for(const p of s){ while(lower.length>=2 && cross(lower[lower.length-2],lower[lower.length-1],p)<=0) lower.pop(); lower.push(p); }
+  const upper=[];
+  for(let i=s.length-1;i>=0;i--){ const p=s[i]; while(upper.length>=2 && cross(upper[upper.length-2],upper[upper.length-1],p)<=0) upper.pop(); upper.push(p); }
+  lower.pop(); upper.pop();
+  return lower.concat(upper);
+}
+function drawCommunityHulls(ctx, s, d, PX, PY){
+  const groups={pos:[], neg:[]};
+  for(let i=0;i<s.n;i++){
+    const op=d.nodes[i].op;
+    if(op>0) groups.pos.push([PX(i),PY(i)]);
+    else if(op<0) groups.neg.push([PX(i),PY(i)]);
+  }
+  const pad=s.r ? (Math.max(...s.r,4)+6) : 10;
+  const colors={pos:opColor(1), neg:opColor(-1)};
+  ctx.save();
+  for(const key of ["pos","neg"]){
+    const pts=groups[key];
+    if(pts.length<3) continue;
+    const hull=convexHull(pts);
+    if(hull.length<3) continue;
+    const cx=hull.reduce((a,p)=>a+p[0],0)/hull.length, cy=hull.reduce((a,p)=>a+p[1],0)/hull.length;
+    ctx.beginPath();
+    hull.forEach(([px,py],i)=>{
+      const dx=px-cx, dy=py-cy, len=Math.hypot(dx,dy)||1;
+      const ex=px+dx/len*pad, ey=py+dy/len*pad;
+      if(i===0) ctx.moveTo(ex,ey); else ctx.lineTo(ex,ey);
+    });
+    ctx.closePath();
+    ctx.fillStyle=colors[key]; ctx.globalAlpha=0.08; ctx.fill();
+    ctx.strokeStyle=colors[key]; ctx.globalAlpha=0.35; ctx.lineWidth=1; ctx.stroke();
+  }
+  ctx.restore();
 }
 /* map layout bbox -> ~90% of canvas, centered; k capped so a degenerate
    (near-collapsed) layout can't blow up. Shared by draw + hover hit-testing. */
@@ -2373,10 +2593,11 @@ $("#netlayout").addEventListener("change",e=>{ netState.layout=e.target.value; s
 $("#netcross").checked=store("netcross",false);
 $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").checked); renderNetControls();
   if(netState.sim&&!netState.sim.raf) drawNet(); });
+$("#nethull").checked=store("nethull",false);
+$("#nethull").addEventListener("change",()=>{ save("nethull",$("#nethull").checked);
+  if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });
-$("#netExpand").addEventListener("click",()=>{ setNetExpanded(!netExpanded); });
-window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&netExpanded) setNetExpanded(false); });
 
 /* ---- in-page color picker: wiring (see openColorPicker/renderColorPicker) ---- */
 $("#cpHandle").addEventListener("mousedown",ev=>{
@@ -2536,6 +2757,12 @@ $("#smooth").checked=store("smooth",false);
 $("#smooth").addEventListener("change",()=>{ save("smooth",$("#smooth").checked); renderAll(); });
 $("#showmean").checked=store("showmean",true);
 $("#showmean").addEventListener("change",()=>{ save("showmean",$("#showmean").checked); renderAll(); });
+$("#opview").value=state.opview;
+$("#opview").addEventListener("change",()=>{
+  state.opview=$("#opview").value; save("opview",state.opview);
+  if(state.opview==="traj") maybeRefetchTrajectories();
+  renderOpinion();
+});
 $("#resetzoom").addEventListener("click",()=>{ state.zoom=null; renderAll(); });
 $("#theme").addEventListener("click",()=>{
   const cur=theme(), next=cur==="dark"?"light":"dark";
@@ -2547,28 +2774,30 @@ const savedTheme=store("theme",null);
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
 
-/* ---------- sidebar collapse/expand ---------- */
+/* ---------- sidebar collapse/expand (time series + network, same behavior) ---------- */
 const SIDEBAR_NARROW_BP = 900;
-function applySidebarCollapsed(collapsed){
-  $("#sidebar").classList.toggle("collapsed", collapsed);
-  const btn=$("#sidebarToggle");
+function applySidebarCollapsed(sidebarSel, toggleSel, collapsed){
+  $(sidebarSel).classList.toggle("collapsed", collapsed);
+  const btn=$(toggleSel);
   btn.textContent = collapsed ? "»" : "«";
   btn.title = collapsed ? "open sidebar" : "collapse sidebar";
   btn.setAttribute("aria-label", btn.title);
 }
-function setSidebarCollapsed(collapsed){
-  applySidebarCollapsed(collapsed);
-  save("sidebar", collapsed);
+function setSidebarCollapsed(sidebarSel, toggleSel, storeKey, collapsed){
+  applySidebarCollapsed(sidebarSel, toggleSel, collapsed);
+  save(storeKey, collapsed);
   renderAll(); // charts need to redraw for the new main-column width
 }
-$("#sidebarToggle").addEventListener("click",()=>{
-  setSidebarCollapsed(!$("#sidebar").classList.contains("collapsed"));
-});
-{
-  const savedSidebar=store("sidebar",null);
-  const collapsed = savedSidebar===null ? innerWidth<SIDEBAR_NARROW_BP : savedSidebar;
-  applySidebarCollapsed(collapsed);
+function initSidebarCollapse(sidebarSel, toggleSel, storeKey){
+  $(toggleSel).addEventListener("click", ()=>{
+    setSidebarCollapsed(sidebarSel, toggleSel, storeKey, !$(sidebarSel).classList.contains("collapsed"));
+  });
+  const saved=store(storeKey,null);
+  const collapsed = saved===null ? innerWidth<SIDEBAR_NARROW_BP : saved;
+  applySidebarCollapsed(sidebarSel, toggleSel, collapsed);
 }
+initSidebarCollapse("#sidebar","#sidebarToggle","sidebar");
+initSidebarCollapse("#netsidebar","#netsidebarToggle","netsidebar");
 
 /* ---------- main loop ---------- */
 let timer=null;
@@ -2576,19 +2805,11 @@ function schedule(){
   if(timer) clearInterval(timer);
   timer=setInterval(()=>{ if(!state.paused){ refresh(); loadLog(); } }, (+$("#interval").value)*1000);
 }
-// one-time cleanup ("v2" — an earlier build of this feature could still leak a
-// near-full-width "size.netsnapshot" while in expanded mode, via a timing race
-// in the old suppress-during-toggle logic; that's now fixed by making
-// watchCardSize() check the current mode at save-time instead of a timer, but
-// any value already leaked into localStorage by the old code needs a fresh
-// clear). Later deliberate compact-mode resizes are saved and respected
-// normally after this.
-if(!store("netSizeMigratedV2", false)){
-  localStorage.removeItem("dash.size.netsnapshot");
-  save("netSizeMigratedV2", true);
-}
+// the network-snapshot card is always viewport-fit now (Phase 4 removed the
+// expand/compact toggle), so any stale manual-resize size from an older build
+// must not be restored.
+localStorage.removeItem("dash.size.netsnapshot");
 initStaticCards();
-setNetExpanded(false); // always start compact
 setTab(state.tab); // restore the last-active tab (R3); renderGrid() no-ops until refresh() below populates state.summary
 refresh(); schedule();
 </script>
