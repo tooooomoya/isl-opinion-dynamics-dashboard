@@ -44,6 +44,21 @@ DEFAULT_METRICS = ["modularity", "opinion_var", "opinion_mean",
 # not decodable); plain-CSV sources are tailed live.
 XZ_SOURCES = {"opinions", "diversity_bias", "screen_diversity", "effective_mu"}
 
+# Dynamic metric discovery: filenames already served by METRICS, and known
+# non-metric files, are excluded from the generic CSV/xz scan below.
+CLAIMED_FILES = {
+    "modularity.csv", "active_users.csv", "triangle_closures.csv",
+    "opinions.csv.xz", "diversity_bias.csv.xz", "screen_diversity.csv.xz",
+    "effective_mu.csv.xz",
+}
+EXCLUDED_FILES = {
+    "opinion_convergence_summary.csv", "user_hypotheses.csv",
+    "edge_events.csv.xz", "messages.csv.xz", "screen_log.csv.xz",
+    "confidences_sample.csv.xz",
+}
+X_AXIS_COLUMNS = ("step", "time", "t")
+DISCOVERY_MAX_COLS = 20      # wider rows are treated as per-agent matrices, not metrics
+
 DEFAULT_ROOTS = ["data", "data_hdd1"]
 RESCAN_EVERY = 15.0          # seconds between run-discovery scans
 STALL_AFTER = 60.0           # no file update for this long => "stalled"
@@ -142,6 +157,16 @@ def read_xz_csv(path):
         return header, rows
 
 
+def probe_xz_header(path):
+    """Read only the header line of an xz CSV, closing the stream immediately after."""
+    with lzma.open(path, "rt", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                return [c.strip('"') for c in line.split(",")]
+    return None
+
+
 def opinion_histogram(ops):
     counts = [0] * OPINION_BINS
     for op in ops:
@@ -164,6 +189,18 @@ class RunStore:
         self.tri = CsvTail(self.dir / "data" / "triangle_closures.csv")
         self._xz_cache = {}     # source -> (stat_key, parsed)
         self._traj_cache = None  # (stat_key, parsed) for the full per-agent opinion matrix
+        # Dynamically discovered metrics: filename -> {tail, x_col, value_cols}.
+        # value_cols is None until the header has been read and the file has
+        # passed the exclusion rules; kind distinguishes plain/xz for a later phase.
+        self._discovered = {}
+        self._discovered_excluded = set()   # filenames rejected permanently
+        self._discovery_scan_at = 0.0
+        # Discovered xz metrics (completed runs only): filename -> probed
+        # header metadata. Full parse is deferred until a series is requested.
+        self._discovered_xz = {}
+        self._discovered_xz_excluded = set()
+        self._discovery_xz_scan_at = 0.0
+        self._xz_discovery_cache = {}   # filename -> (stat_key, (header, columns))
 
     # -- metadata / status ---------------------------------------------------
 
@@ -182,6 +219,176 @@ class RunStore:
         self.main.poll()
         self.active.poll()
         self.tri.poll()
+        self._poll_discovered()
+        self._scan_discovered_xz_files()
+
+    # -- dynamic metric discovery (plain CSV) --------------------------------
+
+    def _scan_discovered_files(self):
+        now = time.time()
+        if now - self._discovery_scan_at < RESCAN_EVERY:
+            return
+        self._discovery_scan_at = now
+        for d in (self.dir, self.dir / "data"):
+            try:
+                candidates = list(d.glob("*.csv"))
+            except OSError:
+                continue
+            for p in candidates:
+                name = p.name
+                if name in CLAIMED_FILES or name in EXCLUDED_FILES:
+                    continue
+                if name in self._discovered_excluded or name in self._discovered:
+                    continue
+                self._discovered[name] = {"tail": CsvTail(p), "x_col": None, "value_cols": None}
+
+    def _poll_discovered(self):
+        self._scan_discovered_files()
+        for name, entry in list(self._discovered.items()):
+            tail = entry["tail"]
+            tail.poll()
+            if tail.header is None and entry["value_cols"] is not None:
+                # file disappeared after being established; drop it so a
+                # fresh scan can pick it back up if it reappears.
+                del self._discovered[name]
+                continue
+            if entry["value_cols"] is None:
+                if tail.header is None:
+                    continue
+                stripped = [h.strip('"') for h in tail.header]
+                x_idx = None
+                for cand in X_AXIS_COLUMNS:
+                    if cand in stripped:
+                        x_idx = stripped.index(cand)
+                        break
+                if x_idx is None or len(tail.header) > DISCOVERY_MAX_COLS:
+                    self._discovered_excluded.add(name)
+                    del self._discovered[name]
+                    continue
+                entry["x_col"] = tail.header[x_idx]
+                entry["value_cols"] = [(tail.header[i], stripped[i])
+                                        for i in range(len(tail.header)) if i != x_idx]
+            xs = tail.column(entry["x_col"])
+            if xs and len(xs) > 1 and any(xs[i] <= xs[i - 1] for i in range(1, len(xs))):
+                self._discovered_excluded.add(name)
+                del self._discovered[name]
+
+    def discovered_metrics(self):
+        """id -> descriptor for every discovered value column (plain CSV or xz)."""
+        result = {}
+        for name, entry in self._discovered.items():
+            if entry["value_cols"] is None:
+                continue
+            stem = name[:-4] if name.endswith(".csv") else name
+            for orig, stripped in entry["value_cols"]:
+                result[f"{stem}.{stripped}"] = {
+                    "kind": "plain", "tail": entry["tail"],
+                    "x_col": entry["x_col"], "value_col": orig,
+                }
+        for name, entry in self._discovered_xz.items():
+            stem = name[:-len(".csv.xz")] if name.endswith(".csv.xz") else name
+            for col in entry["value_cols"]:
+                result[f"{stem}.{col}"] = {
+                    "kind": "xz", "file": name,
+                    "x_col": entry["x_col"], "value_col": col,
+                }
+        return result
+
+    # -- dynamic metric discovery (xz, completed runs only) ------------------
+
+    def _scan_discovered_xz_files(self):
+        if not self.is_done():
+            return
+        now = time.time()
+        if now - self._discovery_xz_scan_at < RESCAN_EVERY:
+            return
+        self._discovery_xz_scan_at = now
+        try:
+            candidates = list((self.dir / "data").glob("*.csv.xz"))
+        except OSError:
+            candidates = []
+        for p in candidates:
+            name = p.name
+            if name in CLAIMED_FILES or name in EXCLUDED_FILES:
+                continue
+            if name in self._discovered_xz_excluded or name in self._discovered_xz:
+                continue
+            try:
+                header = probe_xz_header(p)
+            except (lzma.LZMAError, OSError, EOFError):
+                self._discovered_xz_excluded.add(name)
+                continue
+            if header is None:
+                self._discovered_xz_excluded.add(name)
+                continue
+            x_idx = None
+            for cand in X_AXIS_COLUMNS:
+                if cand in header:
+                    x_idx = header.index(cand)
+                    break
+            if x_idx is None or len(header) > DISCOVERY_MAX_COLS:
+                self._discovered_xz_excluded.add(name)
+                continue
+            self._discovered_xz[name] = {
+                "path": p, "x_col": header[x_idx],
+                "value_cols": [h for i, h in enumerate(header) if i != x_idx],
+            }
+
+    def _xz_discovered_series(self, name, x_col, value_col):
+        """Lazily parse+cache a discovered xz file; returns (steps, values) or (None, None)."""
+        entry = self._discovered_xz.get(name)
+        if entry is None:
+            return None, None
+        path = entry["path"]
+        try:
+            st = path.stat()
+        except OSError:
+            return None, None
+        key = (st.st_size, st.st_mtime)
+        cached = self._xz_discovery_cache.get(name)
+        if cached is not None and cached[0] == key:
+            header, cols = cached[1]
+        else:
+            try:
+                header, rows = read_xz_csv(path)
+            except (lzma.LZMAError, OSError, EOFError):
+                self._discovered_xz_excluded.add(name)
+                del self._discovered_xz[name]
+                return None, None
+            if x_col not in header:
+                self._discovered_xz_excluded.add(name)
+                del self._discovered_xz[name]
+                return None, None
+            x_idx = header.index(x_col)
+            try:
+                xs = [float(r[x_idx]) for r in rows]
+            except (ValueError, IndexError):
+                self._discovered_xz_excluded.add(name)
+                del self._discovered_xz[name]
+                return None, None
+            if len(xs) > 1 and any(xs[i] <= xs[i - 1] for i in range(1, len(xs))):
+                # rule 5: x axis not strictly increasing (event-log style file)
+                self._discovered_xz_excluded.add(name)
+                del self._discovered_xz[name]
+                return None, None
+            cols = {"__x__": xs}
+            for i, h in enumerate(header):
+                if i == x_idx:
+                    continue
+                vals = []
+                for r in rows:
+                    try:
+                        vals.append(float(r[i]))
+                    except (ValueError, IndexError):
+                        vals.append(float("nan"))
+                cols[h] = vals
+            n = len(xs)
+            if n > 4000:
+                stride = math.ceil(n / 4000)
+                for k in cols:
+                    cols[k] = cols[k][::stride]
+            self._xz_discovery_cache[name] = (key, (header, cols))
+        return cols.get("__x__"), cols.get(value_col)
 
     def is_done(self):
         # written once by the Java side when a run finishes (early stop included)
@@ -471,7 +678,18 @@ class RunStore:
         """(steps, values) for one catalogue metric; both [] when unavailable."""
         spec = METRICS.get(name)
         if spec is None:
-            return [], []
+            entry = self.discovered_metrics().get(name)
+            if entry is None:
+                return [], []
+            if entry["kind"] == "plain":
+                steps = entry["tail"].column(entry["x_col"])
+                values = entry["tail"].column(entry["value_col"])
+            else:
+                steps, values = self._xz_discovered_series(
+                    entry["file"], entry["x_col"], entry["value_col"])
+            if not steps or not values:
+                return [], []
+            return [int(s) for s in steps], values
         source = spec["source"]
         steps, values = [], []
         if source == "modularity":
@@ -577,6 +795,13 @@ def api_summary():
                 cols.add(name)
 
         labels = {k: v["label"] for k, v in METRICS.items()}
+
+        for st in STORES.values():
+            for mid in st.discovered_metrics():
+                cols.add(mid)
+                stem, _, col = mid.partition(".")
+                labels.setdefault(mid, f"{stem}: {col}")
+
         return {"runs": runs, "columns": sorted(cols), "labels": labels,
                 "families": families, "defaultMetrics": DEFAULT_METRICS}
 

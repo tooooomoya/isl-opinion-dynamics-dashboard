@@ -845,11 +845,13 @@ function renderPicker(){
     {key:"selected", title:"Selected", items:[]},
     {key:"metrics", title:"Metrics", items:[]},
     {key:"families", title:"Class families", items:[]},
+    {key:"discovered", title:"Discovered", items:[]},
   ];
   const byKey=Object.fromEntries(groups.map(g=>[g.key,g]));
   for(const it of items){
     if(state.metrics.includes(it.id)) byKey.selected.items.push(it);
     else if(families[it.id]) byKey.families.items.push(it);
+    else if(it.id.includes(".")) byKey.discovered.items.push(it);
     else byKey.metrics.items.push(it);
   }
   const search=$("#pickerSearch");
