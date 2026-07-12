@@ -1,0 +1,30 @@
+{
+  "opinion blue/red": [
+    {
+      "color": "#e34948",
+      "pos": 0.0
+    },
+    {
+      "color": "#f0efec",
+      "pos": 0.5
+    },
+    {
+      "color": "#2a78d6",
+      "pos": 1.0
+    }
+  ],
+  "opinion dark blue/red": [
+    {
+      "color": "#e66767",
+      "pos": 0.0
+    },
+    {
+      "color": "#383835",
+      "pos": 0.5
+    },
+    {
+      "color": "#3987e5",
+      "pos": 1.0
+    }
+  ]
+}

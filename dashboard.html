@@ -6,46 +6,74 @@
 <title>echo-chamber live dashboard</title>
 <style>
   :root {
-    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+    --page:#fbfbfc; --surface:#ffffff; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
+    --grid:#f4f5f8; --axis:#d4d8de; --border:#e4e7ec;
+    --good:#1ea765; --bad:#d03b3b; --warn:#e8912d; --accent:#5b5bd6; --accent-soft:#eeeeff;
   }
   @media (prefers-color-scheme: dark) { :root {
-    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+    --page:#101114; --surface:#1a1c20; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
+    --grid:#26282d; --axis:#3a3d43; --border:rgba(255,255,255,.10);
+    --good:#38bd7f; --bad:#ef5a5a; --warn:#f0a13d; --accent:#7b7bf0; --accent-soft:#29294c;
   } }
   :root[data-theme="light"] {
-    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+    --page:#fbfbfc; --surface:#ffffff; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
+    --grid:#f4f5f8; --axis:#d4d8de; --border:#e4e7ec;
+    --good:#1ea765; --bad:#d03b3b; --warn:#e8912d; --accent:#5b5bd6; --accent-soft:#eeeeff;
   }
   :root[data-theme="dark"] {
-    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+    --page:#101114; --surface:#1a1c20; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
+    --grid:#26282d; --axis:#3a3d43; --border:rgba(255,255,255,.10);
+    --good:#38bd7f; --bad:#ef5a5a; --warn:#f0a13d; --accent:#7b7bf0; --accent-soft:#29294c;
   }
   * { box-sizing:border-box; margin:0; }
+  html { min-height:100%; }
   body { background:var(--page); color:var(--ink);
-    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:10px 14px;
-    display:flex; flex-direction:column; height:100vh; overflow-y:auto; overflow-x:hidden; }
+    font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:0;
+    display:flex; min-height:100vh; overflow-x:hidden; overflow-y:auto; }
+  #rail { flex:0 0 48px; width:48px; min-height:100vh; padding:12px 8px;
+    display:flex; flex-direction:column; align-items:center; gap:12px;
+    background:#f7f8fb; border-right:1px solid var(--border);
+    position:sticky; top:0; align-self:flex-start; height:100vh; }
+  .rail-logo { width:30px; height:30px; border-radius:10px; display:grid; place-items:center;
+    color:#fff; background:var(--accent); font-size:15px; font-weight:700; line-height:1; }
+  .rail-spacer { flex:1 1 auto; }
+  #rail button { width:32px; height:32px; display:grid; place-items:center; padding:0;
+    border-radius:999px; color:var(--ink2); }
+  #rail button:hover { color:var(--ink); }
+  #appShell { flex:1 1 auto; min-width:0; padding:10px 14px;
+    display:flex; flex-direction:column; height:100vh; min-height:100vh; overflow:visible; }
   h1 { font-size:16px; font-weight:600; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  header.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:6px; flex:none; }
-  .grow { flex:1; min-width:140px; }
-  .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
-  .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
-  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  header.top { display:flex; gap:16px; align-items:center; margin-bottom:6px; flex:none; }
+  .titleblock { display:flex; flex-direction:column; gap:2px; min-width:220px; }
+  .titleline { display:flex; gap:4px; align-items:baseline; white-space:nowrap; }
+  .titleline .muted { color:var(--muted); font-weight:500; }
+  .statusline { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:11.5px; white-space:nowrap; }
+  .statusline .dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--muted); }
+  .statusline .num { color:var(--ink2); }
+  .controls { position:relative; display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+  .overflowbtn { width:30px; padding:5px 0; font-weight:700; }
+  .overflow-menu { position:absolute; top:calc(100% + 6px); right:0; z-index:15; display:flex; flex-direction:column; gap:6px;
+    min-width:150px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    box-shadow:0 8px 22px rgba(16,24,40,.16); }
+  .overflow-menu[hidden] { display:none; }
+  .overflow-menu button { width:100%; text-align:left; }
   button, select { font:12.5px system-ui,sans-serif; color:var(--ink); background:var(--surface);
-    border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
-  button:hover, select:hover { border-color:var(--muted); }
+    border:1px solid var(--border); border-radius:8px; padding:5px 12px; cursor:pointer; }
+  button:hover, select:hover { background:var(--grid); }
+  button.primary, .primary { color:#fff; background:var(--accent); border-color:var(--accent); }
+  button.primary:hover, .primary:hover { background:color-mix(in srgb, var(--accent) 88%, #000); }
+  input[type=checkbox], input[type=range] { accent-color:var(--accent); }
   label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
-  /* sidebar + main body 2-column layout (collapsible; see #sidebarToggle) */
+  /* sidebar + main body 2-column layout */
   .layout { display:flex; align-items:flex-start; gap:16px; flex:1 1 auto; min-height:0; }
   .layout > main { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; }
   .sidebar { flex:0 0 240px; width:240px; box-sizing:border-box; background:var(--surface);
-    border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+    border:1px solid var(--border); border-radius:12px; padding:10px 12px;
     position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; }
+  #sidebar { background:transparent; border:0; border-radius:0; padding:0;
+    box-shadow:none; top:0; max-height:100%; }
+  #sidebar .sidebar-content > h3, #sidebar #pickerCount { display:none; }
   .sidebar.collapsed { flex:0 0 30px; width:30px; padding:10px 4px; overflow:hidden; }
   .sidebar.collapsed .sidebar-content { display:none; }
   .sidebar-toggle { display:block; width:100%; margin-bottom:8px; }
@@ -56,22 +84,38 @@
   #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:6px; flex:none; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
-  #seedbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px; flex:none; }
-  .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
-    border-radius:14px; padding:3px 8px 3px 6px; font-size:12px; cursor:pointer; user-select:none; }
+  #runscard { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; flex:none; padding:9px 12px 10px; }
+  .runs-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  .runs-title { display:flex; align-items:baseline; gap:6px; font-weight:600; color:var(--ink); }
+  .runs-title .subnote { margin:0; }
+  .runs-actions { display:flex; gap:6px; align-items:center; }
+  #seedbar { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding-bottom:2px; flex:none;
+    scrollbar-width:thin; }
+  #seedbar::-webkit-scrollbar { height:6px; }
+  #seedbar::-webkit-scrollbar-thumb { background:var(--axis); border-radius:999px; }
+  .chip { display:flex; gap:6px; align-items:center; flex:0 0 auto; background:transparent; border:0;
+    border-radius:999px; padding:4px 8px 4px 6px; font-size:12px; cursor:pointer; user-select:none; }
+  .chip.running { background:color-mix(in srgb, var(--warn) 12%, transparent); }
   .chip.off { opacity:.38; }
-  .chip.pinned { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .chip.pinned { box-shadow:0 0 0 1px var(--accent) inset; }
   .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; cursor:pointer; }
   .chip .st { font-size:11px; }
   .chip .st.done { color:var(--good); } .chip .st.failed { color:var(--bad); }
   .chip .st.running { color:var(--accent); } .chip .st.stalled { color:var(--warn); }
   .chip .pct { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .chip.running .pct { color:var(--warn); }
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
   #pickerCount { margin-bottom:6px; }
-  #pickerlist { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
+  #pickerSearch { width:100%; margin:0 0 8px; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; padding:7px 9px; font:12.5px system-ui,sans-serif; }
+  #pickerSearch:focus { outline:2px solid var(--accent-soft); border-color:var(--accent); }
+  #pickerlist { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+  .picker-group { display:flex; flex-direction:column; gap:6px; }
+  .picker-heading { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; }
   #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #pickerlist .resetbtn { width:100%; margin-top:2px; }
   .duo, .trio { display:flex; flex-wrap:wrap; gap:12px; }
   /* Metric charts live in a wrapping grid (2-3 columns, auto-reflow by
      container width) instead of a fixed carousel+featured-row layout. A
@@ -86,15 +130,15 @@
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
     z-index:1; background:none; border:none; }
   .enlargebtn:hover { background:var(--grid); color:var(--ink); }
-  .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px 6px;
-    box-shadow:0 1px 3px rgba(0,0,0,.05); transition:box-shadow .15s, transform .15s; }
-  .panel:hover { box-shadow:0 2px 8px rgba(0,0,0,.09); transform:translateY(-1px); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px 6px;
+    box-shadow:0 1px 2px rgba(16,24,40,.05); }
+  .panel:hover { box-shadow:0 1px 2px rgba(16,24,40,.05); }
   @media (prefers-color-scheme: dark) {
-    .panel { box-shadow:0 1px 3px rgba(0,0,0,.35); }
-    .panel:hover { box-shadow:0 2px 10px rgba(0,0,0,.5); }
+    .panel { box-shadow:0 1px 2px rgba(0,0,0,.28); }
+    .panel:hover { box-shadow:0 1px 2px rgba(0,0,0,.28); }
   }
-  :root[data-theme="dark"] .panel { box-shadow:0 1px 3px rgba(0,0,0,.35); }
-  :root[data-theme="dark"] .panel:hover { box-shadow:0 2px 10px rgba(0,0,0,.5); }
+  :root[data-theme="dark"] .panel { box-shadow:0 1px 2px rgba(0,0,0,.28); }
+  :root[data-theme="dark"] .panel:hover { box-shadow:0 1px 2px rgba(0,0,0,.28); }
   .panel svg { display:block; width:100%; height:auto; }
   /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone —
      used for the big section wrappers, which aren't individually resized. */
@@ -113,21 +157,16 @@
   .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
-  /* header stat tiles: running/done/stalled/updated, always visible above the tabs */
-  .stattiles { display:flex; gap:8px; flex-wrap:wrap; }
-  .ministat { display:flex; align-items:center; gap:7px; background:var(--surface);
-    border:1px solid var(--border); border-radius:8px; padding:5px 11px; }
-  .ministat .dot { width:8px; height:8px; border-radius:50%; flex:none; }
-  .ministat .val { font-size:19px; font-weight:600; font-variant-numeric:proportional-nums; line-height:1.1; }
-  .ministat .lbl { font-size:10.5px; color:var(--muted); }
   /* tabs: 3-way split (time series / opinion / network), the rest of the
      always-visible header (title, stat tiles, controls, banner, chips) stays
      outside the tabpanels below. */
-  .tabnav { display:flex; gap:4px; margin-bottom:6px; border-bottom:1px solid var(--border); flex:none; }
-  .tabbtn { background:none; border:none; border-bottom:2px solid transparent; border-radius:0;
-    padding:7px 14px; font:13px system-ui,sans-serif; color:var(--ink2); cursor:pointer; }
-  .tabbtn:hover { color:var(--ink); border-color:var(--muted); }
-  .tabbtn.active { color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
+  .tabnav { display:flex; gap:3px; align-self:flex-start; margin-bottom:8px; padding:3px;
+    background:var(--grid); border-radius:999px; flex:none; }
+  .tabbtn { background:transparent; border:1px solid transparent; border-radius:999px;
+    padding:6px 14px; font:13px system-ui,sans-serif; color:var(--muted); cursor:pointer; }
+  .tabbtn:hover { background:color-mix(in srgb, var(--surface) 64%, transparent); color:var(--ink2); }
+  .tabbtn.active { background:var(--surface); border-color:var(--border); color:var(--ink); font-weight:600;
+    box-shadow:0 1px 2px rgba(16,24,40,.04); }
   .tabpanel { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; }
   .tabpanel[hidden] { display:none; }
   /* opinion / outcome tab (Phase 3): left = opinion trajectories/heatmap (~60%),
@@ -165,6 +204,7 @@
   .scrubrow input[type=range] { flex:1; accent-color:var(--accent); }
   .scrubrow button.live { color:var(--accent); border-color:var(--accent); }
   .scrubrow .subnote { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  #runscard .scrubrow { margin:0; }
   .leg { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); padding:4px 2px 2px; }
   .leg span { display:flex; gap:4px; align-items:center; }
   .leg i { width:10px; height:10px; border-radius:2px; display:inline-block; }
@@ -184,12 +224,33 @@
   .colorbar-row .cb-gradbar { flex:none; width:180px; min-width:180px; margin:0; }
   .colorbar-row .cb-ticks { display:flex; justify-content:space-between; width:180px;
     font-size:10px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
-  .colorbar-row .cb-chips { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
+  .colorbar-row .cb-chips { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
+  .colorbar-row .cb-chips span { border-radius:999px; padding:3px 8px; background:var(--grid); }
   .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+  #netsidebar .sidebar-content { display:flex; flex-direction:column; gap:10px; }
+  #netsidebar .sidebar-content h3 { margin:0; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; }
+  #netsidebar .sidebar-content h3:not(:first-child) { margin-top:0; }
+  .net-control-card { display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--surface);
+    border:1px solid var(--border); border-radius:12px; }
+  .net-field { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
+  .net-field select { width:100%; }
+  #netreheat { width:100%; }
+  #netleg span { border-radius:999px; padding:3px 8px; }
+  #netleg span:nth-child(1) { background:color-mix(in srgb, var(--bad) 14%, transparent); }
+  #netleg span:nth-child(2) { background:color-mix(in srgb, var(--muted) 14%, transparent); }
+  #netleg span:nth-child(3) { background:color-mix(in srgb, var(--accent) 14%, transparent); }
+  .net-title { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .net-badges { display:flex; gap:6px; flex-wrap:wrap; }
+  .net-badge { background:var(--grid); color:var(--ink2); border-radius:999px; padding:3px 8px;
+    font-size:11px; font-weight:500; white-space:nowrap; }
   /* network snapshot (Phase 4): controls live in the dedicated #netsidebar now,
      so the card itself is just the canvas filling the tab's full remaining
      height/width — no compact/expanded toggle needed any more. */
   #netsnapshotSection { flex:1 1 auto; min-width:0; min-height:0; resize:none; }
+  .tabpanel[data-tabpanel="network"] > .layout { flex:1 1 auto; min-height:0; align-items:stretch; }
+  .tabpanel[data-tabpanel="network"] main { height:100%; }
+  .tabpanel[data-tabpanel="network"] #netsnapshotSection { display:flex; flex-direction:column; overflow:hidden; }
+  #network { flex:1 1 auto; min-width:0; min-height:0; width:100%; height:100%; display:block; }
   #empty { color:var(--muted); padding:40px; text-align:center; }
   /* in-page color picker (replaces the OS-native <input type=color> dialog,
      whose position/layout a web page cannot control): centered modal with an
@@ -222,31 +283,48 @@
 </head>
 <body>
 
+<nav id="rail" aria-label="dashboard rail">
+  <div class="rail-logo" aria-hidden="true">E</div>
+  <div class="rail-spacer"></div>
+  <button id="theme" title="toggle theme" aria-label="toggle theme">&#9681;</button>
+</nav>
+
+<div id="appShell">
+
 <header class="top">
-  <h1>echo-chamber live dashboard</h1>
-  <div class="stattiles" id="stattiles"></div>
-  <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
+  <div class="titleblock">
+    <div class="titleline"><h1>Echo Chamber</h1><span class="muted">/ Live dashboard</span></div>
+    <div class="statusline" id="runStatus"><span class="dot"></span><span>loading runs...</span></div>
+  </div>
   <div class="controls">
-    <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
+    <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
+    <label class="ctl"><input type="checkbox" id="showmean"> show band</label>
     <select id="interval" title="refresh interval">
       <option value="2">2s</option><option value="5" selected>5s</option>
       <option value="10">10s</option><option value="30">30s</option>
     </select>
-    <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
-    <label class="ctl"><input type="checkbox" id="showmean"> show band</label>
-    <button id="resetzoom" hidden>reset zoom</button>
-    <button id="theme" title="toggle theme">&#9681;</button>
+    <button id="pause" class="primary" title="pause/resume auto-refresh">&#9208; Pause</button>
+    <button id="moreMenuBtn" class="overflowbtn" title="more actions" aria-haspopup="true" aria-expanded="false">&hellip;</button>
+    <div id="headerMenu" class="overflow-menu" hidden>
+      <button id="resetzoom" hidden>Reset zoom</button>
+    </div>
   </div>
 </header>
 
 <div id="banner" hidden></div>
-<div id="seedbar"></div>
-
-<div class="scrubrow" id="cursorRow">
-  <button id="cursorPlay" title="play the global step cursor from the earliest step">&#9654; play</button>
-  <button id="cursorLive" title="jump back to the latest step">&#8676; live</button>
-  <input type="range" id="cursorScrub" min="0" max="0" value="0" step="1">
-  <span id="cursorScrubLabel" class="subnote">&ndash;</span>
+<div class="panel" id="runscard">
+  <div class="runs-head">
+    <div class="runs-title">Runs <span id="runsCount" class="subnote">0 runs</span></div>
+    <div class="runs-actions">
+      <button id="cursorPlay" title="play the global step cursor from the earliest step">&#9654; play</button>
+      <button id="cursorLive" title="jump back to the latest step">&#8676; live</button>
+    </div>
+  </div>
+  <div id="seedbar"></div>
+  <div class="scrubrow" id="cursorRow">
+    <input type="range" id="cursorScrub" min="0" max="0" value="0" step="1">
+    <span id="cursorScrubLabel" class="subnote">&ndash;</span>
+  </div>
 </div>
 
 <nav class="tabnav" id="tabnav">
@@ -258,10 +336,10 @@
 <div class="tabpanel" data-tabpanel="timeseries">
 <div class="layout">
 <aside id="sidebar" class="sidebar">
-  <button id="sidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
   <div id="sidebarContent" class="sidebar-content">
     <h3>display metrics</h3>
     <div id="pickerCount" class="subnote"></div>
+    <input type="search" id="pickerSearch" placeholder="Search metrics..." autocomplete="off">
     <div id="pickerlist"></div>
   </div>
 </aside>
@@ -297,28 +375,34 @@
 <aside id="netsidebar" class="sidebar">
   <button id="netsidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
   <div id="netsidebarContent" class="sidebar-content">
+    <section class="net-control-card">
     <h3>snapshot</h3>
-    <label class="ctl">seed <select id="netseed"></select></label>
+    <label class="net-field">Seed <select id="netseed"></select></label>
     <select id="nettype" hidden>
       <option value="follow">follow graph</option>
       <option value="repost">repost graph</option>
     </select>
-    <label class="ctl">step <select id="netstep"><option value="latest">latest</option></select></label>
+    <label class="net-field">Step <select id="netstep"><option value="latest">latest</option></select></label>
+    </section>
 
+    <section class="net-control-card">
     <h3>appearance</h3>
-    <label class="ctl">size <select id="netsize"></select></label>
-    <label class="ctl">color <select id="netcolor"></select></label>
+    <label class="net-field">Node size <select id="netsize"></select></label>
+    <label class="net-field">Node color <select id="netcolor"></select></label>
     <div id="netcolorbar" class="colorbar-row"></div>
     <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
+    </section>
 
+    <section class="net-control-card">
     <h3>layout</h3>
-    <label class="ctl">layout <select id="netlayout">
+    <label class="net-field">Layout <select id="netlayout">
       <option value="force">force</option>
       <option value="forceAtlas2">ForceAtlas2</option>
     </select></label>
-    <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
+    <button id="netreheat" title="restart the force layout">&#10227; Re-layout</button>
     <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
     <label class="ctl" title="experimental: convex hull per opinion-sign group"><input type="checkbox" id="nethull"> hull (experimental)</label>
+    </section>
 
     <h3>about</h3>
     <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber):
@@ -331,7 +415,7 @@
 </aside>
 <main>
   <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
-    <h3>network snapshot <span id="netinfo" class="subnote"></span></h3>
+    <h3 class="net-title">Network snapshot <span id="netinfo" class="net-badges" aria-live="polite"></span></h3>
     <canvas id="network" class="cardbody" style="border-radius:6px"></canvas>
     <div class="leg" id="netleg"></div>
   </section>
@@ -393,6 +477,8 @@
   <header><span id="logtitle"></span><button id="logclose">&times;</button></header>
   <pre id="logtext"></pre>
 </aside>
+
+</div>
 
 <script>
 "use strict";
@@ -472,6 +558,11 @@ function rollmean(vals,k){ if(k<2) return vals;
 
 /* ---------- data fetch ---------- */
 async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function postJson(url,obj){
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(obj)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
 
 function expandMetric(m){
   const fam = state.summary && state.summary.families && state.summary.families[m];
@@ -522,22 +613,27 @@ function initialHide(){
   if(ids.length) save("hiddenInit",true);
 }
 
-/* header stat tiles (R3/R6): running/done/stalled counts + last-update time,
-   always visible above the tabs. Values use proportional (not tabular) nums
-   per R6 — tabular-nums is reserved for tables/axis ticks. */
-function renderStatTiles(){
-  const host=$("#stattiles"); if(!host) return;
+function statusColor(status){
+  if(status==="done") return "var(--good)";
+  if(status==="running") return "var(--accent)";
+  if(status==="stalled") return "var(--warn)";
+  if(status==="failed") return "var(--bad)";
+  return "var(--muted)";
+}
+
+function renderStatusLine(){
+  const host=$("#runStatus"); if(!host) return;
   const ss=state.summary.runs;
   const n=s=>ss.filter(x=>x.status===s).length;
-  const tiles=[
-    {lbl:"running", val:n("running"), dot:"var(--accent)"},
-    {lbl:"done",    val:n("done"),    dot:"var(--good)"},
-    {lbl:"stalled", val:n("stalled"), dot:"var(--warn)"},
-    {lbl:"updated", val:state.lastUpdate?state.lastUpdate.toLocaleTimeString():"–", dot:null},
-  ];
-  host.innerHTML=tiles.map(t=>
-    `<div class="ministat">${t.dot?`<span class="dot" style="background:${t.dot}"></span>`:""}`+
-    `<div><div class="val">${t.val}</div><div class="lbl">${t.lbl}</div></div></div>`).join("");
+  const running=n("running"), stalled=n("stalled"), done=n("done"), failed=n("failed");
+  const dot = running>0 ? "var(--accent)" : stalled>0 ? "var(--warn)" : ss.length&&done===ss.length ? "var(--good)" : "var(--muted)";
+  host.innerHTML =
+    `<span class="dot" style="background:${dot}"></span>`+
+    `<span><span class="num">${done}</span> done &middot; `+
+    `<span class="num">${running}</span> running &middot; `+
+    `<span class="num">${stalled}</span> stalled`+
+    (failed?` &middot; <span class="num">${failed}</span> failed`:"")+
+    ` &middot; updated <span class="num">${state.lastUpdate?state.lastUpdate.toLocaleTimeString():"--:--:--"}</span></span>`;
 }
 
 /* ---------- banners ---------- */
@@ -662,12 +758,10 @@ function stopCursorPlay(){ if(cursorPlayTimer){ clearInterval(cursorPlayTimer); 
 
 function renderHeader(){
   const ss=seedList();
-  const tot=ss.reduce((a,s)=>a+s.target,0), cur=ss.reduce((a,s)=>a+Math.min(s.step,s.target),0);
-  $("#obar").style.width = tot? (100*cur/tot).toFixed(1)+"%" : "0%";
   if(ss.length && ss.every(s=>s.status==="done"))
     showBanner("ok","&#10003; all "+ss.length+" runs finished");
   else hideBanner("ok");
-  renderStatTiles();
+  renderStatusLine();
 }
 
 /* ---------- tabs (R3): time series / opinion / network ----------
@@ -710,16 +804,16 @@ document.querySelectorAll(".tabbtn").forEach(btn=>btn.addEventListener("click",(
 
 function renderSeedbar(){
   const bar=$("#seedbar"); bar.innerHTML="";
+  $("#runsCount").textContent = `${seedList().length} ${seedList().length===1?"run":"runs"}`;
   if(!seedList().length){ bar.innerHTML='<div id="empty">no runs found — nothing under the data roots has a run_meta.json yet</div>'; return; }
   for(const s of seedList()){
-    const {full}=seedColor(s.run);
     const chip=document.createElement("div");
-    chip.className="chip"+(state.hidden.has(s.run)?" off":"")+(state.pinned.has(s.run)?" pinned":"");
+    chip.className="chip "+s.status+(state.hidden.has(s.run)?" off":"")+(state.pinned.has(s.run)?" pinned":"");
     chip.title=s.run+(s.n?` · n=${s.n}`:"")+(s.seed!=null?` · seed ${s.seed}`:"")
       +(mixLabel(s.mix)?` · ${mixLabel(s.mix)}`:"")+" — click dot to pin/highlight";
     const pct=s.target? Math.round(100*Math.min(s.step,s.target)/s.target) : 0;
-    chip.innerHTML=`<span class="dot" style="background:${full}"></span>`+
-      `<b>${shortRun(s.run)}</b> <span class="st ${s.status}">${STATUS_GLYPH[s.status]||s.status}</span>`+
+    chip.innerHTML=`<span class="dot" style="background:${statusColor(s.status)}"></span>`+
+      `<b>${shortRun(s.run)}</b>`+
       `<span class="pct">${pct}%</span>`+
       (mixLabel(s.mix)?`<span class="pct">${mixLabel(s.mix)}</span>`:"");
     chip.querySelector(".dot").addEventListener("click",evt=>{ evt.stopPropagation(); togglePin(s.run); });
@@ -747,20 +841,45 @@ function renderPicker(){
     .sort((a,b)=>a.label.localeCompare(b.label));
   const list=$("#pickerlist"); list.innerHTML="";
   $("#pickerCount").textContent = `${state.metrics.length} shown / ${items.length} available`;
+  const groups=[
+    {key:"selected", title:"Selected", items:[]},
+    {key:"metrics", title:"Metrics", items:[]},
+    {key:"families", title:"Class families", items:[]},
+  ];
+  const byKey=Object.fromEntries(groups.map(g=>[g.key,g]));
   for(const it of items){
-    const lab=document.createElement("label");
-    const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=state.metrics.includes(it.id);
-    cb.addEventListener("change",()=>{
-      state.metrics = cb.checked ? [...state.metrics,it.id] : state.metrics.filter(m=>m!==it.id);
-      save("metrics",state.metrics); refresh();
-    });
-    lab.append(cb, document.createTextNode(it.label));
-    list.appendChild(lab);
+    if(state.metrics.includes(it.id)) byKey.selected.items.push(it);
+    else if(families[it.id]) byKey.families.items.push(it);
+    else byKey.metrics.items.push(it);
+  }
+  const search=$("#pickerSearch");
+  if(search) search.value = search.value || "";
+  for(const group of groups){
+    if(!group.items.length) continue;
+    const groupEl=document.createElement("div");
+    groupEl.className="picker-group";
+    const head=document.createElement("div");
+    head.className="picker-heading";
+    head.textContent=group.title;
+    groupEl.appendChild(head);
+    for(const it of group.items){
+      const lab=document.createElement("label");
+      lab.dataset.search = (it.id+" "+it.label).toLowerCase();
+      const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=state.metrics.includes(it.id);
+      cb.addEventListener("change",()=>{
+        state.metrics = cb.checked ? [...state.metrics,it.id] : state.metrics.filter(m=>m!==it.id);
+        save("metrics",state.metrics); refresh();
+      });
+      lab.append(cb, document.createTextNode(it.label));
+      groupEl.appendChild(lab);
+    }
+    list.appendChild(groupEl);
   }
   const reset=document.createElement("button");
-  reset.textContent="reset to defaults"; reset.style.width="fit-content";
+  reset.textContent="Reset to defaults"; reset.className="resetbtn";
   reset.addEventListener("click",()=>{ state.metrics=[...DEFAULT_METRICS]; save("metrics",state.metrics); refresh(); });
   list.appendChild(reset);
+  applyPickerSearch();
   /* plane axis selects (plain columns only — a 2-D plane axis must be a single scalar) */
   for(const [sel,key] of [["#px","px"],["#py","py"]]){
     const el=$(sel); const prev=state[key]; el.innerHTML="";
@@ -776,6 +895,29 @@ function renderPicker(){
     os.onchange=()=>{ state.opseed=os.value; save("opseed",state.opseed); refresh(); };
   }
 }
+
+function applyPickerSearch(){
+  const input=$("#pickerSearch"), list=$("#pickerlist");
+  if(!input || !list) return;
+  const q=input.value.trim().toLowerCase();
+  for(const group of list.querySelectorAll(".picker-group")){
+    let shown=0;
+    for(const lab of group.querySelectorAll("label")){
+      const hit=!q || (lab.dataset.search||"").includes(q);
+      lab.hidden=!hit;
+      if(hit) shown++;
+    }
+    group.hidden=shown===0;
+  }
+}
+
+$("#pickerSearch").addEventListener("input",applyPickerSearch);
+$("#pickerSearch").addEventListener("keydown",ev=>{
+  if(ev.key==="Escape"){
+    ev.currentTarget.value="";
+    applyPickerSearch();
+  }
+});
 
 /* ---------- series extraction ---------- */
 function seriesFor(metric){
@@ -1756,6 +1898,26 @@ function applyNetColors(){
      (selected-stop color/hex/delete, presets; per-category pickers). */
 let stopSel=0;          // selected stop, index into the pos-sorted stops
 let stopPresetName="";  // name of the loaded preset ("" = custom)
+let standardStopPresets={};
+let localStopPresets=store("netstopPresets",{});
+function allStopPresets(){ return {...standardStopPresets, ...localStopPresets}; }
+async function loadStopPresets(){
+  try{
+    const d=await jget("/api/color-presets");
+    standardStopPresets=d.standard||{};
+    localStopPresets={...(d.local||{}), ...store("netstopPresets",{})};
+    renderColorControls();
+  }catch(e){
+    standardStopPresets={};
+    localStopPresets=store("netstopPresets",{});
+  }
+}
+async function persistLocalPreset(action,name,stops){
+  const d=await postJson("/api/color-presets",{action,name,stops});
+  standardStopPresets=d.standard||{};
+  localStopPresets=d.local||{};
+  save("netstopPresets",localStopPresets);
+}
 function editGradStops(mut){   // mutate a fresh pos-sorted copy, persist, repaint
   const ns=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
   mut(ns);
@@ -1775,7 +1937,7 @@ function renderColorLegend(){
   if(a.categorical){
     const pal=getCatPalette(key);
     host.innerHTML=`<span class="cb-label">${a.label}</span>`+
-      `<span class="cb-chips">`+a.cats.map((c,i)=>`<span><i style="background:${pal[i]}"></i>${c}</span>`).join("")+`</span>`;
+      `<span class="cb-chips">`+a.cats.map((c,i)=>`<span style="background:color-mix(in srgb, ${pal[i]} 14%, transparent)"><i style="background:${pal[i]}"></i>${c}</span>`).join("")+`</span>`;
     return;
   }
   const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
@@ -1846,7 +2008,7 @@ function renderColorControls(){
   const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
   if(stopSel>=stops.length) stopSel=0;
   const sel=stops[stopSel];
-  const presets=store("netstopPresets",{});
+  const presets=allStopPresets();
   host.innerHTML=
     `<label class="ctl">stop <button type="button" class="cp-swatch" id="gradStopSwatch" style="background:${toHexColor(sel.color)}" title="pick a color"></button></label>`+
     `<input type="text" id="gradStopHex" value="${toHexColor(sel.color)}" title="hex, e.g. #2a78d6">`+
@@ -1867,24 +2029,26 @@ function renderColorControls(){
     editGradStops(ns=>{ if(ns.length>2) ns.splice(stopSel,1); stopSel=0; });
   });
   host.querySelector("#gradPreset").addEventListener("change",e=>{
-    const p=store("netstopPresets",{}), name=e.target.value;
+    const p=allStopPresets(), name=e.target.value;
     if(!name||!p[name]) return;
     saveGradStops(p[name].map(s=>({pos:s.pos,color:s.color})));
     stopSel=0; stopPresetName=name;
     applyNetColors(); renderColorControls();
   });
-  host.querySelector("#gradPresetSave").addEventListener("click",()=>{
+  host.querySelector("#gradPresetSave").addEventListener("click",async()=>{
     const name=prompt("preset name?"); if(!name) return;
-    const p=store("netstopPresets",{});
-    p[name]=[...getGradStops()].map(({pos,color})=>({pos,color}));
-    save("netstopPresets",p); stopPresetName=name;
+    const stops=[...getGradStops()].map(({pos,color})=>({pos,color}));
+    localStopPresets[name]=stops;
+    save("netstopPresets",localStopPresets); stopPresetName=name;
+    try{ await persistLocalPreset("save",name,stops); }catch(e){ alert("failed to save preset: "+e.message); }
     renderColorControls();
   });
-  host.querySelector("#gradPresetDel").addEventListener("click",()=>{
+  host.querySelector("#gradPresetDel").addEventListener("click",async()=>{
     const name=host.querySelector("#gradPreset").value;
     if(!name) return;
     if(!confirm(`delete preset "${name}"?`)) return;
-    const p=store("netstopPresets",{}); delete p[name]; save("netstopPresets",p);
+    delete localStopPresets[name]; save("netstopPresets",localStopPresets);
+    try{ await persistLocalPreset("delete",name); }catch(e){ alert("failed to delete preset: "+e.message); }
     if(stopPresetName===name) stopPresetName="";
     renderColorControls();
   });
@@ -1901,26 +2065,42 @@ function maybeRefetchNetwork(){
   if(s && netState.data.step!=null && s.step>=netState.data.step+every) fetchNetwork();
 }
 
+function setNetInfoBadges(parts){
+  const host=$("#netinfo");
+  if(!host) return;
+  host.innerHTML="";
+  for(const part of parts.filter(Boolean)){
+    const badge=document.createElement("span");
+    badge.className="net-badge";
+    badge.textContent=part;
+    host.appendChild(badge);
+  }
+}
+
 async function fetchNetwork(){
   if(netState.loading || !seedList().length) return;
   const ids=seedList().map(s=>s.run);
   if(netState.seed===null || !ids.includes(netState.seed)) netState.seed=ids[0];
   netState.loading=true;
-  $("#netinfo").textContent="loading…";
+  setNetInfoBadges(["loading..."]);
   try{
     const d=await jget(`/api/network?run=${encodeURIComponent(netState.seed)}&step=${netState.step}`);
     if(d.error){
       /* newest snapshot is mid-write while the run is live; server already fell back
          to an older complete one if it could. Keep showing that and retry on the
          normal poll cycle rather than treating this as a hard failure. */
-      $("#netinfo").textContent = (d.step!=null? `step ${fstep(d.step)} (stale) · ` : "")+d.error;
+      setNetInfoBadges([d.step!=null?`step ${fstep(d.step)} (stale)`:null, d.error]);
       if(d.step==null) return;
     }
     netState.data=d;
     const steps=Array.isArray(d.steps)?d.steps:[], idx=steps.indexOf(d.step);
     const idxTxt=idx>=0?` (${idx+1}/${steps.length})`:"";
-    $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (network_data/ is empty, or the run hasn't reached the first export step)"
-      : `step ${fstep(d.step)}${idxTxt}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
+    if(d.step==null) setNetInfoBadges(["no GEXF snapshots found yet"]);
+    else setNetInfoBadges([
+      `step ${fstep(d.step)}${idxTxt}${d.stale?" (stale)":""}`,
+      `${Number(d.n||0).toLocaleString()} nodes`,
+      `${Number(d.m||0).toLocaleString()} edges`,
+    ]);
     renderNetControls();
     netState.loading=false;   // syncNetworkToCursor()'s own loading-guard needs this cleared first
     // the steps list needed to snap to the cursor only exists once a fetch has
@@ -1929,7 +2109,7 @@ async function fetchNetwork(){
     // immediately re-fetches that one instead of animating "latest" first.
     if(state.tab==="network" && syncNetworkToCursor()) return;
     startSim();
-  }catch(e){ $("#netinfo").textContent="dashboard server unreachable: "+e.message; }
+  }catch(e){ setNetInfoBadges(["dashboard server unreachable", e.message]); }
   finally{ netState.loading=false; }
 }
 /* snap the network view to the global cursor (R4): pick the available
@@ -2141,7 +2321,7 @@ function drawNet(){
   s.view={k,ox,oy};
   const PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
   if(hull) drawCommunityHulls(ctx, s, d, PX, PY);
-  ctx.lineWidth=0.5; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=cross?0.15:0.4;
+  ctx.lineWidth=0.8; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=cross?0.25:0.7;
   ctx.beginPath();
   for(const [u,v] of d.edges){
     if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
@@ -2747,10 +2927,22 @@ document.addEventListener("click",ev=>{
 document.addEventListener("keydown",ev=>{ if(ev.key==="Escape"&&!$("#logdrawer").hidden){ $("#logdrawer").hidden=true; logSeed=null; } });
 
 /* ---------- controls ---------- */
-$("#pause").addEventListener("click",()=>{
-  state.paused=!state.paused;
-  $("#pause").innerHTML=state.paused?"&#9654; resume":"&#9208; pause";
+function renderPauseButton(){
+  $("#pause").innerHTML=state.paused?"&#9654; Resume":"&#9208; Pause";
+}
+$("#pause").addEventListener("click",()=>{ state.paused=!state.paused; renderPauseButton(); });
+renderPauseButton();
+function setHeaderMenu(open){
+  $("#headerMenu").hidden=!open;
+  $("#moreMenuBtn").setAttribute("aria-expanded", open?"true":"false");
+}
+$("#moreMenuBtn").addEventListener("click",ev=>{
+  ev.stopPropagation();
+  setHeaderMenu($("#headerMenu").hidden);
 });
+$("#headerMenu").addEventListener("click",ev=>ev.stopPropagation());
+document.addEventListener("click",()=>setHeaderMenu(false));
+document.addEventListener("keydown",ev=>{ if(ev.key==="Escape") setHeaderMenu(false); });
 $("#interval").value=String(store("interval",5));
 $("#interval").addEventListener("change",()=>{ save("interval",+$("#interval").value); schedule(); });
 $("#smooth").checked=store("smooth",false);
@@ -2774,7 +2966,7 @@ const savedTheme=store("theme",null);
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
 
-/* ---------- sidebar collapse/expand (time series + network, same behavior) ---------- */
+/* ---------- sidebar collapse/expand (network only) ---------- */
 const SIDEBAR_NARROW_BP = 900;
 function applySidebarCollapsed(sidebarSel, toggleSel, collapsed){
   $(sidebarSel).classList.toggle("collapsed", collapsed);
@@ -2796,7 +2988,6 @@ function initSidebarCollapse(sidebarSel, toggleSel, storeKey){
   const collapsed = saved===null ? innerWidth<SIDEBAR_NARROW_BP : saved;
   applySidebarCollapsed(sidebarSel, toggleSel, collapsed);
 }
-initSidebarCollapse("#sidebar","#sidebarToggle","sidebar");
 initSidebarCollapse("#netsidebar","#netsidebarToggle","netsidebar");
 
 /* ---------- main loop ---------- */
@@ -2811,6 +3002,7 @@ function schedule(){
 localStorage.removeItem("dash.size.netsnapshot");
 initStaticCards();
 setTab(state.tab); // restore the last-active tab (R3); renderGrid() no-ops until refresh() below populates state.summary
+loadStopPresets();
 refresh(); schedule();
 </script>
 </body>
