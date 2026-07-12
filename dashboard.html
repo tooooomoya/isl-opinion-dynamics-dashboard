@@ -136,6 +136,52 @@
   .leg span { display:flex; gap:4px; align-items:center; }
   .leg i { width:10px; height:10px; border-radius:2px; display:inline-block; }
   #empty { color:var(--muted); padding:40px; text-align:center; }
+  /* arbitrary-stop gradient editor for the network color scale (ported from the yabe branch) */
+  .gradbar { position:relative; flex:1 1 160px; min-width:160px; height:18px; border-radius:4px;
+    border:1px solid var(--border); cursor:crosshair; margin:6px 8px 6px 0; }
+  .gradbar .gradstop { position:absolute; top:-4px; width:8px; height:16px; margin-left:-4px;
+    border:1px solid var(--surface); cursor:grab; background:#111;
+    clip-path:polygon(50% 100%, 0 0, 100% 0); }
+  .gradbar .gradstop.selected { background:#8a8a86; }
+  #netcolorctl input[type=text] { font:11.5px ui-monospace,Menlo,monospace; color:var(--ink);
+    background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:3px 6px; width:76px; }
+  /* compact always-visible color legend (Gephi-style: label + gradient + tick marks) */
+  .colorbar-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px 0 6px; min-height:26px; }
+  .colorbar-row .cb-label { font-size:11px; color:var(--muted); white-space:nowrap; }
+  .colorbar-row .cb-scale { display:flex; flex-direction:column; flex:0 0 auto; }
+  .colorbar-row .cb-gradbar { flex:none; width:180px; min-width:180px; margin:0; }
+  .colorbar-row .cb-ticks { display:flex; justify-content:space-between; width:180px;
+    font-size:10px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .colorbar-row .cb-chips { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
+  .colorbar-row .cb-chips span { border-radius:999px; padding:3px 8px; background:var(--grid); }
+  .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+  /* in-page color picker (replaces the OS-native <input type=color> dialog, whose
+     position/layout a web page cannot control): centered modal with an SV square +
+     hue strip + hex/RGB fields all shown at once. */
+  .cp-swatch { width:28px; height:22px; border-radius:6px; border:1px solid var(--border); cursor:pointer; padding:0; }
+  .cp-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; }
+  .cp-modal[hidden] { display:none; }
+  .cp-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); }
+  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:16px; width:260px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+  .cp-handle { cursor:move; font-size:10.5px; color:var(--muted); text-align:center;
+    margin:-16px -16px 10px; padding:5px; border-bottom:1px solid var(--border);
+    border-radius:10px 10px 0 0; user-select:none; }
+  .cp-sv { position:relative; width:100%; height:150px; border-radius:6px; cursor:crosshair; margin-bottom:10px;
+    background-image:linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 100%),
+                      linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%); }
+  .cp-svcursor { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5); transform:translate(-50%,-50%); pointer-events:none; }
+  .cp-hue { position:relative; width:100%; height:14px; border-radius:7px; margin-bottom:14px; cursor:pointer;
+    background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .cp-huecursor { position:absolute; top:-3px; width:8px; height:20px; margin-left:-4px; border-radius:3px;
+    border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.5); pointer-events:none; }
+  .cp-fields { display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px 8px; align-items:center;
+    font-size:11.5px; color:var(--ink2); margin-bottom:12px; }
+  .cp-fields input[type=number] { width:100%; }
+  .cp-fields input#cpHex { width:100%; font:11.5px ui-monospace,Menlo,monospace; grid-column:2 / span 3; }
+  .cp-actions { display:flex; align-items:center; gap:8px; }
+  .cp-preview { width:28px; height:22px; border-radius:6px; border:1px solid var(--border); }
 </style>
 </head>
 <body>
@@ -211,6 +257,7 @@
       color = opinion, blue &minus;1 &harr; red +1); ringed = intervened hub.
       Positions carry over between snapshots, so stepping through time shows the sorting happen.
       Drag this card's bottom-right corner to resize the canvas.</div>
+    <div id="netcolorbar" class="colorbar-row"></div>
     <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
     <div class="scrubrow">
       <button id="netPlay" title="play through GEXF snapshots from step 0">&#9654; play</button>
@@ -250,6 +297,26 @@
 </main>
 
 <div id="tooltip" hidden></div>
+<div id="colorPickerModal" class="cp-modal" hidden>
+  <div class="cp-backdrop"></div>
+  <div id="cpBox" class="cp-box">
+    <div id="cpHandle" class="cp-handle" title="drag to move">color</div>
+    <div id="cpSv" class="cp-sv"><div id="cpSvCursor" class="cp-svcursor"></div></div>
+    <div id="cpHue" class="cp-hue"><div id="cpHueCursor" class="cp-huecursor"></div></div>
+    <div class="cp-fields">
+      <label for="cpHex">hex</label><input type="text" id="cpHex" maxlength="7">
+      <label for="cpR">R</label><input type="number" id="cpR" min="0" max="255">
+      <label for="cpG">G</label><input type="number" id="cpG" min="0" max="255">
+      <label for="cpB">B</label><input type="number" id="cpB" min="0" max="255">
+    </div>
+    <div class="cp-actions">
+      <div id="cpPreview" class="cp-preview"></div>
+      <span style="flex:1"></span>
+      <button type="button" id="cpCancel">cancel</button>
+      <button type="button" id="cpOk">OK</button>
+    </div>
+  </div>
+</div>
 <aside id="logdrawer" hidden>
   <header><span id="logtitle"></span><button id="logclose">&times;</button></header>
   <pre id="logtext"></pre>
@@ -323,6 +390,11 @@ function rollmean(vals,k){ if(k<2) return vals;
 
 /* ---------- data fetch ---------- */
 async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
+async function postJson(url,obj){
+  const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(obj)});
+  if(!r.ok) throw new Error(await r.text());
+  return r.json();
+}
 
 function expandMetric(m){
   const fam = state.summary && state.summary.families && state.summary.families[m];
@@ -1031,8 +1103,8 @@ const netState={ seed:store("netseed",null), type:store("nettype","follow"),
 /* ---- configurable node encoding ----
    every value below is available per-node in the /api/network payload. "size"
    picks a numeric attr; "color" picks either a numeric attr (rendered with a
-   user-editable 3-stop gradient: low / mid / high) or a categorical attr
-   (rendered from a user-editable palette, one swatch per category). */
+   user-editable arbitrary-stop gradient, with named presets) or a categorical
+   attr (rendered from a user-editable palette, one swatch per category). */
 const NODE_ATTRS = {
   op:     {label:"opinion",               get:n=>n.op, fixedDomain:[-1,1]},
   indeg:  {label:"followers (in-degree)", get:n=>n.indeg},
@@ -1047,7 +1119,6 @@ const NODE_ATTRS = {
 };
 const SIZE_KEYS  = ["indeg","outdeg","total","pp","bc","uniform"];
 const COLOR_KEYS = ["op","indeg","outdeg","total","pp","bc","opsign","hub"];
-const GRAD_DEFAULT = ["#2a78d6","#b3b1a9","#e34948"];   // low / mid / high
 
 function opColor(v){ /* diverging blue -1 <-> gray 0 <-> red +1 (hover-tip fallback) */
   const dark=theme()==="dark";
@@ -1064,19 +1135,55 @@ function seqColor(t){
   const a=SEQ_STOPS[i], b=SEQ_STOPS[i+1];
   return `rgb(${Math.round(a[0]+(b[0]-a[0])*g)},${Math.round(a[1]+(b[1]-a[1])*g)},${Math.round(a[2]+(b[2]-a[2])*g)})`; }
 
-/* ---- user-editable color scales ---- */
+/* ---- user-editable color scales ----
+   the numeric scale is an arbitrary-stop gradient [{pos:0..1, color:"#hex"},...],
+   editable by dragging/clicking a gradient bar, with named presets saved
+   server-side (dashboard/color_presets.json = shipped, color_presets.local.json =
+   user-saved). Ported from the yabe branch, which had generalized the network
+   view's original fixed 3-stop low/mid/high gradient the same way. */
 function hex2rgb(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)&255,n&255]; }
-function getGradStops(){ const g=store("netgrad",GRAD_DEFAULT); return (Array.isArray(g)&&g.length===3)?g:GRAD_DEFAULT.slice(); }
+function toHexColor(c){ if(c.startsWith("#")) return c;
+  const m=c.match(/\d+/g).map(Number);
+  return "#"+m.map(v=>v.toString(16).padStart(2,"0")).join(""); }
+function stopsDefault(){ /* opinion -1 = blue, +1 = red, neutral gray midpoint (matches opColor) */
+  return theme()==="dark"
+    ? [{pos:0,color:"#3987e5"},{pos:0.5,color:"#383835"},{pos:1,color:"#e66767"}]
+    : [{pos:0,color:"#2a78d6"},{pos:0.5,color:"#b3b1a9"},{pos:1,color:"#e34948"}]; }
+function getGradStops(){ const g=store("netstops",null);
+  return (Array.isArray(g)&&g.length>=2)?g:stopsDefault(); }
+function saveGradStops(stops){ save("netstops", stops.map(({pos,color})=>({pos,color}))); }
+/* per-category colors are persisted keyed by category name (not array index),
+   so a category list can be reordered later without silently reshuffling colors */
 function getCatPalette(key){
   const cats=NODE_ATTRS[key].cats, base=theme()==="dark"?SERIES_DARK:SERIES_LIGHT;
-  const def=cats.map((_,i)=>base[i%base.length]);
+  const def={}; cats.forEach((c,i)=>def[c]=base[i%base.length]);
   const saved=store("netcat."+key,null);
-  return (Array.isArray(saved)&&saved.length===cats.length)?saved:def;
+  const byName=(saved&&typeof saved==="object"&&!Array.isArray(saved))?saved:{};
+  return cats.map(c=>byName[c]||def[c]);
 }
-/* 3-stop gradient low(0)->mid(.5)->high(1); stops passed as rgb triples */
-function gradColor(t,g){ t=Math.max(0,Math.min(1,t));
-  let a,b,u; if(t<0.5){a=g[0];b=g[1];u=t*2;}else{a=g[1];b=g[2];u=(t-0.5)*2;}
-  return `rgb(${Math.round(a[0]+(b[0]-a[0])*u)},${Math.round(a[1]+(b[1]-a[1])*u)},${Math.round(a[2]+(b[2]-a[2])*u)})`; }
+function saveCatColor(key,idx,hex){
+  const cats=NODE_ATTRS[key].cats, cur=getCatPalette(key), byName={};
+  cats.forEach((c,i)=>byName[c]=cur[i]);
+  byName[cats[idx]]=hex;
+  save("netcat."+key,byName);
+}
+/* piecewise-linear gradient over pos-sorted stops; t in [0,1] */
+function gradColor(t,stops){ t=Math.max(0,Math.min(1,t));
+  const s=[...stops].sort((a,b)=>a.pos-b.pos);
+  if(!s.length) return "#888";
+  if(t<=s[0].pos) return s[0].color;
+  if(t>=s[s.length-1].pos) return s[s.length-1].color;
+  for(let i=0;i<s.length-1;i++){
+    if(t>=s[i].pos&&t<=s[i+1].pos){
+      const span=s[i+1].pos-s[i].pos, u=span?(t-s[i].pos)/span:0;
+      const a=hex2rgb(toHexColor(s[i].color)), b=hex2rgb(toHexColor(s[i+1].color));
+      return `rgb(${Math.round(a[0]+(b[0]-a[0])*u)},${Math.round(a[1]+(b[1]-a[1])*u)},${Math.round(a[2]+(b[2]-a[2])*u)})`;
+    }
+  }
+  return s[s.length-1].color; }
+function gradCss(stops){
+  const s=[...stops].sort((a,b)=>a.pos-b.pos);
+  return s.map(x=>`${x.color} ${(x.pos*100).toFixed(1)}%`).join(","); }
 
 function colorDomain(key){
   const a=NODE_ATTRS[key]; if(a.fixedDomain) return a.fixedDomain.slice();
@@ -1099,52 +1206,246 @@ function colorNodes(s,d){
   const key=netState.colorBy, a=NODE_ATTRS[key];
   if(!s.col||s.col.length!==s.n) s.col=new Array(s.n);
   if(a.categorical){
-    const pal=getCatPalette(key), cats=a.cats;
-    for(let i=0;i<s.n;i++){ const idx=cats.indexOf(a.cat(d.nodes[i])); s.col[i]=pal[idx<0?0:idx]; }
+    const pal=getCatPalette(key), cats=a.cats, unknown=theme()==="dark"?"#555":"#bbb";
+    for(let i=0;i<s.n;i++){ const idx=cats.indexOf(a.cat(d.nodes[i])); s.col[i]=idx<0?unknown:pal[idx]; }
   } else {
-    const g=getGradStops().map(hex2rgb), dom=colorDomain(key), span=(dom[1]-dom[0])||1;
+    const g=getGradStops(), dom=colorDomain(key), span=(dom[1]-dom[0])||1;
     for(let i=0;i<s.n;i++) s.col[i]=gradColor((a.get(d.nodes[i])-dom[0])/span, g);
   }
 }
+function applyNetColors(){
+  const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d);
+  renderColorLegend(); updateNetLegend(); if(s&&!s.raf) drawNet();
+}
 function updateNetLegend(){
   const leg=$("#netleg"); if(!leg) return;
-  const key=netState.colorBy, a=NODE_ATTRS[key]; let html="";
-  if(a.categorical){
-    const pal=getCatPalette(key);
-    html=a.cats.map((c,i)=>`<span><i style="background:${pal[i]};border-radius:50%"></i>${c}</span>`).join("");
-  } else {
-    const [lo,hi]=colorDomain(key), g=getGradStops();
-    html=`<span style="color:var(--muted)">${a.label}</span><span>${fmt(lo)}</span>`+
-         `<span><i style="width:64px;height:10px;border-radius:2px;background:linear-gradient(to right,${g[0]},${g[1]},${g[2]})"></i></span>`+
-         `<span>${fmt(hi)}</span>`;
-  }
-  leg.innerHTML=html+
-    `<span style="margin-left:12px"><i style="background:none;border:2px solid var(--ink2);border-radius:50%"></i>hub (ringed)</span>`+
+  leg.innerHTML=
+    `<span><i style="background:none;border:2px solid var(--ink2);border-radius:50%"></i>hub (ringed)</span>`+
     ($("#netcross").checked?`<span><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"");
 }
-/* color-scale editor: 3 pickers for a gradient attr, one per category otherwise */
+
+/* ---- named gradient presets: standard (shipped, dashboard/color_presets.json)
+   + local (saved via /api/color-presets, persisted server-side so they survive
+   across browsers/machines; also mirrored to localStorage for instant reuse). */
+let stopSel=0;          // selected stop, index into the pos-sorted stops
+let stopPresetName="";  // name of the loaded preset ("" = custom)
+let standardStopPresets={};
+let localStopPresets=store("netstopPresets",{});
+function allStopPresets(){ return {...standardStopPresets, ...localStopPresets}; }
+async function loadStopPresets(){
+  try{
+    const d=await jget("/api/color-presets");
+    standardStopPresets=d.standard||{};
+    localStopPresets={...(d.local||{}), ...store("netstopPresets",{})};
+    renderColorControls();
+  }catch(e){
+    standardStopPresets={};
+    localStopPresets=store("netstopPresets",{});
+  }
+}
+async function persistLocalPreset(action,name,stops){
+  const d=await postJson("/api/color-presets",{action,name,stops});
+  standardStopPresets=d.standard||{};
+  localStopPresets=d.local||{};
+  save("netstopPresets",localStopPresets);
+}
+function editGradStops(mut){   // mutate a fresh pos-sorted copy, persist, repaint
+  const ns=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  mut(ns);
+  saveGradStops(ns); stopPresetName="";
+  applyNetColors(); renderColorControls();
+}
+/* a plain (non-drag) click on a stop handle opens the in-page color picker
+   directly for that stop, so recoloring doesn't need the edit row below */
+function pickStopColor(idx){
+  const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  const cur=stops[idx]; if(!cur) return;
+  openColorPicker(cur.color, hex=>editGradStops(ns=>{ if(ns[idx]) ns[idx].color=hex; }));
+}
+/* compact always-visible legend in #netcolorbar (Gephi-style: attr label,
+   gradient bar with draggable/clickable stops or category chips, min/mid/max ticks) */
+function renderColorLegend(){
+  const host=$("#netcolorbar"); if(!host) return;
+  const key=netState.colorBy, a=NODE_ATTRS[key];
+  if(a.categorical){
+    const pal=getCatPalette(key);
+    host.innerHTML=`<span class="cb-label">${a.label}</span>`+
+      `<span class="cb-chips">`+a.cats.map((c,i)=>`<span style="background:color-mix(in srgb, ${pal[i]} 14%, transparent)"><i style="background:${pal[i]}"></i>${c}</span>`).join("")+`</span>`;
+    return;
+  }
+  const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  if(stopSel>=stops.length) stopSel=0;
+  const [lo,hi]=colorDomain(key), mid=(lo+hi)/2;
+  host.innerHTML=
+    `<span class="cb-label">${a.label}</span>`+
+    `<div class="cb-scale">`+
+      `<div class="gradbar cb-gradbar" title="click to add a stop, drag a handle to move it">`+
+        stops.map((x,i)=>`<div class="gradstop${i===stopSel?" selected":""}" data-i="${i}" style="left:${(x.pos*100).toFixed(2)}%"></div>`).join("")+
+      `</div>`+
+      `<div class="cb-ticks"><span>${fmt(lo)}</span><span>${fmt(mid)}</span><span>${fmt(hi)}</span></div>`+
+    `</div>`;
+  const bar=host.querySelector(".gradbar");
+  bar.style.background=`linear-gradient(90deg,${gradCss(stops)})`;
+  bar.addEventListener("mousedown",ev=>{
+    if(ev.target.classList.contains("gradstop")) return;
+    const r=bar.getBoundingClientRect();
+    const t=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width));
+    editGradStops(ns=>{ ns.push({pos:t,color:toHexColor(gradColor(t,ns))});
+      ns.sort((x,y)=>x.pos-y.pos); stopSel=ns.findIndex(x=>x.pos===t); });
+  });
+  host.querySelectorAll(".gradstop").forEach(el=>{
+    el.addEventListener("mousedown",ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      stopSel=+el.dataset.i;
+      const work=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+      const st=work[stopSel];
+      const startX=ev.clientX, startY=ev.clientY;
+      let dragged=false;
+      const move=mv=>{
+        if(Math.abs(mv.clientX-startX)>3||Math.abs(mv.clientY-startY)>3) dragged=true;
+        const b=host.querySelector(".gradbar"); if(!b) return;
+        const r=b.getBoundingClientRect();
+        st.pos=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width));
+        stopSel=[...work].sort((x,y)=>x.pos-y.pos).indexOf(st);
+        saveGradStops(work); stopPresetName="";
+        applyNetColors(); renderColorControls();
+      };
+      const up=()=>{
+        window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up);
+        if(!dragged) pickStopColor(stopSel);   // plain click (no drag) = recolor this stop directly
+      };
+      window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+      renderColorLegend();
+    });
+  });
+}
+/* always-visible edit row in #netcolorctl: selected-stop color/hex/delete,
+   presets; per-category swatches otherwise */
 function renderColorControls(){
   const host=$("#netcolorctl"); if(!host) return;
   const key=netState.colorBy, a=NODE_ATTRS[key];
   if(a.categorical){
     const pal=getCatPalette(key);
     host.innerHTML=`<span class="subnote">palette</span>`+
-      a.cats.map((c,i)=>`<label class="ctl">${c}<input type="color" data-cat="${i}" value="${pal[i]}"></label>`).join("");
-  } else {
-    const [lo,hi]=colorDomain(key), g=getGradStops();
-    host.innerHTML=`<span class="subnote">gradient</span>`+
-      `<label class="ctl">low ${fmt(lo)}<input type="color" data-grad="0" value="${g[0]}"></label>`+
-      `<label class="ctl">mid<input type="color" data-grad="1" value="${g[1]}"></label>`+
-      `<label class="ctl">high ${fmt(hi)}<input type="color" data-grad="2" value="${g[2]}"></label>`;
-  }
-  host.querySelectorAll("input[type=color]").forEach(inp=>{
-    inp.addEventListener("input",()=>{
-      if(inp.dataset.grad!=null){ const g=getGradStops(); g[+inp.dataset.grad]=inp.value; save("netgrad",g); }
-      else { const pal=getCatPalette(key); pal[+inp.dataset.cat]=inp.value; save("netcat."+key,pal); }
-      const s=netState.sim,dd=netState.data; if(s&&dd) colorNodes(s,dd);
-      updateNetLegend(); if(s&&!s.raf) drawNet();
+      a.cats.map((c,i)=>`<label class="ctl">${c}<button type="button" class="cp-swatch" data-cat="${i}" style="background:${pal[i]}" title="pick a color"></button></label>`).join("");
+    host.querySelectorAll(".cp-swatch").forEach(btn=>{
+      const i=+btn.dataset.cat;
+      btn.addEventListener("click",()=>{
+        openColorPicker(getCatPalette(key)[i], hex=>{
+          saveCatColor(key,i,hex);
+          applyNetColors(); btn.style.background=hex;
+        });
+      });
     });
+    return;
+  }
+  const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  if(stopSel>=stops.length) stopSel=0;
+  const sel=stops[stopSel];
+  const presets=allStopPresets();
+  host.innerHTML=
+    `<label class="ctl">stop <button type="button" class="cp-swatch" id="gradStopSwatch" style="background:${toHexColor(sel.color)}" title="pick a color"></button></label>`+
+    `<input type="text" id="gradStopHex" value="${toHexColor(sel.color)}" title="hex, e.g. #2a78d6">`+
+    `<button id="gradStopDel" ${stops.length<=2?"disabled":""}>delete stop</button>`+
+    `<select id="gradPreset" title="load a saved preset"><option value="">(custom)</option>`+
+      Object.keys(presets).map(n=>`<option${n===stopPresetName?" selected":""}>${n}</option>`).join("")+`</select>`+
+    `<button id="gradPresetSave" title="save current gradient as a named preset">save preset</button>`+
+    `<button id="gradPresetDel" title="delete the selected preset">delete preset</button>`;
+  host.querySelector("#gradStopSwatch").addEventListener("click",()=>{
+    const cur=[...getGradStops()].sort((x,y)=>x.pos-y.pos)[stopSel]; if(!cur) return;
+    openColorPicker(cur.color, hex=>editGradStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=hex; }));
   });
+  host.querySelector("#gradStopHex").addEventListener("change",e=>{
+    const v=e.target.value.trim();
+    if(/^#[0-9a-fA-F]{6}$/.test(v)) editGradStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=v; });
+  });
+  host.querySelector("#gradStopDel").addEventListener("click",()=>{
+    editGradStops(ns=>{ if(ns.length>2) ns.splice(stopSel,1); stopSel=0; });
+  });
+  host.querySelector("#gradPreset").addEventListener("change",e=>{
+    const p=allStopPresets(), name=e.target.value;
+    if(!name||!p[name]) return;
+    saveGradStops(p[name].map(s=>({pos:s.pos,color:s.color})));
+    stopSel=0; stopPresetName=name;
+    applyNetColors(); renderColorControls();
+  });
+  host.querySelector("#gradPresetSave").addEventListener("click",async()=>{
+    const name=prompt("preset name?"); if(!name) return;
+    const presetStops=[...getGradStops()].map(({pos,color})=>({pos,color}));
+    localStopPresets[name]=presetStops;
+    save("netstopPresets",localStopPresets); stopPresetName=name;
+    try{ await persistLocalPreset("save",name,presetStops); }catch(e){ alert("failed to save preset: "+e.message); }
+    renderColorControls();
+  });
+  host.querySelector("#gradPresetDel").addEventListener("click",async()=>{
+    const name=host.querySelector("#gradPreset").value;
+    if(!name) return;
+    if(!confirm(`delete preset "${name}"?`)) return;
+    delete localStopPresets[name]; save("netstopPresets",localStopPresets);
+    try{ await persistLocalPreset("delete",name); }catch(e){ alert("failed to delete preset: "+e.message); }
+    if(stopPresetName===name) stopPresetName="";
+    renderColorControls();
+  });
+}
+
+/* ---- in-page color picker ----
+   the browser/OS-native <input type=color> dialog can't be repositioned or
+   have its fields customized from a web page (its layout/placement is OS
+   chrome, not DOM), so per the yabe branch this is a small self-contained
+   replacement: a centered modal with an SV square + hue strip + hex/RGB
+   fields all visible at once (no tab-switching). onCommit fires live as the
+   user drags/types; canceling (backdrop/Esc/cancel button) restores the
+   color that was current when the picker opened. */
+function rgb2hsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if(d!==0){
+    if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  return [h, max===0?0:d/max, max];
+}
+function hsv2rgb(h,s,v){
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0]; else if(h<120)[r,g,b]=[x,c,0]; else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c]; else if(h<300)[r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+function rgb2hex(r,g,b){ return "#"+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join(""); }
+let cpState=null; // {h,s,v,orig,onCommit}
+function openColorPicker(hex, onCommit){
+  const [r,g,b]=hex2rgb(toHexColor(hex));
+  const [h,s,v]=rgb2hsv(r,g,b);
+  cpState={h,s,v,orig:toHexColor(hex),onCommit};
+  renderColorPicker();
+  const box=$("#cpBox"); box.style.position=""; box.style.left=""; box.style.top=""; box.style.margin="";
+  $("#colorPickerModal").hidden=false;
+}
+function closeColorPicker(commit){
+  if(!cpState) return;
+  const {orig,onCommit}=cpState;
+  $("#colorPickerModal").hidden=true;
+  cpState=null;
+  if(!commit && onCommit) onCommit(orig);
+}
+function cpChanged(){
+  const {h,s,v,onCommit}=cpState;
+  const [r,g,b]=hsv2rgb(h,s,v);
+  if(onCommit) onCommit(rgb2hex(r,g,b));
+  renderColorPicker();
+}
+function renderColorPicker(){
+  if(!cpState) return;
+  const {h,s,v}=cpState;
+  const [r,g,b]=hsv2rgb(h,s,v);
+  const hex=rgb2hex(r,g,b);
+  $("#cpSv").style.backgroundColor=`hsl(${h.toFixed(0)},100%,50%)`;
+  $("#cpSvCursor").style.left=(s*100)+"%"; $("#cpSvCursor").style.top=((1-v)*100)+"%";
+  $("#cpHueCursor").style.left=(h/360*100)+"%";
+  $("#cpPreview").style.background=hex;
+  $("#cpHex").value=hex; $("#cpR").value=r; $("#cpG").value=g; $("#cpB").value=b;
 }
 
 function maybeRefetchNetwork(){
@@ -1203,6 +1504,7 @@ function renderNetControls(){
   const edgeColorInput = $("#netedgecolor");
   if(edgeColorInput) edgeColorInput.value = netState.edgeColor || cssVar("--axis");
   renderColorControls();
+  renderColorLegend();
   updateNetLegend();
   renderNetScrub();
 }
@@ -1691,8 +1993,8 @@ $("#netstep").addEventListener("change",e=>{ stopNetPlay(); netState.step=e.targ
 $("#netsize").addEventListener("change",e=>{ netState.sizeBy=e.target.value; save("netsize",netState.sizeBy);
   const s=netState.sim,d=netState.data; if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); } });
 $("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; save("netcolor",netState.colorBy);
-  renderColorControls();
-  const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d); updateNetLegend(); if(s&&!s.raf) drawNet(); });
+  stopSel=0; stopPresetName="";
+  renderColorControls(); applyNetColors(); });
 $("#netcross").checked=store("netcross",false);
 $("#netedgecolor").addEventListener("input",e=>{
   netState.edgeColor=e.target.value; save("netedgecolor",netState.edgeColor);
@@ -1702,6 +2004,65 @@ $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").ch
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });
+
+/* ---- in-page color picker: wiring (see openColorPicker/renderColorPicker) ---- */
+$("#cpHandle").addEventListener("mousedown",ev=>{
+  ev.preventDefault();
+  const box=$("#cpBox"), r=box.getBoundingClientRect();
+  box.style.position="fixed"; box.style.margin="0"; box.style.left=r.left+"px"; box.style.top=r.top+"px";
+  const startX=ev.clientX, startY=ev.clientY, startLeft=r.left, startTop=r.top;
+  const move=mv=>{
+    box.style.left=(startLeft+(mv.clientX-startX))+"px";
+    box.style.top=(startTop+(mv.clientY-startY))+"px";
+  };
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpSv").addEventListener("mousedown",ev=>{
+  if(!cpState) return;
+  const el=$("#cpSv");
+  const move=mv=>{
+    const r=el.getBoundingClientRect();
+    cpState.s=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width));
+    cpState.v=1-Math.min(1,Math.max(0,(mv.clientY-r.top)/r.height));
+    cpChanged();
+  };
+  move(ev);
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpHue").addEventListener("mousedown",ev=>{
+  if(!cpState) return;
+  const el=$("#cpHue");
+  const move=mv=>{
+    const r=el.getBoundingClientRect();
+    cpState.h=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width))*360;
+    cpChanged();
+  };
+  move(ev);
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpHex").addEventListener("change",e=>{
+  if(!cpState) return;
+  const v=e.target.value.trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(v)){
+    const [r,g,b]=hex2rgb(v); const [h,s,val]=rgb2hsv(r,g,b);
+    Object.assign(cpState,{h,s,v:val}); cpChanged();
+  } else renderColorPicker();
+});
+["cpR","cpG","cpB"].forEach(id=>{
+  $("#"+id).addEventListener("change",()=>{
+    if(!cpState) return;
+    const r=+$("#cpR").value||0, g=+$("#cpG").value||0, b=+$("#cpB").value||0;
+    const [h,s,v]=rgb2hsv(r,g,b);
+    Object.assign(cpState,{h,s,v}); cpChanged();
+  });
+});
+$("#cpCancel").addEventListener("click",()=>closeColorPicker(false));
+$("#cpOk").addEventListener("click",()=>closeColorPicker(true));
+$(".cp-backdrop").addEventListener("click",()=>closeColorPicker(false));
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cpState) closeColorPicker(false); });
 
 /* ---- network snapshot time-sequence playback ---- */
 let netPlayTimer=null;
@@ -1869,6 +2230,7 @@ function schedule(){
   timer=setInterval(()=>{ if(!state.paused){ refresh(); loadLog(); } }, (+$("#interval").value)*1000);
 }
 initStaticCards();
+loadStopPresets();
 refresh(); schedule();
 </script>
 </body>
