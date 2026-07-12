@@ -227,6 +227,7 @@ class RunStore:
         target = meta.get("tMax") or DEFAULT_TARGET_STEPS
         return {
             "run": self.id,
+            "group": os.path.dirname(self.id),
             "status": self.status(),
             "step": step,
             "target": max(target, step),

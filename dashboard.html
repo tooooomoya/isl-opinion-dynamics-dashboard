@@ -34,12 +34,22 @@
   .grow { flex:1; min-width:140px; }
   .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
   .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
-  #ostats { font-size:12px; color:var(--ink2); white-space:nowrap; }
   .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   button, select { font:12.5px system-ui,sans-serif; color:var(--ink); background:var(--surface);
     border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
   button:hover, select:hover { border-color:var(--muted); }
   label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
+  /* sidebar + main body 2-column layout (collapsible; see #sidebarToggle) */
+  .layout { display:flex; align-items:flex-start; gap:16px; }
+  .layout > main { flex:1 1 0; min-width:0; }
+  #sidebar { flex:0 0 240px; width:240px; box-sizing:border-box; background:var(--surface);
+    border:1px solid var(--border); border-radius:10px; padding:10px 12px;
+    position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; }
+  #sidebar.collapsed { flex:0 0 30px; width:30px; padding:10px 4px; overflow:hidden; }
+  #sidebar.collapsed .sidebar-content { display:none; }
+  .sidebar-toggle { display:block; width:100%; margin-bottom:8px; }
+  #sidebar.collapsed .sidebar-toggle { margin-bottom:0; }
+  .sidebar-content h3 { margin-bottom:6px; }
   #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
@@ -47,43 +57,40 @@
   .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
     border-radius:14px; padding:3px 8px 3px 6px; font-size:12px; cursor:pointer; user-select:none; }
   .chip.off { opacity:.38; }
-  .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; }
+  .chip.pinned { border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
+  .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; cursor:pointer; }
   .chip .st { font-size:11px; }
   .chip .st.done { color:var(--good); } .chip .st.failed { color:var(--bad); }
   .chip .st.running { color:var(--accent); } .chip .st.stalled { color:var(--warn); }
   .chip .pct { color:var(--muted); font-variant-numeric:tabular-nums; }
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
-  details#picker { margin-bottom:10px; font-size:12.5px; }
-  details#picker summary { cursor:pointer; color:var(--ink2); width:fit-content; }
-  #pickerlist { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 14px;
-    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:6px;
-    max-height:260px; overflow-y:auto; }
+  #pickerCount { margin-bottom:6px; }
+  #pickerlist { display:flex; flex-direction:column; gap:3px; margin-bottom:8px; }
   #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .duo, .trio { display:flex; flex-wrap:wrap; gap:12px; }
-  /* Metric charts live in a fixed 2-tier layout instead of free-resize:
-     row 1 = a horizontal carousel of small cards (~4.5 visible, any number),
-     row 2 = up to 2 large "featured" cards. A card's size is set by which row
-     it is in; the ⤢ button on each card moves it between rows (promote to row 2
-     evicts the oldest featured card back to the carousel when row 2 is full). */
-  .carousel-wrap { display:flex; align-items:stretch; gap:6px; margin-bottom:12px; }
-  .carbtn { flex:0 0 auto; border:1px solid var(--border); background:var(--surface);
-    border-radius:8px; cursor:pointer; color:var(--ink2); font-size:18px; padding:0 8px; line-height:1; }
-  .carbtn:hover { background:var(--grid); color:var(--ink); }
-  .carbtn[disabled] { opacity:0.3; cursor:default; }
-  #gridCarousel { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x proximity;
-    scroll-behavior:smooth; flex:1 1 auto; padding-bottom:4px; }
-  #gridCarousel > .metriccard { flex:0 0 clamp(240px, 22%, 340px); scroll-snap-align:start; }
-  #gridFeature { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
-  #gridFeature:empty { display:none; }
-  #gridFeature > .metriccard { flex:1 1 calc(50% - 6px); min-width:min(100%, 420px); }
+  /* Metric charts live in a wrapping grid (2-3 columns, auto-reflow by
+     container width) instead of a fixed carousel+featured-row layout. A
+     card's size is set by whether it carries .featured; the ⤢ button on each
+     card toggles that (at most 2 featured at once, oldest evicted first). */
+  #gridWrap { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  #gridWrap > .metriccard { flex:1 1 clamp(260px, 31%, 380px); }
+  #gridWrap > .metriccard.featured { flex:1 1 calc(50% - 6px); min-width:min(100%, 420px); }
   .metriccard { position:relative; }
   .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
     z-index:1; background:none; border:none; }
   .enlargebtn:hover { background:var(--grid); color:var(--ink); }
-  .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px 6px; }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px 6px;
+    box-shadow:0 1px 3px rgba(0,0,0,.05); transition:box-shadow .15s, transform .15s; }
+  .panel:hover { box-shadow:0 2px 8px rgba(0,0,0,.09); transform:translateY(-1px); }
+  @media (prefers-color-scheme: dark) {
+    .panel { box-shadow:0 1px 3px rgba(0,0,0,.35); }
+    .panel:hover { box-shadow:0 2px 10px rgba(0,0,0,.5); }
+  }
+  :root[data-theme="dark"] .panel { box-shadow:0 1px 3px rgba(0,0,0,.35); }
+  :root[data-theme="dark"] .panel:hover { box-shadow:0 2px 10px rgba(0,0,0,.5); }
   .panel svg { display:block; width:100%; height:auto; }
   /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone —
      used for the big section wrappers, which aren't individually resized. */
@@ -102,6 +109,22 @@
   .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
+  /* header stat tiles: running/done/stalled/updated, always visible above the tabs */
+  .stattiles { display:flex; gap:8px; flex-wrap:wrap; }
+  .ministat { display:flex; align-items:center; gap:7px; background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; padding:5px 11px; }
+  .ministat .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .ministat .val { font-size:19px; font-weight:600; font-variant-numeric:proportional-nums; line-height:1.1; }
+  .ministat .lbl { font-size:10.5px; color:var(--muted); }
+  /* tabs: 3-way split (time series / opinion / network), the rest of the
+     always-visible header (title, stat tiles, controls, banner, chips) stays
+     outside the tabpanels below. */
+  .tabnav { display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid var(--border); }
+  .tabbtn { background:none; border:none; border-bottom:2px solid transparent; border-radius:0;
+    padding:7px 14px; font:13px system-ui,sans-serif; color:var(--ink2); cursor:pointer; }
+  .tabbtn:hover { color:var(--ink); border-color:var(--muted); }
+  .tabbtn.active { color:var(--ink); border-bottom-color:var(--accent); font-weight:600; }
+  .tabpanel[hidden] { display:none; }
   table.bctable { width:100%; border-collapse:collapse; font-size:11.5px; }
   table.bctable td, table.bctable th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--grid); }
   table.bctable th { color:var(--muted); font-weight:600; text-align:right; }
@@ -124,6 +147,7 @@
     color:var(--ink2); white-space:pre-wrap; }
   .subnote { font-size:11px; color:var(--muted); margin:-2px 0 4px; }
   .scrubrow { display:flex; gap:8px; align-items:center; margin:2px 0 6px; }
+  .scrubrow[hidden] { display:none; }
   .scrubrow input[type=range] { flex:1; accent-color:var(--accent); }
   .scrubrow button.live { color:var(--accent); border-color:var(--accent); }
   .scrubrow .subnote { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
@@ -133,20 +157,65 @@
   /* arbitrary-stop gradient editor for the network color scale (phase-2 port) */
   .gradbar { position:relative; flex:1 1 160px; min-width:160px; height:18px; border-radius:4px;
     border:1px solid var(--border); cursor:crosshair; margin:6px 8px 6px 0; }
-  .gradbar .gradstop { position:absolute; top:-4px; width:11px; height:26px; margin-left:-5.5px;
-    border-radius:3px; border:2px solid var(--surface); box-shadow:0 0 0 1px var(--ink2); cursor:grab; }
-  .gradbar .gradstop.selected { box-shadow:0 0 0 2px var(--ink); }
+  .gradbar .gradstop { position:absolute; top:-4px; width:8px; height:16px; margin-left:-4px;
+    border:1px solid var(--surface); cursor:grab; background:#111;
+    clip-path:polygon(50% 100%, 0 0, 100% 0); }
+  .gradbar .gradstop.selected { background:#8a8a86; }
   #netcolorctl input[type=text] { font:11.5px ui-monospace,Menlo,monospace; color:var(--ink);
     background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:3px 6px; width:76px; }
+  /* compact always-visible color legend (Gephi-style: label + gradient + tick marks + gear) */
+  .colorbar-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:2px 0 6px; min-height:26px; }
+  .colorbar-row .cb-label { font-size:11px; color:var(--muted); white-space:nowrap; }
+  .colorbar-row .cb-scale { display:flex; flex-direction:column; flex:0 0 auto; }
+  .colorbar-row .cb-gradbar { flex:none; width:180px; min-width:180px; margin:0; }
+  .colorbar-row .cb-ticks { display:flex; justify-content:space-between; width:180px;
+    font-size:10px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .colorbar-row .cb-chips { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
+  .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
+  /* network snapshot: compact (default, ~2/3 width, canvas ~350px) vs expanded
+     (full width, canvas ~550px) — see #netExpand. Controls/description stay
+     visible in both modes; only the card's overall footprint changes. */
+  #netsnapshotSection { width:66%; }
+  #netsnapshotSection.expanded { width:100%; }
+  #netsnapshotSection #network { min-height:350px; }
+  #netsnapshotSection.expanded #network { min-height:550px; }
+  .net-expand-btn { margin-left:auto; }
   #empty { color:var(--muted); padding:40px; text-align:center; }
+  /* in-page color picker (replaces the OS-native <input type=color> dialog,
+     whose position/layout a web page cannot control): centered modal with an
+     SV square + hue strip + hex/RGB fields all shown at once. */
+  .cp-swatch { width:28px; height:22px; border-radius:6px; border:1px solid var(--border); cursor:pointer; padding:0; }
+  .cp-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; }
+  .cp-modal[hidden] { display:none; }
+  .cp-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); }
+  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding:16px; width:260px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
+  .cp-handle { cursor:move; font-size:10.5px; color:var(--muted); text-align:center;
+    margin:-16px -16px 10px; padding:5px; border-bottom:1px solid var(--border);
+    border-radius:10px 10px 0 0; user-select:none; }
+  .cp-sv { position:relative; width:100%; height:150px; border-radius:6px; cursor:crosshair; margin-bottom:10px;
+    background-image:linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 100%),
+                      linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%); }
+  .cp-svcursor { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5); transform:translate(-50%,-50%); pointer-events:none; }
+  .cp-hue { position:relative; width:100%; height:14px; border-radius:7px; margin-bottom:14px; cursor:pointer;
+    background:linear-gradient(to right,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00); }
+  .cp-huecursor { position:absolute; top:-3px; width:8px; height:20px; margin-left:-4px; border-radius:3px;
+    border:2px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,.5); pointer-events:none; }
+  .cp-fields { display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px 8px; align-items:center;
+    font-size:11.5px; color:var(--ink2); margin-bottom:12px; }
+  .cp-fields input[type=number] { width:100%; }
+  .cp-fields input#cpHex { width:100%; font:11.5px ui-monospace,Menlo,monospace; grid-column:2 / span 3; }
+  .cp-actions { display:flex; align-items:center; gap:8px; }
+  .cp-preview { width:28px; height:22px; border-radius:6px; border:1px solid var(--border); }
 </style>
 </head>
 <body>
 
 <header class="top">
   <h1>echo-chamber live dashboard</h1>
+  <div class="stattiles" id="stattiles"></div>
   <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
-  <span id="ostats">–</span>
   <div class="controls">
     <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
     <select id="interval" title="refresh interval">
@@ -154,7 +223,7 @@
       <option value="10">10s</option><option value="30">30s</option>
     </select>
     <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
-    <label class="ctl"><input type="checkbox" id="showmean"> show mean</label>
+    <label class="ctl"><input type="checkbox" id="showmean"> show band</label>
     <button id="resetzoom" hidden>reset zoom</button>
     <button id="theme" title="toggle theme">&#9681;</button>
   </div>
@@ -163,39 +232,55 @@
 <div id="banner" hidden></div>
 <div id="seedbar"></div>
 
-<details id="picker"><summary>metrics&hellip;</summary><div id="pickerlist"></div></details>
+<div class="scrubrow" id="cursorRow">
+  <button id="cursorPlay" title="play the global step cursor from the earliest step">&#9654; play</button>
+  <button id="cursorLive" title="jump back to the latest step">&#8676; live</button>
+  <input type="range" id="cursorScrub" min="0" max="0" value="0" step="1">
+  <span id="cursorScrubLabel" class="subnote">&ndash;</span>
+</div>
 
+<nav class="tabnav" id="tabnav">
+  <button class="tabbtn" data-tab="timeseries">time series</button>
+  <button class="tabbtn" data-tab="opinion">opinion</button>
+  <button class="tabbtn" data-tab="network">network</button>
+</nav>
+
+<div class="tabpanel" data-tabpanel="timeseries">
+<div class="layout">
+<aside id="sidebar">
+  <button id="sidebarToggle" class="sidebar-toggle" title="collapse sidebar" aria-label="collapse sidebar">&laquo;</button>
+  <div id="sidebarContent" class="sidebar-content">
+    <h3>display metrics</h3>
+    <div id="pickerCount" class="subnote"></div>
+    <div id="pickerlist"></div>
+  </div>
+</aside>
 <main>
-  <div class="carousel-wrap">
-    <button class="carbtn" id="carPrev" title="scroll left" aria-label="scroll left">&lsaquo;</button>
-    <div id="gridCarousel"></div>
-    <button class="carbtn" id="carNext" title="scroll right" aria-label="scroll right">&rsaquo;</button>
-  </div>
-  <div id="gridFeature"></div>
-  <div class="duo" id="topPairRow">
-    <section class="panel card" data-card="plane">
-      <h3>2-D outcome plane
-        <select id="px"></select> &times; <select id="py"></select>
-      </h3>
-      <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = scrub position (zoom window applies); drag the slider to rewind</div>
-      <div class="scrubrow">
-        <button id="planePlay" title="play the trajectory from step 0">&#9654; play</button>
-        <button id="planeLive" title="jump back to the latest step">&#8676; live</button>
-        <input type="range" id="planeScrub" min="0" max="0" value="0" step="1">
-        <span id="planeScrubLabel" class="subnote">&ndash;</span>
-      </div>
-      <div id="plane" class="cardbody"></div>
-    </section>
-    <section class="panel card" data-card="opinion">
-      <h3>opinion distribution over time <select id="opseed"></select></h3>
-      <div class="subnote">density heatmap: per-step share of agents across opinion bins
-        (&minus;1 bottom &harr; +1 top), color = share (done runs: opinions.csv.xz;
-        running runs: rebuilt from GEXF snapshots at snapshot cadence).</div>
-      <div id="opinion" class="cardbody"></div>
-      <div class="leg" id="opleg"></div>
-    </section>
-  </div>
-  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot" style="margin-top:12px">
+  <div id="gridWrap"></div>
+  <section class="panel card" data-card="plane">
+    <h3>2-D outcome plane
+      <select id="px"></select> &times; <select id="py"></select>
+    </h3>
+    <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = global cursor position (zoom window applies)</div>
+    <div id="plane" class="cardbody"></div>
+  </section>
+</main>
+</div>
+</div>
+
+<div class="tabpanel" data-tabpanel="opinion">
+  <section class="panel card" data-card="opinion">
+    <h3>opinion distribution over time <select id="opseed"></select></h3>
+    <div class="subnote">density heatmap: per-step share of agents across opinion bins
+      (&minus;1 bottom &harr; +1 top), color = share (done runs: opinions.csv.xz;
+      running runs: rebuilt from GEXF snapshots at snapshot cadence).</div>
+    <div id="opinion" class="cardbody"></div>
+    <div class="leg" id="opleg"></div>
+  </section>
+</div>
+
+<div class="tabpanel" data-tabpanel="network">
+  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
     <h3>network snapshot
       <select id="netseed"></select>
       <select id="nettype" hidden>
@@ -212,6 +297,7 @@
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
       <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
       <span id="netinfo" class="subnote"></span>
+      <button id="netExpand" class="net-expand-btn" title="expand snapshot">&#10530;</button>
     </h3>
     <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber):
       node radius and color are mapped from the attributes chosen above (default radius &prop; &radic;in-degree,
@@ -219,13 +305,9 @@
       Positions carry over between snapshots, so stepping through time shows the sorting happen.
       Wheel to zoom, drag the background to pan (double-click resets), drag a node to pin it while the
       layout runs. Drag this card's bottom-right corner to resize the canvas.</div>
+    <div id="netcolorbar" class="colorbar-row"></div>
     <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
-    <div class="scrubrow">
-      <button id="netPlay" title="play through GEXF snapshots from step 0">&#9654; play</button>
-      <input type="range" id="netScrub" min="0" max="0" value="0" step="1">
-      <span id="netScrubLabel" class="subnote">&ndash;</span>
-    </div>
-    <canvas id="network" class="cardbody" style="border-radius:6px; min-height:550px"></canvas>
+    <canvas id="network" class="cardbody" style="border-radius:6px"></canvas>
     <div class="leg" id="netleg"></div>
   </section>
 
@@ -257,9 +339,29 @@
     <div id="repostRow" class="trio"></div>
     <div id="attrRow" class="duo" style="margin-top:10px"></div>
   </section>
-</main>
+</div>
 
 <div id="tooltip" hidden></div>
+<div id="colorPickerModal" class="cp-modal" hidden>
+  <div class="cp-backdrop"></div>
+  <div id="cpBox" class="cp-box">
+    <div id="cpHandle" class="cp-handle" title="drag to move">color</div>
+    <div id="cpSv" class="cp-sv"><div id="cpSvCursor" class="cp-svcursor"></div></div>
+    <div id="cpHue" class="cp-hue"><div id="cpHueCursor" class="cp-huecursor"></div></div>
+    <div class="cp-fields">
+      <label for="cpHex">hex</label><input type="text" id="cpHex" maxlength="7">
+      <label for="cpR">R</label><input type="number" id="cpR" min="0" max="255">
+      <label for="cpG">G</label><input type="number" id="cpG" min="0" max="255">
+      <label for="cpB">B</label><input type="number" id="cpB" min="0" max="255">
+    </div>
+    <div class="cp-actions">
+      <div id="cpPreview" class="cp-preview"></div>
+      <span style="flex:1"></span>
+      <button type="button" id="cpCancel">cancel</button>
+      <button type="button" id="cpOk">OK</button>
+    </div>
+  </div>
+</div>
 <aside id="logdrawer" hidden>
   <header><span id="logtitle"></span><button id="logclose">&times;</button></header>
   <pre id="logtext"></pre>
@@ -288,7 +390,12 @@ const state = {
   metrics: store("metrics", DEFAULT_METRICS),
   featured: store("featured", []),   // metric ids promoted to row 2 (max 2, oldest first)
   hidden: new Set(store("hidden", [])),
-  zoom: null, scrub: null, paused:false, busy:false,
+  zoom: null, paused:false, busy:false,
+  // global time cursor (R4): a single step position shared by the line charts,
+  // the 2-D plane and the network snapshot. null = "live" (track the latest
+  // step as new data arrives). cursorRange = [min,max] step spanned by all
+  // currently-visible runs (recomputed every refresh(), see computeCursorRange()).
+  cursor: null, cursorRange: [0,0],
   px: store("px","modularity"), py: store("py","opinion_var"),
   // shared "detail run" for single-run panels: opinion distribution, family
   // charts. Independent of netState.seed (network snapshot), which needs its
@@ -296,7 +403,12 @@ const state = {
   opseed: store("opseed", null),
   charts: {},   // metric -> chart meta for hover
   plane: null,
+  pinned: new Set(),   // seed ids pinned (highlighted) via chip dot click
+  hoverSeed: null,      // seed id transiently highlighted via chip hover
+  tab: store("tab","timeseries"),  // active tab: timeseries | opinion | network
+  lastUpdate: null,
 };
+const TABS=["timeseries","opinion","network"];
 
 function theme(){ const t=document.documentElement.dataset.theme;
   if(t) return t; return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }
@@ -361,9 +473,9 @@ async function refresh(){
       state.opinion = await jget("/api/opinion?run="+encodeURIComponent(state.opseed)+"&max=800");
     }
     hideBanner("err");
+    state.lastUpdate = new Date();
     renderAll();
-    maybeRefetchNetwork();
-    $("#ostats").textContent = statText() + " · updated " + new Date().toLocaleTimeString();
+    if(state.tab==="network") maybeRefetchNetwork();
   }catch(e){
     showBanner("err","server unreachable — is scripts/dashboard/dashboard.py --serve still running? ("+e.message+")");
   }finally{ state.busy=false; }
@@ -378,10 +490,22 @@ function initialHide(){
   if(ids.length) save("hiddenInit",true);
 }
 
-function statText(){
+/* header stat tiles (R3/R6): running/done/stalled counts + last-update time,
+   always visible above the tabs. Values use proportional (not tabular) nums
+   per R6 — tabular-nums is reserved for tables/axis ticks. */
+function renderStatTiles(){
+  const host=$("#stattiles"); if(!host) return;
   const ss=state.summary.runs;
   const n=s=>ss.filter(x=>x.status===s).length;
-  return `running ${n("running")} · done ${n("done")} · stalled ${n("stalled")}`;
+  const tiles=[
+    {lbl:"running", val:n("running"), dot:"var(--accent)"},
+    {lbl:"done",    val:n("done"),    dot:"var(--good)"},
+    {lbl:"stalled", val:n("stalled"), dot:"var(--warn)"},
+    {lbl:"updated", val:state.lastUpdate?state.lastUpdate.toLocaleTimeString():"–", dot:null},
+  ];
+  host.innerHTML=tiles.map(t=>
+    `<div class="ministat">${t.dot?`<span class="dot" style="background:${t.dot}"></span>`:""}`+
+    `<div><div class="val">${t.val}</div><div class="lbl">${t.lbl}</div></div></div>`).join("");
 }
 
 /* ---------- banners ---------- */
@@ -390,8 +514,30 @@ function hideBanner(cls){ const b=$("#banner"); if(b.className===cls) b.hidden=t
 
 /* ---------- run helpers (runs play the role upstream seeds do) ---------- */
 function seedList(){ return state.summary ? state.summary.runs : []; }
-function seedColor(rid){ const ids=seedList().map(s=>s.run); const i=ids.indexOf(rid);
-  return { color: pal()[i % 8], dash: i>=8 ? "6 4" : null }; }
+/* ---------- pattern grouping (color follows the run's parent dir, "the pattern",
+   not the individual seed — R1). A single-pattern dataset (the common flat
+   root/s0.. layout) degenerates to neutral bundle + accent mean/band so it
+   still reads as one coherent condition. */
+function groupOf(s){ return s && s.group!=null ? s.group : ""; }
+function groupNames(){ return [...new Set(seedList().map(groupOf))].sort(); }
+function patternLabel(g){ if(!g) return "(root)"; const parts=String(g).split("/"); return parts[parts.length-1]; }
+function ensurePatternColorMap(){
+  const names=groupNames();
+  const map=store("patternColors", {});
+  const unassigned=names.filter(n=>!(n in map)).sort();
+  if(unassigned.length){
+    let idx=Object.keys(map).length;
+    for(const n of unassigned){ map[n]=idx%8; idx++; }
+    save("patternColors", map);
+  }
+  return map;
+}
+function groupColor(g){
+  if(groupNames().length<=1) return { bundle: cssVar("--muted"), full: cssVar("--accent"), mean: cssVar("--accent"), band: cssVar("--accent") };
+  const c = pal()[ensurePatternColorMap()[g] % 8];
+  return { bundle:c, full:c, mean:c, band:c };
+}
+function seedColor(rid){ return groupColor(groupOf(seedList().find(s=>s.run===rid))); }
 function visibleSeeds(){ return seedList().filter(s=>!state.hidden.has(s.run)); }
 function shortRun(rid){
   if(rid==null) return "–";
@@ -408,12 +554,78 @@ function mixLabel(mix){ if(!mix) return "";
 function metricLabel(m){ const l=state.summary && state.summary.labels; return (l && l[m]) || m; }
 
 /* ---------- render: header/seedbar/picker ---------- */
+/* Only the active tab's cards are rendered/redrawn (R3): the other two tabs'
+   DOM is left untouched (and, for network, its force layout is paused — see
+   onTabActivated/loop). Header/seedbar/picker stay outside the tabs so they
+   always reflect the latest poll regardless of which tab is showing. */
 function renderAll(){
-  renderHeader(); renderSeedbar(); renderPicker();
-  renderGrid(); renderPlane(); renderOpinion();
+  state.cursorRange = computeCursorRange();
+  renderHeader(); renderSeedbar(); renderPicker(); renderCursorRow();
+  if(state.tab==="timeseries"){ renderGrid(); renderPlane(); }
+  else if(state.tab==="opinion"){ renderOpinion(); }
+  else if(state.tab==="network"){ syncNetworkToCursor(); }
   // network-structure + behavior panels stay hidden (no echo-chamber data yet)
   $("#resetzoom").hidden = !state.zoom;
 }
+
+/* ---------- global time cursor (R4) ----------
+   A single state.cursor (null = live) drives the line-chart hairline+markers,
+   the plane's trajectory cutoff and the network view's snapshot selection.
+   state.cursorRange is "the full length" the requirements call for: the
+   min..max step spanned by all currently visible runs' fetched series
+   (not any one metric's own extent, which may be narrower — e.g. a sparse
+   aux column). Recomputed once per refresh(); cursor moves themselves
+   (drag/play/live) don't change it. */
+function computeCursorRange(){
+  let mn=Infinity, mx=-Infinity;
+  const consider=steps=>{ if(!steps||!steps.length) return;
+    if(steps[0]<mn) mn=steps[0]; if(steps[steps.length-1]>mx) mx=steps[steps.length-1]; };
+  for(const s of visibleSeeds()){
+    const e=state.series[s.run]; if(!e) continue;
+    // a run's top-level e.step is only populated when a plain (non-aux)
+    // column was fetched — metrics like modularity live under e.aux.<metric>.step
+    // instead (see seriesFor()), so both need scanning here.
+    consider(e.step);
+    if(e.aux) for(const a of Object.values(e.aux)) consider(a.step);
+  }
+  return mn===Infinity ? [0,0] : [mn,mx];
+}
+function renderCursorRow(){
+  const el=$("#cursorScrub"), lab=$("#cursorScrubLabel"), liveBtn=$("#cursorLive");
+  const [mn,mx]=state.cursorRange;
+  if(!(mx>mn)){ el.min=0; el.max=0; el.value=0; el.disabled=true; lab.textContent="–"; liveBtn.classList.add("live"); return; }
+  el.min=mn; el.max=mx; el.disabled=false;
+  const live=(state.cursor===null || state.cursor>=mx);
+  const cutoff=live?mx:Math.max(mn,state.cursor);
+  el.value=cutoff;
+  lab.textContent=(live?"latest — step ":"step ")+fstep(cutoff);
+  liveBtn.classList.toggle("live", live);
+}
+/* re-render just the views that read the cursor, without a full refresh()
+   (data hasn't changed — only the cursor position has). */
+function onCursorChange(){
+  renderCursorRow();
+  if(state.tab==="timeseries"){ renderGrid(); renderPlane(); }
+  else if(state.tab==="network"){ syncNetworkToCursor(); }
+}
+$("#cursorScrub").addEventListener("input",e=>{ stopCursorPlay(); state.cursor=+e.target.value; onCursorChange(); });
+$("#cursorLive").addEventListener("click",()=>{ stopCursorPlay(); state.cursor=null; onCursorChange(); });
+let cursorPlayTimer=null;
+$("#cursorPlay").addEventListener("click",()=>{ cursorPlayTimer?stopCursorPlay():startCursorPlay(); });
+function startCursorPlay(){
+  const [mn,mx]=state.cursorRange; if(!(mx>mn)) return;
+  const b=$("#cursorPlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
+  const dur=6000, tick=80, inc=(mx-mn)*tick/dur;
+  state.cursor=mn; onCursorChange();
+  cursorPlayTimer=setInterval(()=>{
+    const [mn2,mx2]=state.cursorRange;
+    state.cursor=(state.cursor==null?mn2:state.cursor)+inc;
+    if(state.cursor>=mx2){ state.cursor=null; onCursorChange(); stopCursorPlay(); return; }  /* end -> live */
+    onCursorChange();
+  }, tick);
+}
+function stopCursorPlay(){ if(cursorPlayTimer){ clearInterval(cursorPlayTimer); cursorPlayTimer=null; }
+  const b=$("#cursorPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
 
 function renderHeader(){
   const ss=seedList();
@@ -422,29 +634,75 @@ function renderHeader(){
   if(ss.length && ss.every(s=>s.status==="done"))
     showBanner("ok","&#10003; all "+ss.length+" runs finished");
   else hideBanner("ok");
+  renderStatTiles();
 }
+
+/* ---------- tabs (R3): time series / opinion / network ----------
+   Switching tabs shows/hides the matching .tabpanel and (re)draws that tab's
+   cards; the network tab additionally resumes its force-layout animation
+   loop (paused while hidden — see loop()) and kicks off a fetch if it has
+   never loaded. Persisted so a reload lands back on the same tab. */
+function setTab(tab){
+  if(!TABS.includes(tab)) tab=TABS[0];
+  state.tab=tab; save("tab",tab);
+  applyTab();
+}
+function applyTab(){
+  for(const btn of document.querySelectorAll(".tabbtn"))
+    btn.classList.toggle("active", btn.dataset.tab===state.tab);
+  for(const panel of document.querySelectorAll(".tabpanel"))
+    panel.hidden = panel.dataset.tabpanel!==state.tab;
+  onTabActivated(state.tab);
+}
+function onTabActivated(tab){
+  if(tab==="timeseries"){ renderGrid(); renderPlane(); }
+  else if(tab==="opinion"){ renderOpinion(); }
+  else if(tab==="network"){
+    if(!netState.data){ fetchNetwork(); return; }
+    // the cursor may have moved while this tab was hidden (line/plane tabs
+    // stay live-updating); snap to it now. If that kicks off a refetch,
+    // fetchNetwork()'s own completion handles startSim()/sizing below.
+    if(syncNetworkToCursor()) return;
+    const s=netState.sim; if(!s) return;
+    // the canvas has zero size while its tabpanel was display:none, so its
+    // backing buffer needs a resync to the now-visible clientWidth/Height
+    // before drawing again (positions/zoom/pan are untouched).
+    const cv=$("#network"), W=cv.clientWidth||s.W, H=cv.clientHeight||s.H;
+    if(W&&H){ const dpr=devicePixelRatio||1; cv.width=W*dpr; cv.height=H*dpr;
+      cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); s.W=W; s.H=H; }
+    if(s.alpha>0.005 && !s.raf) loop(); else drawNet();
+  }
+}
+document.querySelectorAll(".tabbtn").forEach(btn=>btn.addEventListener("click",()=>setTab(btn.dataset.tab)));
 
 function renderSeedbar(){
   const bar=$("#seedbar"); bar.innerHTML="";
   if(!seedList().length){ bar.innerHTML='<div id="empty">no runs found — nothing under the data roots has a run_meta.json yet</div>'; return; }
   for(const s of seedList()){
-    const {color}=seedColor(s.run);
+    const {full}=seedColor(s.run);
     const chip=document.createElement("div");
-    chip.className="chip"+(state.hidden.has(s.run)?" off":"");
+    chip.className="chip"+(state.hidden.has(s.run)?" off":"")+(state.pinned.has(s.run)?" pinned":"");
     chip.title=s.run+(s.n?` · n=${s.n}`:"")+(s.seed!=null?` · seed ${s.seed}`:"")
-      +(mixLabel(s.mix)?` · ${mixLabel(s.mix)}`:"");
+      +(mixLabel(s.mix)?` · ${mixLabel(s.mix)}`:"")+" — click dot to pin/highlight";
     const pct=s.target? Math.round(100*Math.min(s.step,s.target)/s.target) : 0;
-    chip.innerHTML=`<span class="dot" style="background:${color}"></span>`+
+    chip.innerHTML=`<span class="dot" style="background:${full}"></span>`+
       `<b>${shortRun(s.run)}</b> <span class="st ${s.status}">${STATUS_GLYPH[s.status]||s.status}</span>`+
       `<span class="pct">${pct}%</span>`+
       (mixLabel(s.mix)?`<span class="pct">${mixLabel(s.mix)}</span>`:"");
+    chip.querySelector(".dot").addEventListener("click",evt=>{ evt.stopPropagation(); togglePin(s.run); });
     chip.addEventListener("click",()=>{ toggleSeed(s.run); });
+    chip.addEventListener("mouseenter",()=>{ state.hoverSeed=s.run; renderGrid(); });
+    chip.addEventListener("mouseleave",()=>{ state.hoverSeed=null; renderGrid(); });
     bar.appendChild(chip);
   }
 }
 function toggleSeed(rid){
   if(state.hidden.has(rid)) state.hidden.delete(rid); else state.hidden.add(rid);
   save("hidden",[...state.hidden]); renderAll(); refresh();
+}
+function togglePin(rid){
+  if(state.pinned.has(rid)) state.pinned.delete(rid); else state.pinned.add(rid);
+  renderSeedbar(); renderGrid();
 }
 
 function renderPicker(){
@@ -455,7 +713,7 @@ function renderPicker(){
                ...Object.keys(families).map(b=>({id:b,label:`${b} (5 classes)`}))]
     .sort((a,b)=>a.label.localeCompare(b.label));
   const list=$("#pickerlist"); list.innerHTML="";
-  $("#picker > summary").textContent = `metrics… (${state.metrics.length} shown / ${items.length} available)`;
+  $("#pickerCount").textContent = `${state.metrics.length} shown / ${items.length} available`;
   for(const it of items){
     const lab=document.createElement("label");
     const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=state.metrics.includes(it.id);
@@ -467,7 +725,7 @@ function renderPicker(){
     list.appendChild(lab);
   }
   const reset=document.createElement("button");
-  reset.textContent="reset to defaults"; reset.style.gridColumn="1/-1"; reset.style.width="fit-content";
+  reset.textContent="reset to defaults"; reset.style.width="fit-content";
   reset.addEventListener("click",()=>{ state.metrics=[...DEFAULT_METRICS]; save("metrics",state.metrics); refresh(); });
   list.appendChild(reset);
   /* plane axis selects (plain columns only — a 2-D plane axis must be a single scalar) */
@@ -499,42 +757,59 @@ function seriesFor(metric){
       let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
       if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
     if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
-    const {color,dash}=seedColor(s.run);
-    out.push({seed:s.run, status:s.status, steps, vals, color, dash});
-  }
-  if($("#showmean").checked && out.length>=2){
-    /* arbitrary (currently-visible) run mean: align every series onto the
-       longest one's step grid via nearest-value lookup (same snapping the
-       hover tooltip already does), then average ignoring gaps per point. */
-    const ref=out.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
-    const vals=ref.steps.map((st,i)=>{
-      let sum=0,cnt=0;
-      for(const s of out){ if(!s.steps.length) continue;
-        const v=s.vals[nearestIdx(s.steps,st)];
-        if(v!=null&&!Number.isNaN(v)){ sum+=v; cnt++; } }
-      return cnt? sum/cnt : null;
-    });
-    out.push({seed:"mean", status:"mean( "+out.length+" runs )", steps:ref.steps, vals,
-               color:cssVar("--ink"), dash:"1 3", isMean:true});
+    const {full}=seedColor(s.run);
+    out.push({seed:s.run, group:groupOf(s), status:s.status, steps, vals, color:full});
   }
   return out;
+}
+/* Per-pattern mean±SD band (R2): every seed in a group is aligned onto the
+   group's longest step grid via nearest-value lookup, then averaged ignoring
+   gaps per point — this is what "seed replicate" grouping is for. */
+function bandsFor(seriesList){
+  const byGroup=new Map();
+  for(const r of seriesList){
+    if(!byGroup.has(r.group)) byGroup.set(r.group,[]);
+    byGroup.get(r.group).push(r);
+  }
+  const bands=[];
+  for(const [group,arr] of byGroup){
+    if(!arr.length) continue;
+    const ref=arr.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
+    const mean=[],sd=[];
+    for(const st of ref.steps){
+      let sum=0,cnt=0;
+      for(const r of arr){ if(!r.steps.length) continue;
+        const v=r.vals[nearestIdx(r.steps,st)];
+        if(v!=null&&!Number.isNaN(v)){ sum+=v; cnt++; } }
+      if(!cnt){ mean.push(null); sd.push(null); continue; }
+      const m=sum/cnt;
+      let sq=0,scnt=0;
+      for(const r of arr){ if(!r.steps.length) continue;
+        const v=r.vals[nearestIdx(r.steps,st)];
+        if(v!=null&&!Number.isNaN(v)){ sq+=(v-m)**2; scnt++; } }
+      mean.push(m); sd.push(scnt? Math.sqrt(sq/scnt) : 0);
+    }
+    bands.push({group, steps:ref.steps, mean, sd, n:arr.length});
+  }
+  return bands;
 }
 
 /* ---------- resizable + reorderable cards ----------
    Most charts live in a `.panel.card`: a native-CSS-resizable box (drag the
    bottom-right corner) whose width/height persist to localStorage per card id,
-   plus a small drag handle to reorder within its row (also persisted).
-   EXCEPTION: the metric charts do NOT use this — they use a fixed 2-tier layout
-   (carousel row + featured row, see renderGrid/makeMetricCard); size is set by
-   which row a card is in, not by dragging. Two kinds of card groups:
+   plus (for groups with more than one member) a small drag handle to reorder
+   within its row, also persisted. EXCEPTION: the metric charts do NOT use
+   this — they live in the wrapping `#gridWrap` grid (see renderGrid), sized
+   by their .featured class rather than by dragging. Two kinds of card groups:
    - dynamic (degree trio, structstats trio, qsignei/repostpair/attrpair duos):
      the container is fully torn down and rebuilt every render, so order lives in
      a plain array (cardOrder.<key> in localStorage for the fixed groups) that
      the render function iterates.
-   - static (2-D plane / opinion pair, network snapshot): these keep their
-     bespoke HTML (selects, scrubbers, legends) and are never torn down, so a
-     drag just physically reorders the DOM nodes; restoreStaticOrder() replays
-     that on page load. */
+   - static (2-D plane, opinion, network snapshot): these keep their bespoke
+     HTML (selects, scrubbers, legends) and are never torn down. Each now
+     lives alone in its own tab (R3), so none of them currently pass a
+     groupKey — initStaticCard()'s drag wiring only activates when one is
+     given, for a future group of >1 static cards sharing a tab. */
 const DEFAULT_ORDER = {
   degree: ["in", "out", "total"],
   structstats: ["rwc", "dip", "clustering", "betweenness", "lambda2", "giant"],
@@ -569,7 +844,12 @@ function watchCardSize(el, id, onResize){
     interacting=true;
     clearTimeout(t);
     t=setTimeout(()=>{
-      save("size."+id, {w:Math.round(el.offsetWidth), h:Math.round(el.offsetHeight)});
+      // el._skipSizeSave(): checked at save-time (not via a timer) so a resize
+      // that isn't a deliberate compact-mode drag — e.g. the network-snapshot
+      // card while in expanded mode, which always forces full width/tall
+      // canvas via CSS — never clobbers the saved compact size.
+      if(!el._skipSizeSave || !el._skipSizeSave())
+        save("size."+id, {w:Math.round(el.offsetWidth), h:Math.round(el.offsetHeight)});
       if(onResize) onResize();
       interacting=false;
     }, 250);
@@ -644,31 +924,26 @@ function initStaticCard(el, id, groupKey, container, onReorder){
   watchCardSize(el, id, id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); }) : null);
   if(groupKey) attachDrag(container, el, handle, groupKey, onReorder);
 }
-function restoreStaticOrder(container, groupKey){
-  const order=store("cardOrder."+groupKey, null);
-  if(!order) return;
-  for(const id of order){
-    const el=container.querySelector(`:scope > [data-card="${id}"]`);
-    if(el) container.appendChild(el);
-  }
-}
+/* plane (time-series tab) and opinion (opinion tab) are now solo cards in
+   separate tabpanels (R3 split them out of the old shared row), so neither
+   has a reorder-drag group anymore — just resize persistence. */
 function initStaticCards(){
-  const topRow=$("#topPairRow");
-  if(topRow){
-    restoreStaticOrder(topRow, "top1");
-    for(const el of topRow.querySelectorAll(":scope > [data-card]")){
-      initStaticCard(el, el.dataset.card, "top1", topRow, order=>saveOrder("top1", order));
-    }
-  }
+  const planeEl=document.querySelector('[data-card="plane"]');
+  if(planeEl) initStaticCard(planeEl, "plane", null, null, null);
+  const opinionEl=document.querySelector('[data-card="opinion"]');
+  if(opinionEl) initStaticCard(opinionEl, "opinion", null, null, null);
   const netSection=$("#netsnapshotSection");
-  if(netSection) initStaticCard(netSection, "netsnapshot", null, null, null);
+  if(netSection){
+    netSection._skipSizeSave=()=>netExpanded;
+    initStaticCard(netSection, "netsnapshot", null, null, null);
+  }
 }
 
 /* ---------- line-chart grid ---------- */
 const LC={W:420,H:230,L:46,R:10,T:22,B:26};
-/* Move a metric between the carousel (row 1) and the featured row (row 2).
-   Promoting when row 2 is full evicts the oldest featured card (front of the
-   list) back to the carousel; demoting just drops it from the featured list. */
+/* Toggle a metric's "featured" (enlarged) state within the wrap grid. At most
+   2 featured at once; promoting past that evicts the oldest featured metric
+   back to normal size (front of the list, FIFO). */
 function toggleFeature(metric){
   let f=state.featured.slice();
   if(f.includes(metric)) f=f.filter(m=>m!==metric);
@@ -676,43 +951,43 @@ function toggleFeature(metric){
   state.featured=f; save("featured",f);
   renderGrid();
 }
-/** Lightweight metric card: no free-resize, no reorder-drag — just a body and an
- *  ⤢/⤡ button that promotes/demotes between the two rows. */
-function makeMetricCard(container, metric, isFeatured){
-  const card=document.createElement("div");
-  card.className="panel metriccard"; card.dataset.card=metric;
-  const btn=document.createElement("button");
-  btn.className="enlargebtn"; btn.textContent=isFeatured?"⤡":"⤢";
-  btn.title=isFeatured?"shrink back to the carousel":"enlarge into the featured row";
-  btn.addEventListener("click",()=>toggleFeature(metric));
-  card.appendChild(btn);
-  const body=document.createElement("div"); body.className="cardbody";
-  card.appendChild(body);
-  container.appendChild(card);
-  return body;
-}
+/* renderGrid() diffs against the existing #gridWrap children instead of
+   wiping and rebuilding the container (R6: no blank/skeleton flash on every
+   poll) — existing cards are reused in place (classList/label patched) and
+   just reordered via appendChild (a no-op DOM move when already in position,
+   so drag/hover/scroll state on unaffected cards survives a refresh). */
 function renderGrid(){
-  const car=$("#gridCarousel"), feat=$("#gridFeature");
-  const sl=car?car.scrollLeft:0;            // preserve carousel scroll across rebuilds
-  car.innerHTML=""; feat.innerHTML=""; state.charts={};
+  const wrap=$("#gridWrap"); if(!wrap||!state.summary) return;
+  state.charts={};
   const families=state.summary.families||{};
   // featured = promoted metrics still selected in the picker, in promotion order
   const featured=state.featured.filter(m=>state.metrics.includes(m));
   if(featured.length!==state.featured.length){ state.featured=featured; save("featured",featured); }
+  const order=[...featured, ...state.metrics.filter(m=>!featured.includes(m))];
+  const keep=new Set(order);
+  for(const el of [...wrap.children]) if(!keep.has(el.dataset.card)) el.remove();
   const draw=(body,metric)=>{ if(families[metric]) drawFamilyChart(body,metric,families[metric]);
                               else drawLineChart(body,metric); };
-  for(const metric of featured) draw(makeMetricCard(feat, metric, true), metric);
-  for(const metric of state.metrics){ if(featured.includes(metric)) continue;
-    draw(makeMetricCard(car, metric, false), metric); }
-  car.scrollLeft=sl;
-  updateCarBtns();
-}
-function updateCarBtns(){
-  const car=$("#gridCarousel"), prev=$("#carPrev"), next=$("#carNext");
-  if(!car||!prev||!next) return;
-  const max=car.scrollWidth-car.clientWidth-1;
-  prev.disabled = car.scrollLeft<=0;
-  next.disabled = car.scrollLeft>=max;
+  for(const metric of order){
+    let card=wrap.querySelector(`:scope > [data-card="${CSS.escape(metric)}"]`);
+    const isFeatured=featured.includes(metric);
+    if(!card){
+      card=document.createElement("div");
+      card.className="panel metriccard"; card.dataset.card=metric;
+      const btn=document.createElement("button");
+      btn.className="enlargebtn";
+      btn.addEventListener("click",()=>toggleFeature(metric));
+      card.appendChild(btn);
+      const body=document.createElement("div"); body.className="cardbody";
+      card.appendChild(body);
+    }
+    card.classList.toggle("featured", isFeatured);
+    const btn=card.querySelector(".enlargebtn");
+    btn.textContent=isFeatured?"⤡":"⤢";
+    btn.title=isFeatured?"shrink back to normal size":"enlarge this card";
+    wrap.appendChild(card);   // moves into final position; no-op if already there
+    draw(card.querySelector(".cardbody"), metric);
+  }
 }
 
 /* Family metrics (cRateMean_0..4 etc): one seed (state.opseed), one line per
@@ -778,13 +1053,23 @@ function drawFamilyChart(host, base, subcols){
   });
   svg.addEventListener("mouseleave",()=>{ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); });
 }
+/* Bundle+band redesign (R2): thin per-seed threads (grouped/colored by pattern)
+   + a bold mean line + an optional mean±SD wash per pattern, with pinned/hovered
+   seeds pulled out on top at full strength. Replaces the old "one line per seed,
+   dashed past 8" rendering. */
 function drawLineChart(host, metric){
   const S=seriesFor(metric);
+  const bands=bandsFor(S);
+  const showBand=$("#showmean").checked;
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
     if(v==null||Number.isNaN(v)) continue;
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
     if(v<y0)y0=v; if(v>y1)y1=v; }
+  if(showBand) for(const b of bands) for(let i=0;i<b.steps.length;i++){
+    const m=b.mean[i]; if(m==null) continue; const sd=b.sd[i]||0;
+    if(b.steps[i]<x0)x0=b.steps[i]; if(b.steps[i]>x1)x1=b.steps[i];
+    if(m-sd<y0)y0=m-sd; if(m+sd>y1)y1=m+sd; }
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${metricLabel(metric)}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
   if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
   const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
@@ -792,31 +1077,94 @@ function drawLineChart(host, metric){
   let g="";
   for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
   for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
-  let paths="";
-  for(const s of S){
+
+  const highlight=new Set([...state.pinned, ...(state.hoverSeed?[state.hoverSeed]:[])]);
+  const anyHi=highlight.size>0;
+  const pathFor=(steps,vals,mapv)=>{
     let d="",pen=false;
-    const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(s.steps.length/maxpts));
-    for(let i=0;i<s.steps.length;i+=k){ const v=s.vals[i];
-      if(v==null||Number.isNaN(v)){pen=false;continue;}
-      d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
-    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?3:2}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} stroke-linejoin="round"/>`;
+    const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(steps.length/maxpts));
+    for(let i=0;i<steps.length;i+=k){ const raw=mapv?mapv(i):vals[i];
+      if(raw==null||Number.isNaN(raw)){pen=false;continue;}
+      d+=(pen?"L":"M")+xs(steps[i]).toFixed(1)+" "+ys(raw).toFixed(1); pen=true; }
+    return d;
+  };
+
+  let bandPaths="";
+  if(showBand) for(const b of bands){
+    const col=groupColor(b.group).band;
+    let upper="",lowerPts=[];
+    for(let i=0;i<b.steps.length;i++){ const m=b.mean[i]; if(m==null) continue;
+      const sd=b.sd[i]||0, px=xs(b.steps[i]).toFixed(1);
+      upper+=(upper?"L":"M")+px+" "+ys(m+sd).toFixed(1);
+      lowerPts.push(px+" "+ys(m-sd).toFixed(1));
+    }
+    if(!upper) continue;
+    bandPaths+=`<path d="${upper} L${lowerPts.reverse().join(" L")} Z" fill="${col}" fill-opacity="0.13" stroke="none"/>`;
   }
+
+  let bundlePaths="";
+  for(const s of S){
+    if(highlight.has(s.seed)) continue;
+    const col=groupColor(s.group).bundle;
+    bundlePaths+=`<path d="${pathFor(s.steps,s.vals)}" fill="none" stroke="${col}" stroke-width="1" stroke-opacity="${anyHi?0.12:0.32}" stroke-linejoin="round"/>`;
+  }
+
+  let meanPaths="";
+  for(const b of bands){
+    const col=groupColor(b.group).mean;
+    meanPaths+=`<path d="${pathFor(b.steps,b.mean)}" fill="none" stroke="${col}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }
+
+  let hiPaths="";
+  for(const s of S){
+    if(!highlight.has(s.seed)) continue;
+    const col=groupColor(s.group).full;
+    hiPaths+=`<path d="${pathFor(s.steps,s.vals)}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round"/>`;
+    let lastX=null,lastY=null;
+    for(let i=s.steps.length-1;i>=0;i--){ const v=s.vals[i]; if(v==null||Number.isNaN(v)) continue;
+      lastX=xs(s.steps[i]); lastY=ys(v); break; }
+    if(lastX!=null){
+      hiPaths+=`<circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="4" fill="${col}" stroke="var(--surface)" stroke-width="2"/>`+
+        `<text x="${(lastX+7).toFixed(1)}" y="${(lastY+3.5).toFixed(1)}" font-weight="600" fill="${col}">${shortRun(s.seed)}</text>`;
+    }
+  }
+
+  // global time cursor (R4): a solid hairline + a dot+value per pattern mean
+  // at the cursor step, distinct from the dashed hover crosshair (.xh) below.
+  // Only drawn while scrubbed away from live — at live the mean lines'
+  // rightmost point (and any pinned/hover end labels) already read as "now",
+  // so a coincident marker there would just duplicate them.
+  let cursorMarks="";
+  if(state.cursor!=null && state.cursor>=x0 && state.cursor<=x1){
+    const cx=xs(state.cursor).toFixed(1);
+    cursorMarks=`<line x1="${cx}" x2="${cx}" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--ink2)" stroke-width="1"/>`;
+    const flip=xs(state.cursor)>LC.W-70;
+    for(const b of bands){
+      if(!b.steps.length) continue;
+      const i=nearestIdx(b.steps,state.cursor); const m=b.mean[i]; if(m==null) continue;
+      const col=groupColor(b.group).mean, cy=ys(m).toFixed(1);
+      cursorMarks+=`<circle cx="${cx}" cy="${cy}" r="3" fill="${col}" stroke="var(--surface)" stroke-width="1.5"/>`+
+        `<text x="${flip?cx-6:+cx+6}" y="${(ys(m)+3.5).toFixed(1)}" text-anchor="${flip?"end":"start"}" fill="${col}">${fmt(m)}</text>`;
+    }
+  }
+
   host.innerHTML=
     `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
       <text class="title" x="10" y="15">${metricLabel(metric)}</text>${g}
       <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
-      ${paths}
+      ${bandPaths}${bundlePaths}${meanPaths}${hiPaths}${cursorMarks}
       <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
       <rect class="zoomrect" y="${LC.T}" height="${LC.H-LC.T-LC.B}" fill="var(--accent)" opacity="0.15" visibility="hidden"/>
     </svg>`;
   const svg=host.querySelector("svg");
-  state.charts[metric]={svg,S,x0,x1,xs,ys};
+  state.charts[metric]={svg,S,bands,x0,x1,xs,ys};
   attachLineInteraction(svg, metric);
 }
 
 function svgX(svg, evt){ const r=svg.getBoundingClientRect(); return (evt.clientX-r.left)/r.width*LC.W; }
 function attachLineInteraction(svg, metric){
   let dragStart=null;
+  const multiPattern=groupNames().length>1;
   svg.addEventListener("mousemove",evt=>{
     const c=state.charts[metric]; if(!c) return;
     const px=svgX(svg,evt);
@@ -831,13 +1179,19 @@ function attachLineInteraction(svg, metric){
     let rows=[],snapX=px;
     for(const s of c.S){ if(!s.steps.length) continue;
       const i=nearestIdx(s.steps,step); const v=s.vals[i];
-      rows.push({seed:s.seed,color:s.color,v,step:s.steps[i],isMean:s.isMean});
+      // shortRun() already folds in the immediate parent dir (== the pattern
+      // name), so prefixing it again here would just repeat it.
+      rows.push({label:shortRun(s.seed), color:groupColor(s.group).full, v, step:s.steps[i]});
       snapX=c.xs(s.steps[i]); }
+    for(const b of c.bands){ if(!b.steps.length) continue;
+      const i=nearestIdx(b.steps,step); const v=b.mean[i];
+      rows.push({label:(multiPattern?patternLabel(b.group)+" · ":"")+"mean",
+                 color:groupColor(b.group).mean, v, step:b.steps[i], isMean:true}); }
     xh.setAttribute("x1",snapX); xh.setAttribute("x2",snapX); xh.setAttribute("visibility","visible");
-    rows.sort((a,b)=>(b.v??-Infinity)-(a.v??-Infinity));
+    rows.sort((a,b)=>(!!b.isMean-!!a.isMean)||((b.v??-Infinity)-(a.v??-Infinity)));
     const more=rows.length>12? rows.length-12:0; if(more) rows=rows.slice(0,12);
     showTip(evt, `<div class="thead">${metricLabel(metric)} @ step ${fstep(Math.round(rows[0]?.step??step))}</div>`+
-      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${r.isMean?"mean":shortRun(r.seed)}</span><span>${fmt(r.v)}</span></div>`).join("")+
+      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${r.label}</span><span>${fmt(r.v)}</span></div>`).join("")+
       (more?`<div class="thead">… +${more} more</div>`:""));
   });
   svg.addEventListener("mouseleave",()=>{ hideTip();
@@ -875,13 +1229,10 @@ function renderPlane(){
       if(xv==null||yv==null||Number.isNaN(xv)||Number.isNaN(yv)) continue;
       pts.push([xv,yv,a.steps[i]]);
     }
-    if(pts.length>1){ const {color,dash}=seedColor(s.run); traj.push({seed:s.run,pts,color,dash}); }
+    if(pts.length>1){ const {full}=seedColor(s.run); traj.push({seed:s.run,pts,color:full}); }
   }
-  const scrubEl=$("#planeScrub"), liveBtn=$("#planeLive"), label=$("#planeScrubLabel");
   if(!traj.length){
     host.innerHTML=`<svg viewBox="0 0 ${PL.W} ${PL.H}"><text x="${PL.W/2}" y="${PL.H/2}" text-anchor="middle">no data</text></svg>`;
-    scrubEl.min=0; scrubEl.max=0; scrubEl.value=0; scrubEl.disabled=true; label.textContent="–";
-    liveBtn.classList.add("live"); state.planeRange=null;
     return;
   }
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
@@ -892,15 +1243,13 @@ function renderPlane(){
   const xs=v=>PL.L+(v-x0)/(x1-x0)*(PL.W-PL.L-PL.R);
   const ys=v=>PL.H-PL.B-(v-y0)/(y1-y0)*(PL.H-PL.T-PL.B);
 
-  /* time scrub: rewind the trajectory endpoint without rescaling the axes above */
-  let smin=Infinity,smax=-Infinity;
-  for(const t of traj) for(const p of t.pts){ if(p[2]<smin)smin=p[2]; if(p[2]>smax)smax=p[2]; }
-  scrubEl.min=smin; scrubEl.max=smax; scrubEl.disabled=(smin>=smax); state.planeRange=[smin,smax];
-  const live=(state.scrub===null||state.scrub>=smax);
-  const cutoff=live?smax:Math.max(smin,state.scrub);
-  scrubEl.value=cutoff;
-  label.textContent=(live?"latest — step ":"step ")+fstep(cutoff);
-  liveBtn.classList.toggle("live",live);
+  /* trajectory endpoint follows the global cursor (R4): rewinds which points
+     are drawn without rescaling the axes above. Cutoff/live come from the
+     shared state.cursor / state.cursorRange, not a plane-local range, so the
+     dot lines up with whatever the line charts and network view show. */
+  const [gmin,gmax]=state.cursorRange;
+  const live=(state.cursor===null || state.cursor>=gmax);
+  const cutoff=live?gmax:Math.max(gmin,state.cursor);
   const visTraj=traj.map(t=>({...t,pts:t.pts.filter(p=>p[2]<=cutoff)})).filter(t=>t.pts.length);
 
   let g="";
@@ -913,7 +1262,7 @@ function renderPlane(){
       const i0=Math.floor(s*(n-1)/NSEG), i1=Math.max(i0+1,Math.floor((s+1)*(n-1)/NSEG));
       let d="";
       for(let i=i0;i<=i1&&i<n;i++) d+=(i===i0?"M":"L")+xs(t.pts[i][0]).toFixed(1)+" "+ys(t.pts[i][1]).toFixed(1);
-      marks+=`<path d="${d}" fill="none" stroke="${t.color}" stroke-width="2" stroke-opacity="${(0.12+0.88*(s+1)/NSEG).toFixed(2)}" ${t.dash?`stroke-dasharray="${t.dash}"`:""}/>`;
+      marks+=`<path d="${d}" fill="none" stroke="${t.color}" stroke-width="2" stroke-opacity="${(0.12+0.88*(s+1)/NSEG).toFixed(2)}"/>`;
     }
     const last=t.pts[n-1];
     marks+=`<circle cx="${xs(last[0]).toFixed(1)}" cy="${ys(last[1]).toFixed(1)}" r="4.5" fill="${t.color}" stroke="var(--surface)" stroke-width="2"/>`;
@@ -1031,6 +1380,31 @@ const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   layout:store("netlayout","force"),
   data:null, loading:false, sim:null, hover:-1 };
 
+/* compact (default, ~2/3 width, canvas ~350px) vs expanded (full width, canvas
+   ~550px) display mode for the network snapshot card. Controls and the
+   description stay visible in both modes — only the card's footprint changes.
+   Always starts compact (not persisted across reloads — user preference).
+   The card's own resize-drag size (localStorage "size.netsnapshot") is only
+   ever saved while compact — see el._skipSizeSave in watchCardSize() — so
+   toggling to expanded (or resizing while expanded) can't clobber it. */
+let netExpanded = false;
+function applyNetExpand(){
+  const el=$("#netsnapshotSection"); if(!el) return;
+  el.classList.toggle("expanded", netExpanded);
+  const btn=$("#netExpand");
+  if(btn){ btn.textContent=netExpanded?"⤡":"⤢";
+    btn.title=netExpanded?"collapse snapshot":"expand snapshot"; }
+  // let the CSS default (compact) / .expanded (full-width) rule take over;
+  // a saved manual-resize width, if any, is restored by setNetExpanded() below.
+  if(netExpanded){ el.style.width=""; el.style.height=""; }
+}
+function setNetExpanded(on){
+  netExpanded=on;
+  const el=$("#netsnapshotSection"); if(!el) return;
+  applyNetExpand();
+  if(!on) applyCardSize(el, "netsnapshot");
+}
+
 /* ---- configurable node encoding ----
    every value below is available per-node in the /api/network payload. "size"
    picks a numeric attr; "color" picks either a numeric attr (rendered with a
@@ -1072,6 +1446,66 @@ function hex2rgb(h){ const n=parseInt(h.slice(1),16); return [(n>>16)&255,(n>>8)
 function toHexColor(c){ if(c.startsWith("#")) return c;
   const m=c.match(/\d+/g).map(Number);
   return "#"+m.map(v=>v.toString(16).padStart(2,"0")).join(""); }
+
+/* ---- in-page color picker ----
+   the browser/OS-native <input type=color> dialog can't be repositioned or
+   have its fields customized from a web page (its layout/placement is OS
+   chrome, not DOM), so per user request this is a small self-contained
+   replacement: a centered modal with an SV square + hue strip + hex/RGB
+   fields all visible at once (no tab-switching). onCommit fires live as the
+   user drags/types; canceling (backdrop/Esc/cancel button) restores the
+   color that was current when the picker opened. */
+function rgb2hsv(r,g,b){
+  r/=255; g/=255; b/=255;
+  const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+  let h=0;
+  if(d!==0){
+    if(max===r) h=((g-b)/d)%6; else if(max===g) h=(b-r)/d+2; else h=(r-g)/d+4;
+    h*=60; if(h<0) h+=360;
+  }
+  return [h, max===0?0:d/max, max];
+}
+function hsv2rgb(h,s,v){
+  const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+  let r,g,b;
+  if(h<60)[r,g,b]=[c,x,0]; else if(h<120)[r,g,b]=[x,c,0]; else if(h<180)[r,g,b]=[0,c,x];
+  else if(h<240)[r,g,b]=[0,x,c]; else if(h<300)[r,g,b]=[x,0,c]; else [r,g,b]=[c,0,x];
+  return [Math.round((r+m)*255), Math.round((g+m)*255), Math.round((b+m)*255)];
+}
+function rgb2hex(r,g,b){ return "#"+[r,g,b].map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,"0")).join(""); }
+let cpState=null; // {h,s,v,orig,onCommit}
+function openColorPicker(hex, onCommit){
+  const [r,g,b]=hex2rgb(toHexColor(hex));
+  const [h,s,v]=rgb2hsv(r,g,b);
+  cpState={h,s,v,orig:toHexColor(hex),onCommit};
+  renderColorPicker();
+  const box=$("#cpBox"); box.style.position=""; box.style.left=""; box.style.top=""; box.style.margin="";
+  $("#colorPickerModal").hidden=false;
+}
+function closeColorPicker(commit){
+  if(!cpState) return;
+  const {orig,onCommit}=cpState;
+  $("#colorPickerModal").hidden=true;
+  cpState=null;
+  if(!commit && onCommit) onCommit(orig);
+}
+function cpChanged(){
+  const {h,s,v,onCommit}=cpState;
+  const [r,g,b]=hsv2rgb(h,s,v);
+  if(onCommit) onCommit(rgb2hex(r,g,b));
+  renderColorPicker();
+}
+function renderColorPicker(){
+  if(!cpState) return;
+  const {h,s,v}=cpState;
+  const [r,g,b]=hsv2rgb(h,s,v);
+  const hex=rgb2hex(r,g,b);
+  $("#cpSv").style.backgroundColor=`hsl(${h.toFixed(0)},100%,50%)`;
+  $("#cpSvCursor").style.left=(s*100)+"%"; $("#cpSvCursor").style.top=((1-v)*100)+"%";
+  $("#cpHueCursor").style.left=(h/360*100)+"%";
+  $("#cpPreview").style.background=hex;
+  $("#cpHex").value=hex; $("#cpR").value=r; $("#cpG").value=g; $("#cpB").value=b;
+}
 function stopsDefault(){ /* opinion −1 = red, +1 = blue, neutral gray midpoint */
   return theme()==="dark"
     ? [{pos:0,color:"#e66767"},{pos:0.5,color:"#383835"},{pos:1,color:"#3987e5"}]
@@ -1134,40 +1568,106 @@ function colorNodes(s,d){
 }
 function updateNetLegend(){
   const leg=$("#netleg"); if(!leg) return;
-  const key=netState.colorBy, a=NODE_ATTRS[key]; let html="";
-  if(a.categorical){
-    const pal=getCatPalette(key);
-    html=a.cats.map((c,i)=>`<span><i style="background:${pal[i]};border-radius:50%"></i>${c}</span>`).join("");
-  } else {
-    const [lo,hi]=colorDomain(key);
-    html=`<span style="color:var(--muted)">${a.label}</span><span>${fmt(lo)}</span>`+
-         `<span><i style="width:64px;height:10px;border-radius:2px;background:linear-gradient(to right,${gradCss(getGradStops())})"></i></span>`+
-         `<span>${fmt(hi)}</span>`;
-  }
-  leg.innerHTML=html+
-    ($("#netcross").checked?`<span style="margin-left:12px"><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"");
+  leg.innerHTML=$("#netcross").checked
+    ?`<span><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"";
 }
 function applyNetColors(){
   const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d);
-  updateNetLegend(); if(s&&!s.raf) drawNet();
+  renderColorLegend(); updateNetLegend(); if(s&&!s.raf) drawNet();
 }
-/* color-scale editor (phase-2 port): an arbitrary-stop gradient bar for a
-   numeric attr — click to add a stop, drag a handle to move it, color/hex
-   inputs + delete for the selected stop, and named presets — or one picker
-   per category for a categorical attr. */
+/* color-scale UI (phase-2 port, re-split for 005_01 R1):
+   - renderColorLegend(): compact, always-visible legend in #netcolorbar
+     (Gephi-style: attr label, gradient bar with draggable/clickable stops
+     or category chips, min/mid/max ticks) — this IS the interactive
+     gradbar (drag a handle to move it, click the bar to add a stop; same
+     operability as before).
+   - renderColorControls(): the always-visible edit row in #netcolorctl
+     (selected-stop color/hex/delete, presets; per-category pickers). */
 let stopSel=0;          // selected stop, index into the pos-sorted stops
 let stopPresetName="";  // name of the loaded preset ("" = custom)
+function editGradStops(mut){   // mutate a fresh pos-sorted copy, persist, repaint
+  const ns=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  mut(ns);
+  saveGradStops(ns); stopPresetName="";
+  applyNetColors(); renderColorControls();
+}
+/* a plain (non-drag) click on a stop handle opens the in-page color picker
+   directly for that stop, so recoloring doesn't need the edit row below */
+function pickStopColor(idx){
+  const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  const cur=stops[idx]; if(!cur) return;
+  openColorPicker(cur.color, hex=>editGradStops(ns=>{ if(ns[idx]) ns[idx].color=hex; }));
+}
+function renderColorLegend(){
+  const host=$("#netcolorbar"); if(!host) return;
+  const key=netState.colorBy, a=NODE_ATTRS[key];
+  if(a.categorical){
+    const pal=getCatPalette(key);
+    host.innerHTML=`<span class="cb-label">${a.label}</span>`+
+      `<span class="cb-chips">`+a.cats.map((c,i)=>`<span><i style="background:${pal[i]}"></i>${c}</span>`).join("")+`</span>`;
+    return;
+  }
+  const stops=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+  if(stopSel>=stops.length) stopSel=0;
+  const [lo,hi]=colorDomain(key), mid=(lo+hi)/2;
+  host.innerHTML=
+    `<span class="cb-label">${a.label}</span>`+
+    `<div class="cb-scale">`+
+      `<div class="gradbar cb-gradbar" title="click to add a stop, drag a handle to move it">`+
+        stops.map((x,i)=>`<div class="gradstop${i===stopSel?" selected":""}" data-i="${i}" style="left:${(x.pos*100).toFixed(2)}%"></div>`).join("")+
+      `</div>`+
+      `<div class="cb-ticks"><span>${fmt(lo)}</span><span>${fmt(mid)}</span><span>${fmt(hi)}</span></div>`+
+    `</div>`;
+  const bar=host.querySelector(".gradbar");
+  bar.style.background=`linear-gradient(90deg,${gradCss(stops)})`;
+  bar.addEventListener("mousedown",ev=>{
+    if(ev.target.classList.contains("gradstop")) return;
+    const r=bar.getBoundingClientRect();
+    const t=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width));
+    editGradStops(ns=>{ ns.push({pos:t,color:toHexColor(gradColor(t,ns))});
+      ns.sort((x,y)=>x.pos-y.pos); stopSel=ns.findIndex(x=>x.pos===t); });
+  });
+  host.querySelectorAll(".gradstop").forEach(el=>{
+    el.addEventListener("mousedown",ev=>{
+      ev.preventDefault(); ev.stopPropagation();
+      stopSel=+el.dataset.i;
+      const work=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
+      const st=work[stopSel];
+      const startX=ev.clientX, startY=ev.clientY;
+      let dragged=false;
+      const move=mv=>{
+        if(Math.abs(mv.clientX-startX)>3||Math.abs(mv.clientY-startY)>3) dragged=true;
+        const b=host.querySelector(".gradbar"); if(!b) return;
+        const r=b.getBoundingClientRect();
+        st.pos=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width));
+        stopSel=[...work].sort((x,y)=>x.pos-y.pos).indexOf(st);
+        saveGradStops(work); stopPresetName="";
+        applyNetColors(); renderColorControls();
+      };
+      const up=()=>{
+        window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up);
+        if(!dragged) pickStopColor(stopSel);   // plain click (no drag) = recolor this stop directly
+      };
+      window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+      renderColorLegend();
+    });
+  });
+}
 function renderColorControls(){
   const host=$("#netcolorctl"); if(!host) return;
   const key=netState.colorBy, a=NODE_ATTRS[key];
   if(a.categorical){
     const pal=getCatPalette(key);
     host.innerHTML=`<span class="subnote">palette</span>`+
-      a.cats.map((c,i)=>`<label class="ctl">${c}<input type="color" data-cat="${i}" value="${pal[i]}"></label>`).join("");
-    host.querySelectorAll("input[type=color]").forEach(inp=>{
-      inp.addEventListener("input",()=>{
-        const pal=getCatPalette(key); pal[+inp.dataset.cat]=inp.value; save("netcat."+key,pal);
-        applyNetColors();
+      a.cats.map((c,i)=>`<label class="ctl">${c}<button type="button" class="cp-swatch" data-cat="${i}" style="background:${pal[i]}" title="pick a color"></button></label>`).join("");
+    host.querySelectorAll(".cp-swatch").forEach(btn=>{
+      const i=+btn.dataset.cat;
+      btn.addEventListener("click",()=>{
+        const pal0=getCatPalette(key);
+        openColorPicker(pal0[i], hex=>{
+          const pal=getCatPalette(key); pal[i]=hex; save("netcat."+key,pal);
+          applyNetColors(); btn.style.background=hex;
+        });
       });
     });
     return;
@@ -1177,59 +1677,23 @@ function renderColorControls(){
   const sel=stops[stopSel];
   const presets=store("netstopPresets",{});
   host.innerHTML=
-    `<div class="gradbar" title="click to add a stop, drag a handle to move it">`+
-      stops.map((x,i)=>`<div class="gradstop${i===stopSel?" selected":""}" data-i="${i}" style="left:${(x.pos*100).toFixed(2)}%;background:${x.color}"></div>`).join("")+
-    `</div>`+
-    `<label class="ctl">stop <input type="color" id="gradStopColor" value="${toHexColor(sel.color)}"></label>`+
+    `<label class="ctl">stop <button type="button" class="cp-swatch" id="gradStopSwatch" style="background:${toHexColor(sel.color)}" title="pick a color"></button></label>`+
     `<input type="text" id="gradStopHex" value="${toHexColor(sel.color)}" title="hex, e.g. #2a78d6">`+
     `<button id="gradStopDel" ${stops.length<=2?"disabled":""}>delete stop</button>`+
     `<select id="gradPreset" title="load a saved preset"><option value="">(custom)</option>`+
       Object.keys(presets).map(n=>`<option${n===stopPresetName?" selected":""}>${n}</option>`).join("")+`</select>`+
     `<button id="gradPresetSave" title="save current stops as a named preset">save preset</button>`+
     `<button id="gradPresetDel" title="delete the selected preset">delete preset</button>`;
-  const bar=host.querySelector(".gradbar");
-  bar.style.background=`linear-gradient(90deg,${gradCss(stops)})`;
-  const editStops=mut=>{   // mutate a fresh pos-sorted copy, persist, repaint
-    const ns=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
-    mut(ns);
-    saveGradStops(ns); stopPresetName="";
-    applyNetColors(); renderColorControls();
-  };
-  bar.addEventListener("mousedown",ev=>{
-    if(ev.target.classList.contains("gradstop")) return;
-    const r=bar.getBoundingClientRect();
-    const t=Math.min(1,Math.max(0,(ev.clientX-r.left)/r.width));
-    editStops(ns=>{ ns.push({pos:t,color:toHexColor(gradColor(t,ns))});
-      ns.sort((x,y)=>x.pos-y.pos); stopSel=ns.findIndex(x=>x.pos===t); });
-  });
-  host.querySelectorAll(".gradstop").forEach(el=>{
-    el.addEventListener("mousedown",ev=>{
-      ev.preventDefault(); ev.stopPropagation();
-      stopSel=+el.dataset.i;
-      const work=[...getGradStops()].sort((x,y)=>x.pos-y.pos);
-      const st=work[stopSel];
-      const move=mv=>{
-        const b=host.querySelector(".gradbar"); if(!b) return;
-        const r=b.getBoundingClientRect();
-        st.pos=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width));
-        stopSel=[...work].sort((x,y)=>x.pos-y.pos).indexOf(st);
-        saveGradStops(work); stopPresetName="";
-        applyNetColors(); renderColorControls();
-      };
-      const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
-      window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
-      renderColorControls();
-    });
-  });
-  host.querySelector("#gradStopColor").addEventListener("input",e=>{
-    editStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=e.target.value; });
+  host.querySelector("#gradStopSwatch").addEventListener("click",()=>{
+    const cur=[...getGradStops()].sort((x,y)=>x.pos-y.pos)[stopSel]; if(!cur) return;
+    openColorPicker(cur.color, hex=>editGradStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=hex; }));
   });
   host.querySelector("#gradStopHex").addEventListener("change",e=>{
     const v=e.target.value.trim();
-    if(/^#[0-9a-fA-F]{6}$/.test(v)) editStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=v; });
+    if(/^#[0-9a-fA-F]{6}$/.test(v)) editGradStops(ns=>{ if(ns[stopSel]) ns[stopSel].color=v; });
   });
   host.querySelector("#gradStopDel").addEventListener("click",()=>{
-    editStops(ns=>{ if(ns.length>2) ns.splice(stopSel,1); stopSel=0; });
+    editGradStops(ns=>{ if(ns.length>2) ns.splice(stopSel,1); stopSel=0; });
   });
   host.querySelector("#gradPreset").addEventListener("change",e=>{
     const p=store("netstopPresets",{}), name=e.target.value;
@@ -1282,12 +1746,33 @@ async function fetchNetwork(){
       if(d.step==null) return;
     }
     netState.data=d;
+    const steps=Array.isArray(d.steps)?d.steps:[], idx=steps.indexOf(d.step);
+    const idxTxt=idx>=0?` (${idx+1}/${steps.length})`:"";
     $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (network_data/ is empty, or the run hasn't reached the first export step)"
-      : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
+      : `step ${fstep(d.step)}${idxTxt}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
     renderNetControls();
+    netState.loading=false;   // syncNetworkToCursor()'s own loading-guard needs this cleared first
+    // the steps list needed to snap to the cursor only exists once a fetch has
+    // resolved, so a first-ever fetch (which always requests "latest") checks
+    // here whether the cursor actually wants an earlier snapshot and, if so,
+    // immediately re-fetches that one instead of animating "latest" first.
+    if(state.tab==="network" && syncNetworkToCursor()) return;
     startSim();
   }catch(e){ $("#netinfo").textContent="dashboard server unreachable: "+e.message; }
   finally{ netState.loading=false; }
+}
+/* snap the network view to the global cursor (R4): pick the available
+   snapshot nearest state.cursor (or "latest" when live) and refetch if that
+   differs from what's currently shown. Returns true iff a refetch was kicked
+   off (caller should let fetchNetwork()'s completion resume sizing/animation
+   rather than doing it itself). */
+function syncNetworkToCursor(){
+  if(!netState.data || netState.loading) return false;
+  const steps=netSteps();
+  const target = state.cursor===null ? "latest" : (steps.length? String(steps[nearestIdx(steps,state.cursor)]) : null);
+  if(target===null || target===netState.step) return false;
+  netState.step=target; save("netstep",netState.step); fetchNetwork();
+  return true;
 }
 function renderNetControls(){
   const ns=$("#netseed");
@@ -1305,21 +1790,13 @@ function renderNetControls(){
   st.value=netState.step;
   fillAttrSelect($("#netsize"), SIZE_KEYS, netState.sizeBy);
   fillAttrSelect($("#netcolor"), COLOR_KEYS, netState.colorBy);
+  renderColorLegend();
   renderColorControls();
   updateNetLegend();
-  renderNetScrub();
 }
-/* time-sequence bar over the available GEXF snapshot steps */
+/* the available GEXF snapshot steps for this run (used to snap the global
+   cursor to the nearest existing snapshot — see syncNetworkToCursor()). */
 function netSteps(){ const d=netState.data; return (d&&Array.isArray(d.steps))?d.steps:[]; }
-function renderNetScrub(){
-  const el=$("#netScrub"), lab=$("#netScrubLabel"); if(!el) return;
-  const steps=netSteps();
-  if(steps.length<1){ el.min=0; el.max=0; el.value=0; el.disabled=true; lab.textContent="–"; return; }
-  el.min=0; el.max=steps.length-1; el.step=1; el.disabled=(steps.length<2);
-  let idx=steps.indexOf(netState.data.step); if(idx<0) idx=steps.length-1;
-  el.value=idx;
-  lab.textContent=`step ${fstep(steps[idx])} (${idx+1}/${steps.length})`;
-}
 /* one <option> per attribute key; "uniform" is a size-only pseudo-attr */
 function fillAttrSelect(sel, keys, current){
   if([...sel.options].map(o=>o.value).join()!==keys.join()){
@@ -1534,7 +2011,10 @@ function fitView(s){
 
 function loop(){
   const s=netState.sim;
-  if(!s){ return; }
+  if(!s) return;
+  // pause the force-layout dynamics while the network tab isn't showing (R3);
+  // onTabActivated() resumes it on switching back in.
+  if(state.tab!=="network"){ s.raf=0; return; }
   const tick = netState.layout==="forceAtlas2" ? simTickFA2 : simTick;
   if(s.alpha>0.005){ tick(s,netState.data); drawNet();
     s.raf=requestAnimationFrame(loop);
@@ -1874,13 +2354,19 @@ $("#network").addEventListener("dblclick",()=>{
 });
 $("#network").addEventListener("mouseleave",()=>{ hideTip();
   if(netState.hover>=0){ netState.hover=-1; if(netState.sim&&!netState.sim.raf) drawNet(); } });
-$("#netseed").addEventListener("change",e=>{ stopNetPlay(); netState.seed=e.target.value; save("netseed",netState.seed); fetchNetwork(); });
-$("#nettype").addEventListener("change",e=>{ stopNetPlay(); netState.type=e.target.value; save("nettype",netState.type); fetchNetwork(); });
-$("#netstep").addEventListener("change",e=>{ stopNetPlay(); netState.step=e.target.value; save("netstep",netState.step); fetchNetwork(); });
+$("#netseed").addEventListener("change",e=>{ stopCursorPlay(); netState.seed=e.target.value; save("netseed",netState.seed); fetchNetwork(); });
+$("#nettype").addEventListener("change",e=>{ stopCursorPlay(); netState.type=e.target.value; save("nettype",netState.type); fetchNetwork(); });
+$("#netstep").addEventListener("change",e=>{ stopCursorPlay(); netState.step=e.target.value; save("netstep",netState.step);
+  // move the global cursor to match (R4: this select IS a cursor move, not a
+  // network-only override) — otherwise the very next syncNetworkToCursor()
+  // call would silently snap this choice straight back to the cursor's old
+  // position (typically "live").
+  state.cursor = netState.step==="latest" ? null : +netState.step; renderCursorRow();
+  fetchNetwork(); });
 $("#netsize").addEventListener("change",e=>{ netState.sizeBy=e.target.value; save("netsize",netState.sizeBy);
   const s=netState.sim,d=netState.data; if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); } });
 $("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; save("netcolor",netState.colorBy);
-  renderColorControls();
+  renderColorLegend(); renderColorControls();
   const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d); updateNetLegend(); if(s&&!s.raf) drawNet(); });
 $("#netlayout").addEventListener("change",e=>{ netState.layout=e.target.value; save("netlayout",netState.layout);
   const s=netState.sim; if(s){ s.alpha=Math.max(s.alpha,1); if(!s.raf) loop(); } });
@@ -1889,26 +2375,67 @@ $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").ch
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });
+$("#netExpand").addEventListener("click",()=>{ setNetExpanded(!netExpanded); });
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&netExpanded) setNetExpanded(false); });
 
-/* ---- network snapshot time-sequence playback ---- */
-let netPlayTimer=null;
-$("#netScrub").addEventListener("input",e=>{ stopNetPlay();
-  const steps=netSteps(), i=+e.target.value;
-  if(steps[i]!=null){ netState.step=String(steps[i]); save("netstep",netState.step); fetchNetwork(); } });
-$("#netPlay").addEventListener("click",()=>{ netPlayTimer?stopNetPlay():startNetPlay(); });
-function startNetPlay(){
-  const steps=netSteps(); if(steps.length<2) return;
-  const b=$("#netPlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
-  let i=0;                                   /* begin at the earliest snapshot */
-  netState.step=String(steps[0]); save("netstep",netState.step); fetchNetwork();
-  netPlayTimer=setInterval(()=>{
-    const st=netSteps(); i++;
-    if(i>=st.length){ stopNetPlay(); return; }
-    netState.step=String(st[i]); save("netstep",netState.step); fetchNetwork();
-  }, 1800);   /* first pass is gated by fetch/relayout; snapshots cache server-side after */
-}
-function stopNetPlay(){ if(netPlayTimer){ clearInterval(netPlayTimer); netPlayTimer=null; }
-  const b=$("#netPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
+/* ---- in-page color picker: wiring (see openColorPicker/renderColorPicker) ---- */
+$("#cpHandle").addEventListener("mousedown",ev=>{
+  ev.preventDefault();
+  const box=$("#cpBox"), r=box.getBoundingClientRect();
+  box.style.position="fixed"; box.style.margin="0"; box.style.left=r.left+"px"; box.style.top=r.top+"px";
+  const startX=ev.clientX, startY=ev.clientY, startLeft=r.left, startTop=r.top;
+  const move=mv=>{
+    box.style.left=(startLeft+(mv.clientX-startX))+"px";
+    box.style.top=(startTop+(mv.clientY-startY))+"px";
+  };
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpSv").addEventListener("mousedown",ev=>{
+  if(!cpState) return;
+  const el=$("#cpSv");
+  const move=mv=>{
+    const r=el.getBoundingClientRect();
+    cpState.s=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width));
+    cpState.v=1-Math.min(1,Math.max(0,(mv.clientY-r.top)/r.height));
+    cpChanged();
+  };
+  move(ev);
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpHue").addEventListener("mousedown",ev=>{
+  if(!cpState) return;
+  const el=$("#cpHue");
+  const move=mv=>{
+    const r=el.getBoundingClientRect();
+    cpState.h=Math.min(1,Math.max(0,(mv.clientX-r.left)/r.width))*360;
+    cpChanged();
+  };
+  move(ev);
+  const up=()=>{ window.removeEventListener("mousemove",move); window.removeEventListener("mouseup",up); };
+  window.addEventListener("mousemove",move); window.addEventListener("mouseup",up);
+});
+$("#cpHex").addEventListener("change",e=>{
+  if(!cpState) return;
+  const v=e.target.value.trim();
+  if(/^#[0-9a-fA-F]{6}$/.test(v)){
+    const [r,g,b]=hex2rgb(v); const [h,s,val]=rgb2hsv(r,g,b);
+    Object.assign(cpState,{h,s,v:val}); cpChanged();
+  } else renderColorPicker();
+});
+["cpR","cpG","cpB"].forEach(id=>{
+  $("#"+id).addEventListener("change",()=>{
+    if(!cpState) return;
+    const r=+$("#cpR").value||0, g=+$("#cpG").value||0, b=+$("#cpB").value||0;
+    const [h,s,v]=rgb2hsv(r,g,b);
+    Object.assign(cpState,{h,s,v}); cpChanged();
+  });
+});
+$("#cpCancel").addEventListener("click",()=>closeColorPicker(false));
+$("#cpOk").addEventListener("click",()=>closeColorPicker(true));
+$(".cp-backdrop").addEventListener("click",()=>closeColorPicker(false));
+window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cpState) closeColorPicker(false); });
 
 /* ---------- agent behavior & attributes panel ---------- */
 function autoRange(values){
@@ -2007,38 +2534,9 @@ $("#interval").value=String(store("interval",5));
 $("#interval").addEventListener("change",()=>{ save("interval",+$("#interval").value); schedule(); });
 $("#smooth").checked=store("smooth",false);
 $("#smooth").addEventListener("change",()=>{ save("smooth",$("#smooth").checked); renderAll(); });
-$("#showmean").checked=store("showmean",false);
+$("#showmean").checked=store("showmean",true);
 $("#showmean").addEventListener("change",()=>{ save("showmean",$("#showmean").checked); renderAll(); });
 $("#resetzoom").addEventListener("click",()=>{ state.zoom=null; renderAll(); });
-/* ---- metric carousel (row 1) scroll controls ---- */
-(function(){
-  const car=$("#gridCarousel"), prev=$("#carPrev"), next=$("#carNext");
-  if(!car) return;
-  const page=dir=>car.scrollBy({left:dir*car.clientWidth*0.85, behavior:"smooth"});
-  prev.addEventListener("click",()=>page(-1));
-  next.addEventListener("click",()=>page(1));
-  car.addEventListener("scroll",updateCarBtns,{passive:true});
-  window.addEventListener("resize",updateCarBtns);
-})();
-$("#planeScrub").addEventListener("input",e=>{ stopPlanePlay(); state.scrub=+e.target.value; renderPlane(); });
-$("#planeLive").addEventListener("click",()=>{ stopPlanePlay(); state.scrub=null; renderPlane(); });
-/* ---- 2-D plane trajectory playback (reveal from step 0 to latest) ---- */
-let planePlayTimer=null;
-$("#planePlay").addEventListener("click",()=>{ planePlayTimer?stopPlanePlay():startPlanePlay(); });
-function startPlanePlay(){
-  const r=state.planeRange; if(!r||!(r[1]>r[0])) return;
-  const b=$("#planePlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
-  const dur=6000, tick=80, inc=(r[1]-r[0])*tick/dur;
-  state.scrub=r[0]; renderPlane();
-  planePlayTimer=setInterval(()=>{
-    const rr=state.planeRange; if(!rr){ stopPlanePlay(); return; }
-    state.scrub=(state.scrub==null?rr[0]:state.scrub)+inc;
-    if(state.scrub>=rr[1]){ state.scrub=null; renderPlane(); stopPlanePlay(); return; }  /* end -> live */
-    renderPlane();
-  }, tick);
-}
-function stopPlanePlay(){ if(planePlayTimer){ clearInterval(planePlayTimer); planePlayTimer=null; }
-  const b=$("#planePlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
 $("#theme").addEventListener("click",()=>{
   const cur=theme(), next=cur==="dark"?"light":"dark";
   document.documentElement.dataset.theme=next; save("theme",next); renderAll();
@@ -2049,13 +2547,49 @@ const savedTheme=store("theme",null);
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
 
+/* ---------- sidebar collapse/expand ---------- */
+const SIDEBAR_NARROW_BP = 900;
+function applySidebarCollapsed(collapsed){
+  $("#sidebar").classList.toggle("collapsed", collapsed);
+  const btn=$("#sidebarToggle");
+  btn.textContent = collapsed ? "»" : "«";
+  btn.title = collapsed ? "open sidebar" : "collapse sidebar";
+  btn.setAttribute("aria-label", btn.title);
+}
+function setSidebarCollapsed(collapsed){
+  applySidebarCollapsed(collapsed);
+  save("sidebar", collapsed);
+  renderAll(); // charts need to redraw for the new main-column width
+}
+$("#sidebarToggle").addEventListener("click",()=>{
+  setSidebarCollapsed(!$("#sidebar").classList.contains("collapsed"));
+});
+{
+  const savedSidebar=store("sidebar",null);
+  const collapsed = savedSidebar===null ? innerWidth<SIDEBAR_NARROW_BP : savedSidebar;
+  applySidebarCollapsed(collapsed);
+}
+
 /* ---------- main loop ---------- */
 let timer=null;
 function schedule(){
   if(timer) clearInterval(timer);
   timer=setInterval(()=>{ if(!state.paused){ refresh(); loadLog(); } }, (+$("#interval").value)*1000);
 }
+// one-time cleanup ("v2" — an earlier build of this feature could still leak a
+// near-full-width "size.netsnapshot" while in expanded mode, via a timing race
+// in the old suppress-during-toggle logic; that's now fixed by making
+// watchCardSize() check the current mode at save-time instead of a timer, but
+// any value already leaked into localStorage by the old code needs a fresh
+// clear). Later deliberate compact-mode resizes are saved and respected
+// normally after this.
+if(!store("netSizeMigratedV2", false)){
+  localStorage.removeItem("dash.size.netsnapshot");
+  save("netSizeMigratedV2", true);
+}
 initStaticCards();
+setNetExpanded(false); // always start compact
+setTab(state.tab); // restore the last-active tab (R3); renderGrid() no-ops until refresh() below populates state.summary
 refresh(); schedule();
 </script>
 </body>
