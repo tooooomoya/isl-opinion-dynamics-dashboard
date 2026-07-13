@@ -24,17 +24,41 @@
   CDNなし(完全オフラインで動作する — CSPフリーのローカルサーバーはそもそも外部アセットに
   アクセスできないのでこれは意味がある)。約1500行。
 
-## 2つの起動モード
+## 起動方法(デフォルト: 外部公開込み)
 
 ```bash
-python dashboard/dashboard.py --serve             # インタラクティブなWebダッシュボード — こちらを使う
+./dashboard/serve_public.sh                        # デフォルト — ローカルサーバー + 公開URLを同時に起動
+./dashboard/serve_public.sh --port 9000
+./dashboard/serve_public.sh --seeds 0 1 2          # dashboard.py側の引数はそのまま渡せる
+```
+
+**`dashboard/serve_public.sh`(デフォルトの起動方法、2026-07-13〜):**
+`dashboard/dashboard.py --serve`(ローカル`127.0.0.1:<port>`)と
+[Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/do-more-with-tunnels/trycloudflare/)
+(`cloudflared tunnel --url http://127.0.0.1:<port>`)を1つのプロセスグループとしてまとめて起動し、
+発行された`https://<random>.trycloudflare.com`のURLを標準出力に表示する。ルーターのポート開放・
+アカウント登録・ドメイン設定は一切不要 — 同じWi-Fi内はもちろん、Wi-Fi外・別ネットワークからも
+このURLだけでダッシュボードにフルアクセスできる。Ctrl-Cで両プロセスとも終了する。要
+`cloudflared`(`brew install cloudflared`)。
+
+**既知の制約(認識した上で採用):**
+- 認証レイヤーは無い。URLを知っていれば誰でも閲覧でき、`POST /api/color-presets`で
+  ローカルの色プリセットファイルを書き換えることもできてしまう。実験メトリクスのみで
+  機密情報は無いため許容と判断(2026-07-13の設計判断、下記「外部アクセスの設計判断」参照)。
+- URLは`serve_public.sh`を起動し直すたびに**毎回変わる**(アカウント登録なしのQuick
+  Tunnelは固定URLを持たない)。共有し続けたい相手には都度新しいURLを伝える必要がある。
+- Cloudflareのアカウントレス Quick Tunnelは稼働率保証が無い(実験用途と割り切ること)。
+
+**`dashboard.py`を直接叩く(ローカル限定・またはSSHポートフォワード用):**
+
+```bash
+python dashboard/dashboard.py --serve             # インタラクティブなWebダッシュボード
 python dashboard/dashboard.py --serve --port 8765 --seeds 0 1 2
 python dashboard/dashboard.py                      # 最小限のmatplotlib GUI(ローカルディスプレイが必要)
 python dashboard/dashboard.py --interval 10        # GUIモードの更新間隔のみ変更
 ```
 
-**`--serve`(推奨、かつ現在も積極的に開発されている唯一のモード):** デフォルトで
-`127.0.0.1:8765`に`http.server.ThreadingHTTPServer`を立て、`/`で`dashboard.html`を、
+デフォルトで`127.0.0.1:8765`に`http.server.ThreadingHTTPServer`を立て、`/`で`dashboard.html`を、
 加えて下記のJSON APIを配信する。SSH越しの作業を想定して作られている(このプロジェクトの
 実際の開発環境はVSCode Remote-SSH): VSCodeがポートを自動転送するので、トースト通知を
 クリックするかPORTSタブを確認するか、Cmd/Ctrl+Shift+P →「Simple Browser: Show」→転送された
@@ -412,7 +436,10 @@ opinionの値はカテゴリカルパレットとは別の、diverging青↔赤�
 ## 既知の限界・やらないこと
 
 - マルチユーザー非対応、認証なし、デフォルトで`127.0.0.1`にバインド(`--host`で変更可能だが
-  認証レイヤーはないので、共有マシンで`0.0.0.0`にバインドしないこと)。
+  認証レイヤーはないので、共有マシンで`0.0.0.0`にバインドしないこと)。外部からアクセスしたい
+  場合も`--host 0.0.0.0`+ルーターのポート開放ではなく`dashboard/serve_public.sh`
+  (Cloudflare Quick Tunnel)を使うこと — サーバー自体は`127.0.0.1`にバインドしたまま
+  トンネル経由で公開するため、意図せずLAN全体やインターネットにポートを晒すことがない。
 - 履歴・永続ストレージなし — 現時点の`results/`/`logs/`の中身に対するライブビューでしか
   ない。ブラウザタブを閉じても何も失われないが(状態はサーバー側で導出されるものと
   localStorageの表示設定のみ)、ダッシュボードサーバーの再起動をまたいだタイムライン

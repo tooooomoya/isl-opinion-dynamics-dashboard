@@ -97,6 +97,12 @@
   .trio > .panel.card { flex-basis:260px; }
   .duo > .panel.card { flex-basis:420px; }
   .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
+  /* dynamic mini-cards (makeCard()) put text/values at the very top of the body,
+     which the absolutely-positioned .draghandle (top:6px) can sit on top of —
+     push their content down a bit so it clears the handle. Static full-bleed
+     cards (network canvas, 2-D plane, opinion heatmap) don't use this class,
+     since they fill the card edge-to-edge and don't have that overlap problem. */
+  .cardbody-pad { padding-top:14px; }
   .cardbody canvas { width:100%; height:100%; display:block; }
   .draghandle { position:absolute; top:6px; right:8px; cursor:grab; color:var(--muted);
     font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1; }
@@ -107,6 +113,12 @@
   .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
+  /* compact list of value-only structural stats (no chart), bundled into one card */
+  .statlist { display:flex; flex-direction:column; gap:9px; }
+  .statlist .stat-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .statlist .stat-row .lbl { font-size:11.5px; color:var(--ink2); }
+  .statlist .stat-row .val { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .statlist .stat-note { font-size:10px; color:var(--muted); margin:-6px 0 0; }
   table.bctable { width:100%; border-collapse:collapse; font-size:11.5px; }
   table.bctable td, table.bctable th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--grid); }
   table.bctable th { color:var(--muted); font-weight:600; text-align:right; }
@@ -196,7 +208,9 @@
       <option value="2">2s</option><option value="5" selected>5s</option>
       <option value="10">10s</option><option value="30">30s</option>
     </select>
-    <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
+    <label class="ctl"><input type="checkbox" id="smooth"> smooth
+      <input type="number" id="smoothWindow" min="2" step="1" placeholder="auto" style="width:52px"
+        title="moving-average window, in samples. Blank = auto (~120 points across the visible range)."></label>
     <label class="ctl"><input type="checkbox" id="showmean"> show mean</label>
     <button id="resetzoom" hidden>reset zoom</button>
     <button id="theme" title="toggle theme">&#9681;</button>
@@ -278,21 +292,15 @@
     <div id="degreeGrid" class="trio"></div>
     <div id="structRow" class="trio" style="margin-top:10px"></div>
     <div id="qsignEiRow" class="duo" style="margin-top:10px"></div>
-    <div class="subnote" style="margin-top:12px">Echo-chamber diet (Cinelli et&nbsp;al. 2021): each node's own opinion (x)
-      vs. the mean opinion of the accounts it follows (y). A tight positive diagonal = echo chambers
-      (you mostly hear your own side); a shapeless blob = a well-mixed feed. Ringed = intervened hub.</div>
-    <div id="echoScatter" style="margin-top:4px"></div>
   </section>
 
   <section class="panel" style="margin-top:12px">
-    <h3>agent behavior &amp; attributes
-      <select id="behSeed"></select>
-    </h3>
-    <div class="subnote">repost depth/rate: posts/repost_cascades.csv, any seed. bounded-confidence /
-      post-prob distributions: GEXF node attributes at the network-snapshot panel's current seed/step
-      (<span id="attrSeedNote"></span>).</div>
-    <div id="repostRow" class="trio"></div>
-    <div id="attrRow" class="duo" style="margin-top:10px"></div>
+    <h3>agent behavior &amp; attributes <span id="attrSeedNote" class="subnote"></span></h3>
+    <div class="subnote">same seed/step as the network snapshot/structure above (use the seed selector there
+      to change it). bounded-confidence / post-prob: GEXF node attributes at that seed/step (snapshot, not a
+      time series). repost depth/virality/share below: full time series for that seed, posts/repost_cascades.csv.</div>
+    <div id="attrRow" class="duo"></div>
+    <div id="repostRow" class="trio" style="margin-top:10px"></div>
   </section>
 </main>
 
@@ -333,7 +341,7 @@ const BINS_DARK  = ["#3987e5","#6da7ec","#77756f","#e88a8a","#e66767"];
 const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
 /* "cRateMean" here is a FAMILY id (see state.summary.families), not a literal
    results.csv column — rendered as one class-colored chart, not five. */
-const DEFAULT_METRICS = ["cRateMean","disagreement","apparentPolarization",
+const DEFAULT_METRICS = ["cRateMean","postShare","disagreement","apparentPolarization",
                          "unfollow","originalPostCount"];
 const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed"};
 
@@ -380,6 +388,12 @@ function ticks(min,max,n){ if(!(max>min)) return [min];
 function nearestIdx(arr,x){ let lo=0,hi=arr.length-1;
   while(hi-lo>1){ const m=(lo+hi)>>1; if(arr[m]<x) lo=m; else hi=m; }
   return (x-arr[lo] < arr[hi]-x) ? lo : hi; }
+/* moving-average window, in samples: user-set value (localStorage "smoothwin")
+   if present, else auto — target ~120 points visible regardless of series length */
+function smoothWindow(len){
+  const w=store("smoothwin",null);
+  return (w && w>=2) ? w : Math.max(2,Math.round(len/120));
+}
 function rollmean(vals,k){ if(k<2) return vals;
   const out=new Array(vals.length); let sum=0,cnt=0; const q=[];
   for(let i=0;i<vals.length;i++){ const v=vals[i];
@@ -415,10 +429,11 @@ async function refresh(){
     state.series = s.seeds;
     const seedIds = summary.seeds.map(x=>x.seed);
     if(state.opseed===null || !seedIds.includes(state.opseed)) state.opseed = seedIds[0] ?? null;
-    if(state.opseed!==null){
-      state.opinion = await jget("/api/opinion?seed="+state.opseed+"&max=800");
-      state.repost = await jget("/api/repost?seed="+state.opseed);
-    }
+    if(state.opseed!==null) state.opinion = await jget("/api/opinion?seed="+state.opseed+"&max=800");
+    // repost cascade stats follow the network snapshot's seed (network snapshot / structure /
+    // agent behavior all describe the same seed+step, so there's one seed picker for all three)
+    const netSeed=(netState.seed!==null && seedIds.includes(netState.seed)) ? netState.seed : (seedIds[0] ?? null);
+    if(netSeed!==null) state.repost = await jget("/api/repost?seed="+netSeed);
     hideBanner("err");
     renderAll();
     maybeRefetchNetwork();
@@ -516,13 +531,12 @@ function renderPicker(){
     el.value = cols.includes(prev)?prev:cols[0]||"";
     el.onchange=()=>{ state[key]=el.value; save(key,el.value); refresh(); };
   }
-  /* detail-seed selects: opinion distribution + agent-behavior panel, kept in sync */
-  for(const selId of ["#opseed","#behSeed"]){
-    const os=$(selId); os.innerHTML="";
-    for(const s of seedList()){ const o=document.createElement("option"); o.value=s.seed; o.textContent="seed "+s.seed; os.appendChild(o); }
-    os.value=state.opseed;
-    os.onchange=()=>{ state.opseed=+os.value; save("opseed",state.opseed); refresh(); };
-  }
+  /* opinion-distribution seed select (network snapshot/structure/agent-behavior
+     share netState.seed instead — set via #netseed, see fetchNetwork) */
+  const os=$("#opseed"); os.innerHTML="";
+  for(const s of seedList()){ const o=document.createElement("option"); o.value=s.seed; o.textContent="seed "+s.seed; os.appendChild(o); }
+  os.value=state.opseed;
+  os.onchange=()=>{ state.opseed=+os.value; save("opseed",state.opseed); refresh(); };
 }
 
 /* ---------- series extraction ---------- */
@@ -537,25 +551,58 @@ function seriesFor(metric){
     if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
       let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
       if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
-    if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
+    if($("#smooth").checked && vals.length>50) vals=rollmean(vals, smoothWindow(vals.length));
     const {color,dash}=seedColor(s.seed);
     out.push({seed:s.seed, status:s.status, steps, vals, color, dash});
   }
   if($("#showmean").checked && out.length>=2){
-    /* arbitrary (currently-visible) seed mean: align every series onto the
-       longest one's step grid via nearest-value lookup (same snapping the
-       hover tooltip already does), then average ignoring gaps per point. */
-    const ref=out.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
-    const vals=ref.steps.map((st,i)=>{
-      let sum=0,cnt=0;
-      for(const s of out){ if(!s.steps.length) continue;
-        const v=s.vals[nearestIdx(s.steps,st)];
-        if(v!=null&&!Number.isNaN(v)){ sum+=v; cnt++; } }
-      return cnt? sum/cnt : null;
-    });
-    out.push({seed:"mean", status:"mean( "+out.length+" seeds )", steps:ref.steps, vals,
-               color:cssVar("--ink"), dash:"1 3", isMean:true});
+    /* Show mean ± standard error: the mean line becomes the star (a filled
+       ±SE band around it), and the individual seed lines dim to cede focus. */
+    const {steps,mean,se}=computeMeanSE(out);
+    for(const s of out) s.dim=true;
+    out.push({seed:"mean", status:"mean±SE ( "+out.length+" seeds )", steps, vals:mean, se,
+               color:cssVar("--ink"), isMean:true});
   }
+  return out;
+}
+
+/* Align every series onto the longest one's step grid via nearest-value lookup
+   (the same snapping the hover tooltip uses), then per point return the mean and
+   the standard error of the mean (sample SD / sqrt(n); SE=0 when a single seed
+   contributes). Shared by the main metric grid and the network-structure minis. */
+function computeMeanSE(list){
+  const ref=list.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
+  const mean=[], se=[];
+  for(const st of ref.steps){
+    const vs=[];
+    for(const s of list){ if(!s.steps.length) continue;
+      const v=s.vals[nearestIdx(s.steps,st)];
+      if(v!=null&&!Number.isNaN(v)) vs.push(v); }
+    if(!vs.length){ mean.push(null); se.push(null); continue; }
+    const m=vs.reduce((a,b)=>a+b,0)/vs.length;
+    let ss=0; for(const v of vs) ss+=(v-m)*(v-m);
+    const sd=vs.length>1? Math.sqrt(ss/(vs.length-1)) : 0;
+    mean.push(m); se.push(sd/Math.sqrt(vs.length));
+  }
+  return {steps:ref.steps, mean, se};
+}
+
+/* SVG <path> fill for a mean±SE band around series s (needs s.se aligned to
+   s.steps). Splits on null gaps into separate filled polygons. xs/ys map data
+   to screen (ys may embed a symlog transform — the caller's does). */
+function seBandPath(s, xs, ys, stride){
+  stride=Math.max(1, stride||1);
+  let out="", run=[];
+  const flush=()=>{ if(run.length>1){
+      let d="M"+run[0][0].toFixed(1)+" "+run[0][1].toFixed(1);
+      for(let i=1;i<run.length;i++) d+="L"+run[i][0].toFixed(1)+" "+run[i][1].toFixed(1);
+      for(let i=run.length-1;i>=0;i--) d+="L"+run[i][0].toFixed(1)+" "+run[i][2].toFixed(1);
+      out+=`<path d="${d}Z" fill="${s.color}" fill-opacity="0.16" stroke="none"/>`;
+    } run=[]; };
+  for(let i=0;i<s.steps.length;i+=stride){ const v=s.vals[i], e=s.se?s.se[i]:null;
+    if(v==null||Number.isNaN(v)||e==null){ flush(); continue; }
+    run.push([xs(s.steps[i]), ys(v+e), ys(v-e)]); }
+  flush();
   return out;
 }
 
@@ -576,7 +623,7 @@ function seriesFor(metric){
      that on page load. */
 const DEFAULT_ORDER = {
   degree: ["in", "out", "total"],
-  structstats: ["rwc", "dip", "clustering", "betweenness", "lambda2", "giant"],
+  structstats: ["summary", "clustering", "betweenness", "echo"],
   qsignei: ["qsign", "ei"],
   repostpair: ["depth", "virality", "share"],
   attrpair: ["bc", "pp"],
@@ -658,7 +705,7 @@ function makeCard(container, id, groupKey, onReorder){
   handle.className="draghandle"; handle.textContent="✦"; handle.draggable=true;
   handle.title="drag to reorder · drag corner to resize";
   card.appendChild(handle);
-  const body=document.createElement("div"); body.className="cardbody";
+  const body=document.createElement("div"); body.className="cardbody cardbody-pad";
   card.appendChild(body);
   applyCardSize(card, id);
   watchCardSize(card, id);
@@ -756,28 +803,38 @@ function updateCarBtns(){
 /* Family metrics (cRateMean_0..4 etc): one seed (state.opseed), one line per
    opinion class, colored with the diverging opinion-bin palette so it reads
    consistently with the opinion-distribution panel. */
+/* Family metrics (cRateMean_0..4, postShare_0..4, etc.): always the seed-mean
+   per class ± SE across all *visible* seeds, regardless of the global
+   "show mean" toggle (a single seed's per-class value is too noisy to read;
+   the toggle only controls whether the main metric grid dims to a mean). */
 function drawFamilyChart(host, base, subcols){
-  const e=state.opseed!=null ? state.series[String(state.opseed)] : null;
   const B=bins();
+  const seeds=visibleSeeds();
   let S=[];
-  if(e){
-    for(let cls=0;cls<5;cls++){
-      const col=subcols[cls];
+  for(let cls=0;cls<5;cls++){
+    const col=subcols[cls];
+    const perSeed=[];
+    for(const sd of seeds){
+      const e=state.series[String(sd.seed)]; if(!e) continue;
       let steps=e.step, vals=e.cols[col];
       if(!vals) continue;
       if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
         let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
         if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
-      if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
-      S.push({seed:"class "+cls, cls, steps, vals, color:B[cls], dash:null});
+      if($("#smooth").checked && vals.length>50) vals=rollmean(vals, smoothWindow(vals.length));
+      perSeed.push({steps,vals});
     }
+    if(!perSeed.length) continue;
+    const {steps,mean,se}=computeMeanSE(perSeed);
+    S.push({seed:"class "+cls, cls, steps, vals:mean, se, color:B[cls], dash:null});
   }
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
     if(v==null||Number.isNaN(v)) continue;
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
-    if(v<y0)y0=v; if(v>y1)y1=v; }
-  const title=`${base} — seed ${state.opseed??"–"}`;
+    const e=(s.se && s.se[i]!=null)? s.se[i] : 0;
+    if(v-e<y0)y0=v-e; if(v+e>y1)y1=v+e; }
+  const title=`${base} — mean over ${seeds.length} seed${seeds.length===1?"":"s"}`;
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
   if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
   const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
@@ -785,10 +842,11 @@ function drawFamilyChart(host, base, subcols){
   let g="";
   for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
   for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
-  let paths="";
+  let bands="", paths="";
   for(const s of S){
     let d="",pen=false;
     const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(s.steps.length/maxpts));
+    if(s.se) bands+=seBandPath(s, xs, ys, k);
     for(let i=0;i<s.steps.length;i+=k){ const v=s.vals[i];
       if(v==null||Number.isNaN(v)){pen=false;continue;}
       d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
@@ -797,6 +855,7 @@ function drawFamilyChart(host, base, subcols){
   host.innerHTML=
     `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
       <text class="title" x="10" y="15">${title}</text>${g}
+      ${bands}
       <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
       ${paths}
       <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
@@ -808,11 +867,11 @@ function drawFamilyChart(host, base, subcols){
     const step=x0+(px-LC.L)/(LC.W-LC.L-LC.R)*(x1-x0);
     let snapX=px, rows=[];
     for(const s of S){ if(!s.steps.length) continue;
-      const i=nearestIdx(s.steps,step); rows.push({cls:s.cls,color:s.color,v:s.vals[i],step:s.steps[i]});
+      const i=nearestIdx(s.steps,step); rows.push({cls:s.cls,color:s.color,v:s.vals[i],se:s.se?s.se[i]:null,step:s.steps[i]});
       snapX=xs(s.steps[i]); }
     const xh=svg.querySelector(".xh"); xh.setAttribute("x1",snapX); xh.setAttribute("x2",snapX); xh.setAttribute("visibility","visible");
-    showTip(evt, `<div class="thead">${base} @ step ${fstep(Math.round(rows[0]?.step??step))}</div>`+
-      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${BIN_LABELS[r.cls]}</span><span>${fmt(r.v)}</span></div>`).join(""));
+    showTip(evt, `<div class="thead">${base} @ step ${fstep(Math.round(rows[0]?.step??step))} — mean over ${seeds.length} seeds</div>`+
+      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${BIN_LABELS[r.cls]}</span><span>${fmt(r.v)}${r.se!=null&&r.se>0?` &plusmn;${fmt(r.se)}`:""}</span></div>`).join(""));
   });
   svg.addEventListener("mouseleave",()=>{ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); });
 }
@@ -834,9 +893,12 @@ function drawLineChart(host, metric){
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
     if(v==null||Number.isNaN(v)) continue;
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
-    if(v<yMinOrig)yMinOrig=v; if(v>yMaxOrig)yMaxOrig=v;
-    const tv = trans(v);
-    if(tv<y0)y0=tv; if(tv>y1)y1=tv; }
+    /* a ±SE band can reach slightly past the raw seed values — keep it in view */
+    const e=(s.se && s.se[i]!=null)? s.se[i] : 0;
+    const vlo=v-e, vhi=v+e;
+    if(vlo<yMinOrig)yMinOrig=vlo; if(vhi>yMaxOrig)yMaxOrig=vhi;
+    const tlo=trans(vlo), thi=trans(vhi);
+    if(tlo<y0)y0=tlo; if(thi>y1)y1=thi; }
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${metric}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
   if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
   const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
@@ -860,19 +922,22 @@ function drawLineChart(host, metric){
 
   for(const t of yTicks) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
   for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
-  let paths="";
+  let bands="", paths="";
   for(const s of S){
     let d="",pen=false;
     const maxpts=(LC.W-LC.L-LC.R)*2, k=Math.max(1,Math.ceil(s.steps.length/maxpts));
+    if(s.se) bands+=seBandPath(s, xs, ys, k);
     for(let i=0;i<s.steps.length;i+=k){ const v=s.vals[i];
       if(v==null||Number.isNaN(v)){pen=false;continue;}
       d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
-    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?3:2}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} stroke-linejoin="round"/>`;
+    const op=s.dim?0.28:1;   /* dimmed seeds cede the spotlight to the mean */
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?2.5:2}" stroke-opacity="${op}" ${s.dash?`stroke-dasharray="${s.dash}"`:""} stroke-linejoin="round"/>`;
   }
   const titleText = metric === "apparentPolarization" ? "apparentPolarization (symlog)" : metric;
   host.innerHTML=
     `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
       <text class="title" x="10" y="15">${titleText}</text>${g}
+      ${bands}
       <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
       ${paths}
       <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
@@ -1714,70 +1779,70 @@ function loop(){
 /* ---------- network-structure panel: degree/clustering/betweenness/lambda2/Q_sign/EI ---------- */
 function statTile(label,value){ return `<div class="stattile"><div class="lbl">${label}</div><div class="val">${value}</div></div>`; }
 
+/* value-only structural stats (no chart) bundled into one card, so the row
+   below only spends independent cards on things that actually have a graph */
+function renderStructSummary(s){
+  const r=s && s.rwc, dp=s && s.dip;
+  const rwcNote = r && r.rwc!=null
+    ? `1=segregated echo chambers, 0=well-mixed, &lt;0=walks cross more than they stay. p<sub>XX</sub>=${fmt(r.pXX)} p<sub>YY</sub>=${fmt(r.pYY)} · sides ${r.sideX}/${r.sideY}, k=${r.k} hubs (Garimella et&nbsp;al. 2018, giant comp.)`
+    : (r && r.unavailable==="one-sided" ? "all nodes on one opinion side"
+       : r && r.unavailable==="too-few" ? `giant component too small (n=${r.n})`
+       : r && r.detail ? r.detail : "not available");
+  const dipSig = dp && dp.p<0.05;
+  const dipNote = dp && dp.dip!=null
+    ? `p=${fmt(dp.p)} vs uniform null (B=${dp.B}, n=${dp.n}) — ${dipSig?"multimodal (reject unimodality)":"unimodal (n.s.)"}. Complements bimodalityCoeff; unlike it, not fooled by skew.`
+    : (dp && dp.detail ? dp.detail : (dp && dp.unavailable==="degenerate" ? `too few opinions (n=${dp.n})` : "not available"));
+  return `<div class="statlist">
+    <div><div class="stat-row"><span class="lbl">Random Walk Controversy (opinion sides)</span><span class="val">${r && r.rwc!=null?fmt(r.rwc):"–"}</span></div>
+      <div class="stat-note">${rwcNote}</div></div>
+    <div><div class="stat-row"><span class="lbl">Hartigan dip (opinion multimodality)</span><span class="val">${dp && dp.dip!=null?fmt(dp.dip):"–"}</span></div>
+      <div class="stat-note">${dipNote}</div></div>
+    <div class="stat-row"><span class="lbl">&lambda;<sub>2</sub> algebraic connectivity (giant comp.)</span><span class="val">${s && s.lambda2!=null?fmt(s.lambda2):"–"}</span></div>
+    <div class="stat-row"><span class="lbl">giant component fraction</span><span class="val">${s && s.giantComponentFrac!=null?(100*s.giantComponentFrac).toFixed(1)+"%":"–"}</span></div>
+  </div>`;
+}
 function renderStructural(){
   const d=netState.data, s=d && d.structural;
   const dg=$("#degreeGrid"); dg.innerHTML="";
   const row=$("#structRow"); row.innerHTML="";
   const info=$("#structinfo");
-  drawEchoScatter($("#echoScatter"), d && d.nodes);  // only needs op/nbrOp, not structural
-  if(!s){
-    info.textContent = d && d.structuralError ? ("structural: not available — "+d.structuralError) : "";
-    dg.innerHTML = `<div class="subnote">no structural data for this snapshot yet.</div>`;
-    renderQsignEiCharts();
-    return;
-  }
-  info.textContent = `computed on step ${fstep(d.step)} · ${netState.type} graph`;
+  info.textContent = s ? `computed on step ${fstep(d.step)} · ${netState.type} graph`
+    : (d && d.structuralError ? ("structural: not available — "+d.structuralError) : "");
 
   const degLabel={in:"in-degree (followers)", out:"out-degree (following)", total:"total degree"};
-  for(const key of getOrder("degree")){
-    const {card,body}=makeCard(dg, key, "degree", o=>saveOrder("degree",o));
-    dg.appendChild(card);
-    drawDegreeChart(body, degLabel[key], s.degree && s.degree[key], s.degreeFit && s.degreeFit[key]);
+  if(!s){
+    dg.innerHTML = `<div class="subnote">no structural data for this snapshot yet.</div>`;
+  } else {
+    for(const key of getOrder("degree")){
+      const {card,body}=makeCard(dg, key, "degree", o=>saveOrder("degree",o));
+      dg.appendChild(card);
+      drawDegreeChart(body, degLabel[key], s.degree && s.degree[key], s.degreeFit && s.degreeFit[key]);
+    }
   }
 
+  // echo-chamber diet only needs op/nbrOp, so it (like this whole card row) renders even
+  // when structural (betweenness/lambda2/...) computation isn't available yet
   for(const key of getOrder("structstats")){
     const {card,body}=makeCard(row, key, "structstats", o=>saveOrder("structstats",o));
     row.appendChild(card);
-    if(key==="rwc"){
-      const r=s.rwc;
-      if(r && r.rwc!=null){
-        body.innerHTML=statTile("Random Walk Controversy (opinion sides)", fmt(r.rwc))+
-          `<div class="subnote" style="margin-top:6px">1 = segregated echo chambers, 0 = well-mixed, &lt;0 = walks cross more than they stay.
-           p<sub>XX</sub>=${fmt(r.pXX)} p<sub>YY</sub>=${fmt(r.pYY)} · sides ${r.sideX}/${r.sideY}, k=${r.k} hubs (Garimella et&nbsp;al. 2018, giant comp.)</div>`;
-      } else {
-        const why = r && r.unavailable==="one-sided" ? "all nodes on one opinion side"
-                  : r && r.unavailable==="too-few" ? `giant component too small (n=${r.n})`
-                  : r && r.detail ? r.detail : "not available";
-        body.innerHTML=statTile("Random Walk Controversy (opinion sides)", "–")+
-          `<div class="subnote" style="margin-top:6px;color:var(--muted)">${why}</div>`;
-      }
-    } else if(key==="dip"){
-      const dp=s.dip;
-      if(dp && dp.dip!=null){
-        const sig = dp.p<0.05;
-        body.innerHTML=statTile("Hartigan dip (opinion multimodality)", fmt(dp.dip))+
-          `<div class="subnote" style="margin-top:6px">p=${fmt(dp.p)} vs uniform null (B=${dp.B}, n=${dp.n}) —
-           <span style="color:${sig?'var(--warn)':'var(--muted)'}">${sig?'multimodal (reject unimodality)':'unimodal (n.s.)'}</span>.
-           Complements bimodalityCoeff; unlike it, not fooled by skew.</div>`;
-      } else {
-        body.innerHTML=statTile("Hartigan dip (opinion multimodality)", "–")+
-          `<div class="subnote" style="margin-top:6px;color:var(--muted)">${dp && dp.detail ? dp.detail : (dp && dp.unavailable==="degenerate" ? `too few opinions (n=${dp.n})` : "not available")}</div>`;
-      }
+    if(key==="summary"){
+      body.innerHTML=renderStructSummary(s);
     } else if(key==="clustering"){
-      body.innerHTML=statTile("mean clustering coeff.", s.clustering && s.clustering.mean!=null ? fmt(s.clustering.mean) : "–");
+      body.innerHTML=statTile("mean clustering coeff.", s && s.clustering && s.clustering.mean!=null ? fmt(s.clustering.mean) : "–");
       const chart=document.createElement("div"); chart.style.marginTop="6px"; body.appendChild(chart);
-      drawHistChart(chart, (s.clustering && s.clustering.values) || [], 0, 1, 15);
+      drawHistChart(chart, (s && s.clustering && s.clustering.values) || [], 0, 1, 15);
     } else if(key==="betweenness"){
-      const bwTop=(s.betweenness && s.betweenness.top) || [];
-      body.innerHTML=statTile("mean betweenness (giant comp.)", s.betweenness && s.betweenness.mean!=null ? fmt(s.betweenness.mean) : "–") +
+      const bwTop=(s && s.betweenness && s.betweenness.top) || [];
+      body.innerHTML=statTile("mean betweenness (giant comp.)", s && s.betweenness && s.betweenness.mean!=null ? fmt(s.betweenness.mean) : "–") +
         `<table class="bctable" style="margin-top:6px"><thead><tr><th>node</th><th>betweenness</th></tr></thead><tbody>`+
         (bwTop.length ? bwTop.map(t=>`<tr><td>${t.id}${t.hub?" &#9673;":""}</td><td>${fmt(t.value)}</td></tr>`).join("")
                       : `<tr><td colspan="2" style="text-align:center;color:var(--muted)">–</td></tr>`)+
         `</tbody></table>`;
-    } else if(key==="lambda2"){
-      body.innerHTML=statTile("&lambda;<sub>2</sub> algebraic connectivity (giant comp.)", s.lambda2!=null ? fmt(s.lambda2) : "–");
-    } else if(key==="giant"){
-      body.innerHTML=statTile("giant component fraction", s.giantComponentFrac!=null ? (100*s.giantComponentFrac).toFixed(1)+"%" : "–");
+    } else if(key==="echo"){
+      body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">echo-chamber diet (Cinelli et&nbsp;al. 2021)</div>`+
+        `<div class="subnote" style="margin:-2px 0 4px">own opinion (x) vs. mean opinion of accounts followed (y): tight positive diagonal = echo chambers, shapeless blob = well-mixed feed. Ringed = intervened hub.</div>`;
+      const chart=document.createElement("div"); body.appendChild(chart);
+      drawEchoScatter(chart, d && d.nodes);
     }
   }
 
@@ -1799,14 +1864,32 @@ function renderQsignEiCharts(){
   }
 }
 function drawMiniSeedChart(host, title, col, isAux){
-  const seed=netState.seed, e=(seed!=null && state.series) ? state.series[String(seed)] : null;
-  let steps=[], vals=[];
-  if(e){
+  /* Plot ALL visible seeds (not just the network-panel seed). Default: the
+     network-panel seed is the spotlight, the rest dim. show mean: overlay a
+     mean±SE band and dim every seed line, matching the main metric grid. */
+  const sel=netState.seed;
+  const out=[];
+  for(const s of visibleSeeds()){
+    const e=state.series[String(s.seed)]; if(!e) continue;
+    let steps,vals;
     if(isAux && e.aux && e.aux[col]){ steps=e.aux[col].step; vals=e.aux[col].values; }
     else if(e.cols && e.cols[col]){ steps=e.step; vals=e.cols[col]; }
+    else continue;
+    const {color}=seedColor(s.seed);
+    out.push({seed:s.seed, steps, vals, color});
   }
-  const S = steps.length ? [{steps,vals,color:cssVar("--accent")}] : [];
-  drawSimpleSeries(host, `${title} — seed ${seed??"–"}`, S);
+  const showMean=$("#showmean").checked && out.length>=2;
+  let label;
+  if(showMean){
+    const {steps,mean,se}=computeMeanSE(out);
+    for(const s of out) s.dim=true;
+    out.push({seed:"mean", steps, vals:mean, se, color:cssVar("--ink"), isMean:true});
+    label=`${title} — mean±SE of ${out.length-1} seeds`;
+  } else {
+    for(const s of out) s.dim=(s.seed!==sel);   /* spotlight the network-panel seed */
+    label=`${title} — seed ${sel??"–"} spotlit${out.length>1?` (of ${out.length})`:""}`;
+  }
+  drawSimpleSeries(host, label, out);
 }
 
 /* Non-interactive single/few-line chart (no hover/zoom) for the confirmatory
@@ -1817,7 +1900,8 @@ function drawSimpleSeries(host, title, S){
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
     if(v==null||Number.isNaN(v)) continue;
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
-    if(v<y0)y0=v; if(v>y1)y1=v; }
+    const e=(s.se && s.se[i]!=null)? s.se[i] : 0;   /* keep the ±SE band in view */
+    if(v-e<y0)y0=v-e; if(v+e>y1)y1=v+e; }
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
   if(y0===y1){ y0-=1; y1+=1; } const yp=(y1-y0)*0.06; y0-=yp; y1+=yp;
   const xs=v=>LC.L+(v-x0)/(x1-x0||1)*(LC.W-LC.L-LC.R);
@@ -1825,15 +1909,18 @@ function drawSimpleSeries(host, title, S){
   let g="";
   for(const t of ticks(y0,y1,4)) g+=`<line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${ys(t).toFixed(1)}" y2="${ys(t).toFixed(1)}" stroke="var(--grid)" stroke-width="1"/><text x="${LC.L-5}" y="${(ys(t)+3.5).toFixed(1)}" text-anchor="end">${fmt(t)}</text>`;
   for(const t of ticks(x0,x1,5)) g+=`<text x="${xs(t).toFixed(1)}" y="${LC.H-8}" text-anchor="middle">${fstep(t)}</text>`;
-  let paths="";
+  let bands="", paths="";
   for(const s of S){
+    if(s.se) bands+=seBandPath(s, xs, ys, 1);
     let d="",pen=false;
     for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
       if(v==null||Number.isNaN(v)){pen=false;continue;}
       d+=(pen?"L":"M")+xs(s.steps[i]).toFixed(1)+" "+ys(v).toFixed(1); pen=true; }
-    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2"/>`;
+    const op=s.dim?0.28:1;
+    paths+=`<path d="${d}" fill="none" stroke="${s.color}" stroke-width="${s.isMean?2.5:2}" stroke-opacity="${op}"/>`;
   }
   host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${title}</text>${g}
+    ${bands}
     <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
     ${paths}</svg>`;
 }
@@ -1846,18 +1933,25 @@ function drawHistChart(host, values, lo, hi, nbins){
   const counts=new Array(nbins).fill(0), w=(hi-lo)/nbins;
   for(const v of arr){ let b=Math.floor((v-lo)/w); b=Math.max(0,Math.min(nbins-1,b)); counts[b]++; }
   const maxC=Math.max(...counts,1), bw=(HG.W-HG.L-HG.R)/nbins;
+  const ys=c=>HG.H-HG.B-(c/maxC)*(HG.H-HG.T-HG.B);
+  const xs=v=>HG.L+(v-lo)/((hi-lo)||1)*(HG.W-HG.L-HG.R);
+  let grid="";
+  for(const t of ticks(0,maxC,4)){
+    const yy=ys(t).toFixed(1);
+    grid+=`<line x1="${HG.L}" x2="${HG.W-HG.R}" y1="${yy}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>`+
+      `<text x="${HG.L-3}" y="${(+yy+3).toFixed(1)}" font-size="9" text-anchor="end" fill="var(--muted)">${fmt(t)}</text>`;
+  }
   let bars="";
   for(let i=0;i<nbins;i++){
     const h=(counts[i]/maxC)*(HG.H-HG.T-HG.B);
     bars+=`<rect x="${(HG.L+i*bw+0.5).toFixed(1)}" y="${(HG.H-HG.B-h).toFixed(1)}" width="${Math.max(0,bw-1).toFixed(1)}" height="${h.toFixed(1)}" fill="var(--accent)" opacity="0.8"/>`;
   }
-  host.innerHTML=`<svg viewBox="0 0 ${HG.W} ${HG.H}">${bars}
+  let xticks="";
+  for(const t of ticks(lo,hi,4)) xticks+=`<text x="${xs(t).toFixed(1)}" y="${HG.H-4}" font-size="9" text-anchor="middle" fill="var(--muted)">${fmt(t)}</text>`;
+  host.innerHTML=`<svg viewBox="0 0 ${HG.W} ${HG.H}">${grid}${bars}
     <line x1="${HG.L}" x2="${HG.L}" y1="${HG.T}" y2="${HG.H-HG.B}" stroke="var(--axis)"/>
     <line x1="${HG.L}" x2="${HG.W-HG.R}" y1="${HG.H-HG.B}" y2="${HG.H-HG.B}" stroke="var(--axis)"/>
-    <text x="${HG.L-3}" y="${HG.T+7}" font-size="9" text-anchor="end" fill="var(--muted)">${maxC}</text>
-    <text x="${HG.L-3}" y="${HG.H-HG.B}" font-size="9" text-anchor="end" fill="var(--muted)">0</text>
-    <text x="${HG.L}" y="${HG.H-4}" font-size="9" fill="var(--muted)">${lo}</text>
-    <text x="${HG.W-HG.R}" y="${HG.H-4}" font-size="9" text-anchor="end" fill="var(--muted)">${hi}</text>
+    ${xticks}
   </svg>`;
 }
 
@@ -1911,17 +2005,24 @@ function drawDegreeChart(host, label, values, fit){
   let yTicks="";
   for(let k=0;k>=Math.floor(ly0);k--){
     const yy=sy(Math.pow(10,k));
-    yTicks+=`<line x1="${DG.L-2}" x2="${DG.L}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="var(--axis)"/>`+
+    yTicks+=`<line x1="${DG.L}" x2="${DG.W-DG.R}" y1="${yy.toFixed(1)}" y2="${yy.toFixed(1)}" stroke="var(--grid)" stroke-width="1"/>`+
       `<text x="${DG.L-3}" y="${(yy+3).toFixed(1)}" font-size="8" text-anchor="end" fill="var(--muted)">${k===0?"1":"1e"+k}</text>`;
+  }
+  let xTicks="";
+  for(let k=Math.ceil(lx0);k<=Math.floor(lx1);k++){
+    const xv=Math.pow(10,k);
+    if(xv<=xMin || xv>=xMax) continue;   // don't crowd the endpoint labels below
+    xTicks+=`<text x="${sx(xv).toFixed(1)}" y="${DG.H-6}" font-size="9" text-anchor="middle" fill="var(--muted)">${k===0?"1":"1e"+k}</text>`;
   }
   host.innerHTML=`<svg viewBox="0 0 ${DG.W} ${DG.H}">
       <text class="title" x="8" y="13">${label}</text>
+      ${yTicks}
       <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="1.75"/>
       ${fitPath}
       <line x1="${DG.L}" x2="${DG.L}" y1="${DG.T}" y2="${DG.H-DG.B}" stroke="var(--axis)"/>
       <line x1="${DG.L}" x2="${DG.W-DG.R}" y1="${DG.H-DG.B}" y2="${DG.H-DG.B}" stroke="var(--axis)"/>
-      ${yTicks}
       <text x="${DG.L}" y="${DG.H-6}" font-size="9" fill="var(--muted)">${xMin}</text>
+      ${xTicks}
       <text x="${DG.W-DG.R}" y="${DG.H-6}" font-size="9" text-anchor="end" fill="var(--muted)">${xMax}</text>
     </svg>
     <div class="subnote" style="margin-top:2px">${fitNote}</div>`;
@@ -2094,10 +2195,25 @@ function autoRange(values, padFrac=0.06){
 }
 
 function renderBehavior(){
-  const seed=state.opseed;
+  const seed=netState.seed;   // same seed/step as network snapshot/structure, see fetchNetwork
   $("#attrSeedNote").textContent =
-    `bc/postProb currently from seed ${netState.seed??"–"}`+
-    (netState.data && netState.data.step!=null ? ` @ step ${fstep(netState.data.step)}` : "");
+    `seed ${seed??"–"}`+(netState.data && netState.data.step!=null ? ` @ step ${fstep(netState.data.step)}` : "");
+
+  // non-time-series first (GEXF node attributes at the current snapshot), then time series below
+  const nodes = netState.data && netState.data.nodes;
+  const attrHost=$("#attrRow"); attrHost.innerHTML="";
+  const attrSpec={ bc: ["bc", "bounded confidence distribution"], pp: ["pp", "post probability distribution"] };
+  for(const key of getOrder("attrpair")){
+    const {card,body}=makeCard(attrHost, key, "attrpair", o=>saveOrder("attrpair",o));
+    attrHost.appendChild(card);
+    const [field,label]=attrSpec[key];
+    const vals = nodes ? nodes.map(n=>n[field]).filter(v=>v!=null) : [];
+    const padFrac = (key === "bc" || key === "pp") ? 0.0 : 0.06;
+    const [lo,hi]=autoRange(vals, padFrac);
+    body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">${label} (seed ${seed??"–"})</div>`;
+    const chart=document.createElement("div"); body.appendChild(chart);
+    drawHistChart(chart, vals, lo, hi, 20);
+  }
 
   const repostHost=$("#repostRow"); repostHost.innerHTML="";
   for(const key of getOrder("repostpair")){
@@ -2117,21 +2233,6 @@ function renderBehavior(){
       const S=(vals && e.step.length) ? [{steps:e.step, vals, color:cssVar("--accent")}] : [];
       drawSimpleSeries(body, `repost share of content — seed ${seed??"–"}`, S);
     }
-  }
-
-  const nodes = netState.data && netState.data.nodes;
-  const attrHost=$("#attrRow"); attrHost.innerHTML="";
-  const attrSpec={ bc: ["bc", "bounded confidence distribution"], pp: ["pp", "post probability distribution"] };
-  for(const key of getOrder("attrpair")){
-    const {card,body}=makeCard(attrHost, key, "attrpair", o=>saveOrder("attrpair",o));
-    attrHost.appendChild(card);
-    const [field,label]=attrSpec[key];
-    const vals = nodes ? nodes.map(n=>n[field]).filter(v=>v!=null) : [];
-    const padFrac = (key === "bc" || key === "pp") ? 0.0 : 0.06;
-    const [lo,hi]=autoRange(vals, padFrac);
-    body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">${label} (seed ${netState.seed??"–"})</div>`;
-    const chart=document.createElement("div"); body.appendChild(chart);
-    drawHistChart(chart, vals, lo, hi, 20);
   }
 }
 
@@ -2181,6 +2282,13 @@ $("#interval").value=String(store("interval",5));
 $("#interval").addEventListener("change",()=>{ save("interval",+$("#interval").value); schedule(); });
 $("#smooth").checked=store("smooth",false);
 $("#smooth").addEventListener("change",()=>{ save("smooth",$("#smooth").checked); renderAll(); });
+$("#smoothWindow").value=store("smoothwin","")||"";
+$("#smoothWindow").addEventListener("change",e=>{
+  const v=Math.round(+e.target.value);
+  save("smoothwin", (v>=2)?v:null);
+  e.target.value=store("smoothwin","")||"";
+  renderAll();
+});
 $("#showmean").checked=store("showmean",false);
 $("#showmean").addEventListener("change",()=>{ save("showmean",$("#showmean").checked); renderAll(); });
 $("#resetzoom").addEventListener("click",()=>{ state.zoom=null; renderAll(); });
