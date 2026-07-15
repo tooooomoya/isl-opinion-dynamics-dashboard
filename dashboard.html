@@ -262,6 +262,11 @@
       <label class="ctl">size <select id="netsize"></select></label>
       <label class="ctl">color <select id="netcolor"></select></label>
       <label class="ctl" title="set network link edge color">edge color <input type="color" id="netedgecolor"></label>
+      <label class="ctl" title="only draw/simulate edges whose weight (repost graph: repost count on that edge) falls in this range. Leave a box empty for no bound on that side.">weight
+        <input type="number" id="netwmin" min="0" step="1" placeholder="min" style="width:4.5em">
+        &ndash;
+        <input type="number" id="netwmax" min="0" step="1" placeholder="max" style="width:4.5em">
+      </label>
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
       <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
       <span id="netinfo" class="subnote"></span>
@@ -1163,7 +1168,18 @@ function renderOpinion(){
 const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
   edgeColor:store("netedgecolor",null),
-  data:null, loading:false, sim:null, hover:-1 };
+  wMin:store("netwmin",null), wMax:store("netwmax",null), filteredEdges:null,
+  data:null, loading:false, sim:null, hover:-1, lastTag:undefined };
+
+/* edges within [wMin,wMax] (either bound optional); recomputed whenever a fresh
+   snapshot lands or the weight filter changes, not per animation frame. */
+function applyWeightFilter(){
+  const d=netState.data, lo=netState.wMin, hi=netState.wMax;
+  const all=(d&&d.edges)||[];
+  netState.filteredEdges=(lo==null && hi==null) ? all
+    : all.filter(([,,w])=>(lo==null||w>=lo)&&(hi==null||w<=hi));
+  netState.giantComponentIndices=getGiantComponentNodeIndices(d?d.n:0, netState.filteredEdges);
+}
 
 /* ---- configurable node encoding ----
    every value below is available per-node in the /api/network payload. "size"
@@ -1514,11 +1530,15 @@ function renderColorPicker(){
 }
 
 function maybeRefetchNetwork(){
-  /* snapshots land every 5000 steps; refetch "latest" only when a newer one can exist */
+  /* snapshots land every 5000 steps; refetch "latest" only when a newer one can exist.
+     Also refetch immediately if this seed's run was replaced (results dir swapped to a
+     fresh tag) — that resets the step counter, so the "+5000 steps" check alone would
+     never fire again and the section would keep showing the previous run's snapshot. */
   if(netState.loading) return;
-  if(!netState.data){ fetchNetwork(); return; }
-  if(netState.step!=="latest") return;
   const s=seedList().find(v=>v.seed===netState.seed);
+  if(!netState.data){ fetchNetwork(); return; }
+  if(s && s.tag!==netState.lastTag){ fetchNetwork(); return; }
+  if(netState.step!=="latest") return;
   if(s && netState.data.step!=null && s.step>=netState.data.step+5000) fetchNetwork();
 }
 
@@ -1541,9 +1561,11 @@ async function fetchNetwork(){
       if(d.step==null) return;
     }
     netState.data=d;
-    netState.giantComponentIndices = getGiantComponentNodeIndices(d.n, d.edges);
+    netState.lastTag = (seedList().find(v=>v.seed===netState.seed)||{}).tag;
+    applyWeightFilter();
     $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (log_gexf=false, or run hasn't reached step 5000)"
-      : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.m} edges`;
+      : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.edges.length} edges`+
+        (netState.filteredEdges.length!==d.edges.length?` (${netState.filteredEdges.length} shown in weight range)`:"");
     renderNetControls();
     startSim();
     renderStructural();
@@ -1568,6 +1590,9 @@ function renderNetControls(){
   fillAttrSelect($("#netcolor"), COLOR_KEYS, netState.colorBy);
   const edgeColorInput = $("#netedgecolor");
   if(edgeColorInput) edgeColorInput.value = netState.edgeColor || cssVar("--axis");
+  const wmin=$("#netwmin"), wmax=$("#netwmax");
+  wmin.value = netState.wMin==null ? "" : netState.wMin;
+  wmax.value = netState.wMax==null ? "" : netState.wMax;
   renderColorControls();
   renderColorLegend();
   updateNetLegend();
@@ -1618,7 +1643,7 @@ function startSim(){
     }
   } else { s.alpha=Math.max(s.alpha,0.35); s.W=W; s.H=H; } /* same graph: reheat, keep positions */
   for(let i=0;i<n;i++){ s.deg[i]=0; }
-  for(const [u,v] of d.edges){ s.deg[u]++; s.deg[v]++; }
+  for(const [u,v] of netState.filteredEdges){ s.deg[u]++; s.deg[v]++; }
   sizeNodes(s,d);          /* radius from the chosen size attribute */
   colorNodes(s,d);         /* fill s.col[] from the chosen color attribute */
   netState.sim=s;
@@ -1629,7 +1654,7 @@ function simTick(s,d){
   const {n,x,y,vx,vy,deg}=s, a=s.alpha;
   /* link springs (d3-style: distance 14, strength 1/min(deg), degree-biased split) */
   const DIST=14;
-  for(const [u,v] of d.edges){
+  for(const [u,v] of netState.filteredEdges){
     let dx=x[v]+vx[v]-x[u]-vx[u], dy=y[v]+vy[v]-y[u]-vy[u];
     let l=Math.sqrt(dx*dx+dy*dy)||1e-6;
     const k=(l-DIST)/l * a / Math.min(deg[u],deg[v]);
@@ -1692,7 +1717,7 @@ function drawNet(){
   const {k,ox,oy}=view, PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
   ctx.lineWidth=0.5; ctx.strokeStyle=netState.edgeColor||cssVar("--axis"); ctx.globalAlpha=0.4;
   ctx.beginPath();
-  for(const [u,v] of d.edges){
+  for(const [u,v] of netState.filteredEdges){
     if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
     ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
   }
@@ -1700,7 +1725,7 @@ function drawNet(){
   if(cross){
     ctx.lineWidth=0.9; ctx.strokeStyle=cssVar("--warn"); ctx.globalAlpha=0.75;
     ctx.beginPath();
-    for(const [u,v] of d.edges){
+    for(const [u,v] of netState.filteredEdges){
       if(d.nodes[u].op*d.nodes[v].op<0){ ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v)); }
     }
     ctx.stroke();
@@ -1799,6 +1824,11 @@ function renderStructSummary(s){
       <div class="stat-note">${dipNote}</div></div>
     <div class="stat-row"><span class="lbl">&lambda;<sub>2</sub> algebraic connectivity (giant comp.)</span><span class="val">${s && s.lambda2!=null?fmt(s.lambda2):"–"}</span></div>
     <div class="stat-row"><span class="lbl">giant component fraction</span><span class="val">${s && s.giantComponentFrac!=null?(100*s.giantComponentFrac).toFixed(1)+"%":"–"}</span></div>
+    <div class="stat-row"><span class="lbl">nodes / edges</span><span class="val">${s && s.nNodes!=null?`${s.nNodes} / ${s.nEdges}`:"–"}</span></div>
+    <div class="stat-row"><span class="lbl">mean degree</span><span class="val">${s && s.avgDegree!=null?fmt(s.avgDegree):"–"}</span></div>
+    <div class="stat-row"><span class="lbl">density</span><span class="val">${s && s.density!=null?fmt(s.density):"–"}</span></div>
+    <div><div class="stat-row"><span class="lbl">avg. shortest path length (giant comp.)</span><span class="val">${s && s.avgPathLength!=null?fmt(s.avgPathLength):"–"}</span></div>
+      <div class="stat-note">diameter = ${s && s.diameter!=null?s.diameter:"–"}${s && s.avgPathLength==null && s.giantComponentFrac!=null ? " · skipped above node-count cutoff" : ""}</div></div>
   </div>`;
 }
 function renderStructural(){
@@ -2105,6 +2135,15 @@ $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").ch
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });
+function onWeightFilterChange(){
+  netState.wMin = $("#netwmin").value===""? null : +$("#netwmin").value;
+  netState.wMax = $("#netwmax").value===""? null : +$("#netwmax").value;
+  save("netwmin",netState.wMin); save("netwmax",netState.wMax);
+  applyWeightFilter();
+  startSim();       /* same graph -> reheats in place with the new edge set */
+}
+$("#netwmin").addEventListener("change",onWeightFilterChange);
+$("#netwmax").addEventListener("change",onWeightFilterChange);
 
 /* ---- in-page color picker: wiring (see openColorPicker/renderColorPicker) ---- */
 $("#cpHandle").addEventListener("mousedown",ev=>{

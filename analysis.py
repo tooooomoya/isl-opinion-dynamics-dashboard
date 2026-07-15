@@ -46,7 +46,10 @@ def load_network(path: Path):
             "pp": round(float(d.get("postProb", 0.0)), 4),
             "nbrOp": nbr,
         })
-    edges = [[idx[u], idx[v]] for u, v in G.edges()]
+    # weight: repost count on that edge (repostNW); Gephi's GEXF exporter omits the
+    # attribute entirely when it equals the default (1.0), so a missing key means 1.
+    edges = [[idx[u], idx[v], round(float(dat.get("weight") or 1.0), 4)]
+             for u, v, dat in G.edges(data=True)]
     return {"n": len(nodes), "m": len(edges), "nodes": nodes, "edges": edges}
 
 
@@ -260,6 +263,10 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
     Gu = G.to_undirected()
     giant_frac, lambda2, bc_mean, bc_top = None, None, None, []
     rwc = None
+    n_nodes, n_edges = Gu.number_of_nodes(), Gu.number_of_edges()
+    avg_degree = round(2 * n_edges / n_nodes, 4) if n_nodes else None
+    density = round(nx.density(Gu), 6) if n_nodes > 1 else None
+    avg_path_length, diameter = None, None
     if Gu.number_of_nodes() > 0:
         giant_nodes = max(nx.connected_components(Gu), key=len)
         Gg = Gu.subgraph(giant_nodes).copy()
@@ -275,6 +282,15 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
             top = sorted(bc.items(), key=lambda kv: -kv[1])[:10]
             bc_top = [{"id": nid, "value": round(v, 6), "hub": bool(G.nodes[nid].get("target", False))}
                       for nid, v in top]
+            # exact APL/diameter is O(n*m) BFS sweeps; fine at ~1e3 nodes, so only
+            # skip it once the giant component gets too large to stay responsive
+            if Gg.number_of_nodes() <= 3000:
+                try:
+                    ecc = nx.eccentricity(Gg)
+                    avg_path_length = round(nx.average_shortest_path_length(Gg), 4)
+                    diameter = max(ecc.values())
+                except Exception:
+                    avg_path_length, diameter = None, None
         rwc = compute_rwc(Gg)
 
     opinions = [float(G.nodes[nid].get("opinion", 0.0)) for nid in G.nodes]
@@ -299,6 +315,8 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
         "betweenness": {"mean": bc_mean, "top": bc_top},
         "degree": degree, "degreeFit": degree_fit, "clustering": clustering,
         "rwc": rwc, "dip": dip,
+        "nNodes": n_nodes, "nEdges": n_edges, "avgDegree": avg_degree,
+        "density": density, "avgPathLength": avg_path_length, "diameter": diameter,
     }
     with STRUCT_LOCK:
         STRUCT_CACHE[key] = (st.st_size, payload)
