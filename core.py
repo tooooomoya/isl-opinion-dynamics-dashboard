@@ -182,9 +182,13 @@ def opinion_histogram(ops):
 class RunStore:
     """Per-run state: run_meta.json, live CSV tails, and xz parse caches."""
 
-    def __init__(self, run_dir, rid):
+    def __init__(self, run_dir, rid, root_dir):
         self.dir = Path(run_dir)
         self.id = rid
+        self.root = Path(root_dir).resolve()
+        relative_parts = self.dir.resolve().relative_to(self.root).parts
+        self.pattern = relative_parts[0] if relative_parts else self.root.name
+        self.group = ((self.root / self.pattern) if relative_parts else self.root).as_posix()
         self.meta = None
         self.main = CsvTail(self.dir / "modularity.csv")
         self.active = CsvTail(self.dir / "data" / "active_users.csv")
@@ -440,7 +444,7 @@ class RunStore:
         target = meta.get("tMax") or DEFAULT_TARGET_STEPS
         return {
             "run": self.id,
-            "group": os.path.dirname(self.id),
+            "group": self.group,
             "status": self.status(),
             "step": step,
             "target": max(target, step),
@@ -767,7 +771,7 @@ def scan_runs(force=False):
             if "run_meta.json" in filenames:
                 rid = os.path.relpath(dirpath, root.parent)
                 if rid not in STORES:
-                    STORES[rid] = RunStore(Path(dirpath), rid)
+                    STORES[rid] = RunStore(Path(dirpath), rid, root)
                 dirnames[:] = []  # never descend into a run directory
     for rid in list(STORES):
         if not STORES[rid].dir.is_dir():

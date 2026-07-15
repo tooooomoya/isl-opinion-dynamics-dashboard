@@ -86,10 +86,25 @@
   .runs-title { display:flex; align-items:baseline; gap:6px; font-weight:600; color:var(--ink); }
   .runs-title .subnote { margin:0; }
   .runs-actions { display:flex; gap:6px; align-items:center; }
-  #seedbar { display:flex; gap:6px; flex-wrap:nowrap; overflow-x:auto; overflow-y:hidden; padding-bottom:2px; flex:none;
-    scrollbar-width:thin; }
+  #seedbar { display:flex; gap:8px; flex-wrap:wrap; padding-bottom:2px; flex:none; }
   #seedbar::-webkit-scrollbar { height:6px; }
   #seedbar::-webkit-scrollbar-thumb { background:var(--axis); border-radius:999px; }
+  .pattern-group { flex:1 1 300px; min-width:260px; border:1px solid var(--border); border-radius:9px;
+    background:color-mix(in srgb, var(--grid) 42%, transparent); overflow:hidden; }
+  .pattern-summary { width:100%; display:flex; align-items:center; gap:7px; border:0; border-radius:0;
+    padding:6px 8px; background:transparent; color:var(--ink2); text-align:left; }
+  .pattern-summary:hover { background:color-mix(in srgb, var(--grid) 70%, transparent); }
+  .pattern-summary .pattern-chevron { color:var(--muted); width:10px; flex:none; }
+  .pattern-summary .pattern-dot { width:10px; height:10px; border-radius:50%; flex:none; }
+  .pattern-summary .pattern-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    font-size:12px; font-weight:600; }
+  .pattern-summary .pattern-n { color:var(--muted); font-size:11px; white-space:nowrap; }
+  .pattern-statuses { margin-left:auto; display:flex; gap:5px; flex-wrap:wrap; justify-content:flex-end;
+    font-size:10px; color:var(--muted); }
+  .pattern-statuses .done { color:var(--good); } .pattern-statuses .running { color:var(--accent); }
+  .pattern-statuses .stalled { color:var(--warn); } .pattern-statuses .failed { color:var(--bad); }
+  .pattern-seeds { display:flex; gap:5px; flex-wrap:wrap; padding:2px 7px 7px 24px; border-top:1px solid var(--grid); }
+  .pattern-seeds[hidden] { display:none; }
   .chip { display:flex; gap:6px; align-items:center; flex:0 0 auto; background:transparent; border:0;
     border-radius:999px; padding:4px 8px 4px 6px; font-size:12px; cursor:pointer; user-select:none; }
   .chip.running { background:color-mix(in srgb, var(--warn) 12%, transparent); }
@@ -107,6 +122,9 @@
   #runscard.compact { padding:5px 10px 6px; gap:4px; }
   #runscard.compact .runs-title { font-size:11px; }
   #runscard.compact #seedbar { gap:3px; }
+  #runscard.compact .pattern-group { min-width:220px; }
+  #runscard.compact .pattern-summary { padding:3px 5px; }
+  #runscard.compact .pattern-seeds { padding:2px 4px 4px 16px; }
   #runscard.compact .chip { padding:1px 5px 1px 4px; font-size:10px; gap:3px; }
   #runscard.compact .chip .dot { width:6px; height:6px; }
   #runscard.compact .chip .pct + .pct { display:none; }
@@ -195,6 +213,14 @@
   #tooltip .trow { display:flex; gap:8px; justify-content:space-between; font-variant-numeric:tabular-nums; }
   #tooltip .trow .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
   #tooltip .thead { color:var(--muted); margin-bottom:2px; }
+  #tooltip.pattern-tip { max-width:min(720px, calc(100vw - 24px)); }
+  #tooltip .pattern-tip-row { display:flex; align-items:baseline; gap:4px 10px; flex-wrap:wrap;
+    padding:2px 0; font-variant-numeric:tabular-nums; }
+  #tooltip .pattern-tip-row + .pattern-tip-row { border-top:1px solid var(--grid); }
+  #tooltip .pattern-tip-label { display:flex; align-items:center; min-width:0; margin-right:auto; font-weight:600; }
+  #tooltip .pattern-tip-label .dot { display:inline-block; width:8px; height:8px; border-radius:50%;
+    margin-right:4px; flex:none; }
+  #tooltip .pattern-tip-stat { white-space:nowrap; }
   #logdrawer { position:fixed; top:0; right:0; bottom:0; width:min(560px,90vw); background:var(--surface);
     border-left:1px solid var(--border); box-shadow:-8px 0 24px rgba(0,0,0,.25); z-index:20;
     display:flex; flex-direction:column; }
@@ -308,6 +334,7 @@
   <div id="banner" hidden></div>
   <div class="controls">
     <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
+    <label class="ctl"><input type="checkbox" id="showseeds"> show seeds</label>
     <label class="ctl"><input type="checkbox" id="showmean"> show band</label>
     <select id="interval" title="refresh interval">
       <option value="2">2s</option><option value="5" selected>5s</option>
@@ -528,6 +555,7 @@ const state = {
   plane: null,
   pinned: new Set(),   // seed ids pinned (highlighted) via chip dot click
   hoverSeed: null,      // seed id transiently highlighted via chip hover
+  expandedPatterns: new Set(store("expandedPatterns", [])),
   tab: store("tab","timeseries"),  // active tab: timeseries | opinion | network
   lastUpdate: null,
 };
@@ -659,6 +687,11 @@ function seedList(){ return state.summary ? state.summary.runs : []; }
    still reads as one coherent condition. */
 function groupOf(s){ return s && s.group!=null ? s.group : ""; }
 function groupNames(){ return [...new Set(seedList().map(groupOf))].sort(); }
+function patternRuns(){
+  const groups=new Map(groupNames().map(g=>[g,[]]));
+  for(const s of seedList()) groups.get(groupOf(s)).push(s);
+  return groups;
+}
 function patternLabel(g){ if(!g) return "(root)"; const parts=String(g).split("/"); return parts[parts.length-1]; }
 function ensurePatternColorMap(){
   const names=groupNames();
@@ -672,7 +705,6 @@ function ensurePatternColorMap(){
   return map;
 }
 function groupColor(g){
-  if(groupNames().length<=1) return { bundle: cssVar("--muted"), full: cssVar("--accent"), mean: cssVar("--accent"), band: cssVar("--accent") };
   const c = pal()[ensurePatternColorMap()[g] % 8];
   return { bundle:c, full:c, mean:c, band:c };
 }
@@ -823,9 +855,35 @@ document.querySelectorAll(".tabbtn").forEach(btn=>btn.addEventListener("click",(
 
 function renderSeedbar(){
   const bar=$("#seedbar"); bar.innerHTML="";
-  $("#runsCount").textContent = `${seedList().length} ${seedList().length===1?"run":"runs"}`;
+  const groups=patternRuns();
+  $("#runsCount").textContent = `${groups.size} ${groups.size===1?"pattern":"patterns"} / ${seedList().length} ${seedList().length===1?"run":"runs"}`;
   if(!seedList().length){ bar.innerHTML='<div id="empty">no runs found — nothing under the data roots has a run_meta.json yet</div>'; return; }
-  for(const s of seedList()){
+  for(const [group,runs] of groups){
+    const wrapper=document.createElement("section"); wrapper.className="pattern-group";
+    const summary=document.createElement("button"); summary.type="button"; summary.className="pattern-summary";
+    summary.title=group||"(root)";
+    const counts=Object.fromEntries(["done","running","stalled","failed"].map(status=>
+      [status,runs.filter(s=>s.status===status).length]));
+    const aggregateCount=runs.filter(s=>!state.hidden.has(s.run)).length;
+    const expanded=state.expandedPatterns.has(group);
+    summary.innerHTML=`<span class="pattern-chevron">${expanded?"&#9662;":"&#9656;"}</span>`+
+      `<span class="pattern-dot" style="background:${groupColor(group).mean}"></span>`+
+      `<span class="pattern-name"></span><span class="pattern-n" title="runs included in the pattern aggregate">n=${aggregateCount}</span>`+
+      `<span class="pattern-statuses">`+
+        `<span class="done">${counts.done} done</span><span class="running">${counts.running} running</span>`+
+        `<span class="stalled">${counts.stalled} stalled</span><span class="failed">${counts.failed} failed</span>`+
+      `</span>`;
+    summary.querySelector(".pattern-name").textContent=patternLabel(group);
+    const seeds=document.createElement("div"); seeds.className="pattern-seeds"; seeds.hidden=!expanded;
+    summary.addEventListener("click",()=>{
+      if(state.expandedPatterns.has(group)) state.expandedPatterns.delete(group); else state.expandedPatterns.add(group);
+      save("expandedPatterns",[...state.expandedPatterns]); renderSeedbar();
+    });
+    for(const s of runs) seeds.appendChild(runChip(s));
+    wrapper.append(summary,seeds); bar.appendChild(wrapper);
+  }
+}
+function runChip(s){
     const chip=document.createElement("div");
     chip.className="chip "+s.status+(state.hidden.has(s.run)?" off":"")+(state.pinned.has(s.run)?" pinned":"");
     chip.title=s.run+(s.n?` · n=${s.n}`:"")+(s.seed!=null?` · seed ${s.seed}`:"")
@@ -833,14 +891,17 @@ function renderSeedbar(){
     const pct=s.target? Math.round(100*Math.min(s.step,s.target)/s.target) : 0;
     chip.innerHTML=`<span class="dot" style="background:${statusColor(s.status)}"></span>`+
       `<b>${shortRun(s.run)}</b>`+
+      `<span class="st ${s.status}">${s.status}</span>`+
       `<span class="pct">${pct}%</span>`+
-      (mixLabel(s.mix)?`<span class="pct">${mixLabel(s.mix)}</span>`:"");
+      (mixLabel(s.mix)?`<span class="pct">${mixLabel(s.mix)}</span>`:"")+
+      (s.seed!=null?`<button type="button" class="logbtn" title="open run log">log</button>`:"");
     chip.querySelector(".dot").addEventListener("click",evt=>{ evt.stopPropagation(); togglePin(s.run); });
+    const logbtn=chip.querySelector(".logbtn");
+    if(logbtn) logbtn.addEventListener("click",evt=>{ evt.stopPropagation(); openLog(s.seed); });
     chip.addEventListener("click",()=>{ toggleSeed(s.run); });
     chip.addEventListener("mouseenter",()=>{ state.hoverSeed=s.run; renderGrid(); });
     chip.addEventListener("mouseleave",()=>{ state.hoverSeed=null; renderGrid(); });
-    bar.appendChild(chip);
-  }
+    return chip;
 }
 function toggleSeed(rid){
   if(state.hidden.has(rid)) state.hidden.delete(rid); else state.hidden.add(rid);
@@ -958,9 +1019,8 @@ function seriesFor(metric){
   }
   return out;
 }
-/* Per-pattern mean±SD band (R2): every seed in a group is aligned onto the
-   group's longest step grid via nearest-value lookup, then averaged ignoring
-   gaps per point — this is what "seed replicate" grouping is for. */
+/* Per-pattern mean±SD band (R2): aggregate only values that actually exist at
+   the same numeric step. seriesFor() has already applied per-run smoothing. */
 function bandsFor(seriesList){
   const byGroup=new Map();
   for(const r of seriesList){
@@ -970,22 +1030,31 @@ function bandsFor(seriesList){
   const bands=[];
   for(const [group,arr] of byGroup){
     if(!arr.length) continue;
-    const ref=arr.reduce((a,b)=> b.steps.length>a.steps.length?b:a);
-    const mean=[],sd=[];
-    for(const st of ref.steps){
-      let sum=0,cnt=0;
-      for(const r of arr){ if(!r.steps.length) continue;
-        const v=r.vals[nearestIdx(r.steps,st)];
-        if(v!=null&&!Number.isNaN(v)){ sum+=v; cnt++; } }
+    const stepMaps=arr.map(r=>{
+      const m=new Map();
+      for(let i=0;i<r.steps.length;i++){
+        const st=Number(r.steps[i]);
+        if(!Number.isNaN(st)) m.set(st,r.vals[i]);
+      }
+      return m;
+    });
+    const steps=[...new Set(stepMaps.flatMap(m=>[...m.keys()]))].sort((a,b)=>a-b);
+    const mean=[],sd=[],nEff=[];
+    for(const st of steps){
+      const values=[];
+      for(const m of stepMaps){
+        if(!m.has(st)) continue;
+        const v=m.get(st);
+        if(v!=null&&!Number.isNaN(v)) values.push(v);
+      }
+      const cnt=values.length;
+      nEff.push(cnt);
       if(!cnt){ mean.push(null); sd.push(null); continue; }
-      const m=sum/cnt;
-      let sq=0,scnt=0;
-      for(const r of arr){ if(!r.steps.length) continue;
-        const v=r.vals[nearestIdx(r.steps,st)];
-        if(v!=null&&!Number.isNaN(v)){ sq+=(v-m)**2; scnt++; } }
-      mean.push(m); sd.push(scnt? Math.sqrt(sq/scnt) : 0);
+      const avg=values.reduce((sum,v)=>sum+v,0)/cnt;
+      mean.push(avg);
+      sd.push(cnt>=2 ? Math.sqrt(values.reduce((sum,v)=>sum+(v-avg)**2,0)/cnt) : null);
     }
-    bands.push({group, steps:ref.steps, mean, sd, n:arr.length});
+    bands.push({group, steps, mean, sd, nEff, n:arr.length});
   }
   return bands;
 }
@@ -1264,13 +1333,13 @@ function drawFamilyChart(host, base, subcols){
   });
   svg.addEventListener("mouseleave",()=>{ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); });
 }
-/* Bundle+band redesign (R2): thin per-seed threads (grouped/colored by pattern)
-   + a bold mean line + an optional mean±SD wash per pattern, with pinned/hovered
-   seeds pulled out on top at full strength. Replaces the old "one line per seed,
-   dashed past 8" rendering. */
+/* Mean-centered pattern rendering (R3): mean lines are always present, the SD
+   wash and per-seed threads are independently optional, and seed paths are not
+   generated at all while show seeds is off. */
 function drawLineChart(host, metric){
   const S=seriesFor(metric);
   const bands=bandsFor(S);
+  const showSeeds=$("#showseeds").checked;
   const showBand=$("#showmean").checked;
   let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity;
   for(const s of S) for(let i=0;i<s.steps.length;i++){ const v=s.vals[i];
@@ -1278,7 +1347,7 @@ function drawLineChart(host, metric){
     if(s.steps[i]<x0)x0=s.steps[i]; if(s.steps[i]>x1)x1=s.steps[i];
     if(v<y0)y0=v; if(v>y1)y1=v; }
   if(showBand) for(const b of bands) for(let i=0;i<b.steps.length;i++){
-    const m=b.mean[i]; if(m==null) continue; const sd=b.sd[i]||0;
+    const m=b.mean[i],sd=b.sd[i]; if(m==null||sd==null) continue;
     if(b.steps[i]<x0)x0=b.steps[i]; if(b.steps[i]>x1)x1=b.steps[i];
     if(m-sd<y0)y0=m-sd; if(m+sd>y1)y1=m+sd; }
   if(!S.length||x0===Infinity){ host.innerHTML=`<svg viewBox="0 0 ${LC.W} ${LC.H}"><text class="title" x="10" y="15">${metricLabel(metric)}</text><text x="${LC.W/2}" y="${LC.H/2}" text-anchor="middle">no data</text></svg>`; return; }
@@ -1303,21 +1372,28 @@ function drawLineChart(host, metric){
   let bandPaths="";
   if(showBand) for(const b of bands){
     const col=groupColor(b.group).band;
-    let upper="",lowerPts=[];
-    for(let i=0;i<b.steps.length;i++){ const m=b.mean[i]; if(m==null) continue;
-      const sd=b.sd[i]||0, px=xs(b.steps[i]).toFixed(1);
-      upper+=(upper?"L":"M")+px+" "+ys(m+sd).toFixed(1);
+    let upperPts=[],lowerPts=[];
+    const flushBand=()=>{
+      if(!upperPts.length) return;
+      bandPaths+=`<path d="M${upperPts.join(" L")} L${lowerPts.reverse().join(" L")} Z" fill="${col}" fill-opacity="0.13" stroke="none"/>`;
+      upperPts=[]; lowerPts=[];
+    };
+    for(let i=0;i<b.steps.length;i++){ const m=b.mean[i],sd=b.sd[i];
+      if(m==null||sd==null){ flushBand(); continue; }
+      const px=xs(b.steps[i]).toFixed(1);
+      upperPts.push(px+" "+ys(m+sd).toFixed(1));
       lowerPts.push(px+" "+ys(m-sd).toFixed(1));
     }
-    if(!upper) continue;
-    bandPaths+=`<path d="${upper} L${lowerPts.reverse().join(" L")} Z" fill="${col}" fill-opacity="0.13" stroke="none"/>`;
+    flushBand();
   }
 
   let bundlePaths="";
-  for(const s of S){
-    if(highlight.has(s.seed)) continue;
-    const col=groupColor(s.group).bundle;
-    bundlePaths+=`<path d="${pathFor(s.steps,s.vals)}" fill="none" stroke="${col}" stroke-width="1" stroke-opacity="${anyHi?0.12:0.32}" stroke-linejoin="round"/>`;
+  if(showSeeds){
+    for(const s of S){
+      if(highlight.has(s.seed)) continue;
+      const col=groupColor(s.group).bundle;
+      bundlePaths+=`<path d="${pathFor(s.steps,s.vals)}" fill="none" stroke="${col}" stroke-width="1" stroke-opacity="${anyHi?0.12:0.32}" stroke-linejoin="round"/>`;
+    }
   }
 
   let meanPaths="";
@@ -1363,7 +1439,7 @@ function drawLineChart(host, metric){
     `<svg viewBox="0 0 ${LC.W} ${LC.H}" style="cursor:crosshair">
       <text class="title" x="10" y="15">${metricLabel(metric)}</text>${g}
       <line x1="${LC.L}" x2="${LC.W-LC.R}" y1="${LC.H-LC.B}" y2="${LC.H-LC.B}" stroke="var(--axis)"/>
-      ${bandPaths}${bundlePaths}${meanPaths}${hiPaths}${cursorMarks}
+      ${bandPaths}${bundlePaths}${hiPaths}${meanPaths}${cursorMarks}
       <line class="xh" y1="${LC.T}" y2="${LC.H-LC.B}" stroke="var(--muted)" stroke-dasharray="3 3" visibility="hidden"/>
       <rect class="zoomrect" y="${LC.T}" height="${LC.H-LC.T-LC.B}" fill="var(--accent)" opacity="0.15" visibility="hidden"/>
     </svg>`;
@@ -1375,7 +1451,6 @@ function drawLineChart(host, metric){
 function svgX(svg, evt){ const r=svg.getBoundingClientRect(); return (evt.clientX-r.left)/r.width*LC.W; }
 function attachLineInteraction(svg, metric){
   let dragStart=null;
-  const multiPattern=groupNames().length>1;
   svg.addEventListener("mousemove",evt=>{
     const c=state.charts[metric]; if(!c) return;
     const px=svgX(svg,evt);
@@ -1387,23 +1462,33 @@ function attachLineInteraction(svg, metric){
     if(px<LC.L||px>LC.W-LC.R){ hideTip(); svg.querySelector(".xh").setAttribute("visibility","hidden"); return; }
     const step=c.x0+(px-LC.L)/(LC.W-LC.L-LC.R)*(c.x1-c.x0);
     const xh=svg.querySelector(".xh");
-    let rows=[],snapX=px;
-    for(const s of c.S){ if(!s.steps.length) continue;
-      const i=nearestIdx(s.steps,step); const v=s.vals[i];
-      // shortRun() already folds in the immediate parent dir (== the pattern
-      // name), so prefixing it again here would just repeat it.
-      rows.push({label:shortRun(s.seed), color:groupColor(s.group).full, v, step:s.steps[i]});
-      snapX=c.xs(s.steps[i]); }
+    const meanRows=[];
+    let snapX=px;
     for(const b of c.bands){ if(!b.steps.length) continue;
-      const i=nearestIdx(b.steps,step); const v=b.mean[i];
-      rows.push({label:(multiPattern?patternLabel(b.group)+" · ":"")+"mean",
-                 color:groupColor(b.group).mean, v, step:b.steps[i], isMean:true}); }
+      const i=nearestIdx(b.steps,step);
+      meanRows.push({label:patternLabel(b.group), group:b.group, color:groupColor(b.group).mean,
+                     step:b.steps[i], mean:b.mean[i], sd:b.sd[i], nEff:b.nEff[i]});
+      snapX=c.xs(b.steps[i]);
+    }
+    let seedRows=[];
+    if($("#showseeds").checked){
+      for(const s of c.S){ if(!s.steps.length) continue;
+        const i=nearestIdx(s.steps,step);
+        seedRows.push({label:shortRun(s.seed), color:groupColor(s.group).full, v:s.vals[i]});
+      }
+      seedRows.sort((a,b)=>(b.v??-Infinity)-(a.v??-Infinity));
+    }
     xh.setAttribute("x1",snapX); xh.setAttribute("x2",snapX); xh.setAttribute("visibility","visible");
-    rows.sort((a,b)=>(!!b.isMean-!!a.isMean)||((b.v??-Infinity)-(a.v??-Infinity)));
-    const more=rows.length>12? rows.length-12:0; if(more) rows=rows.slice(0,12);
-    showTip(evt, `<div class="thead">${metricLabel(metric)} @ step ${fstep(Math.round(rows[0]?.step??step))}</div>`+
-      rows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${r.label}</span><span>${fmt(r.v)}</span></div>`).join("")+
-      (more?`<div class="thead">… +${more} more</div>`:""));
+    const more=seedRows.length>12? seedRows.length-12:0; if(more) seedRows=seedRows.slice(0,12);
+    showTip(evt, `<div class="thead">${metricLabel(metric)}</div>`+
+      meanRows.map(r=>`<div class="pattern-tip-row">`+
+        `<span class="pattern-tip-label"><span class="dot" style="background:${r.color}"></span>${r.label}</span>`+
+        `<span class="pattern-tip-stat">step ${fstep(r.step)}</span>`+
+        `<span class="pattern-tip-stat">mean ${fmt(r.mean)}</span>`+
+        `<span class="pattern-tip-stat">SD ${r.nEff>=2?fmt(r.sd):"–"}</span>`+
+        `<span class="pattern-tip-stat">n=${r.nEff}</span></div>`).join("")+
+      seedRows.map(r=>`<div class="trow"><span><span class="dot" style="background:${r.color}"></span>${r.label}</span><span>${fmt(r.v)}</span></div>`).join("")+
+      (more?`<div class="thead">… +${more} more</div>`:""), true);
   });
   svg.addEventListener("mouseleave",()=>{ hideTip();
     const xh=svg.querySelector(".xh"); if(xh) xh.setAttribute("visibility","hidden"); });
@@ -2912,8 +2997,8 @@ function renderBehavior(){
 }
 
 /* ---------- tooltip ---------- */
-function showTip(evt,html){
-  const t=$("#tooltip"); t.innerHTML=html; t.hidden=false;
+function showTip(evt,html,patternTip=false){
+  const t=$("#tooltip"); t.classList.toggle("pattern-tip",patternTip); t.innerHTML=html; t.hidden=false;
   const pad=14, w=t.offsetWidth, h=t.offsetHeight;
   let x=evt.clientX+pad, y=evt.clientY+pad;
   if(x+w>innerWidth-8) x=evt.clientX-w-pad;
@@ -2969,6 +3054,8 @@ $("#interval").value=String(store("interval",5));
 $("#interval").addEventListener("change",()=>{ save("interval",+$("#interval").value); schedule(); });
 $("#smooth").checked=store("smooth",false);
 $("#smooth").addEventListener("change",()=>{ save("smooth",$("#smooth").checked); renderAll(); });
+$("#showseeds").checked=store("showseeds",false);
+$("#showseeds").addEventListener("change",()=>{ save("showseeds",$("#showseeds").checked); renderAll(); });
 $("#showmean").checked=store("showmean",true);
 $("#showmean").addEventListener("change",()=>{ save("showmean",$("#showmean").checked); renderAll(); });
 $("#opview").value=state.opview;
