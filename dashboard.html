@@ -30,28 +30,71 @@
   body { background:var(--page); color:var(--ink);
     font:13px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:0;
     display:flex; min-height:100vh; overflow-x:hidden; overflow-y:auto; }
-  #rail { flex:0 0 48px; width:48px; min-height:100vh; padding:12px 8px;
-    display:flex; flex-direction:column; align-items:center; gap:12px;
+  #rail { flex:0 0 216px; width:216px; min-height:100vh; padding:12px 10px;
+    display:flex; flex-direction:column; gap:14px; overflow:hidden;
     background:var(--rail); border-right:1px solid var(--border);
-    position:sticky; top:0; align-self:flex-start; height:100vh; }
+    position:sticky; top:0; align-self:flex-start; height:100vh;
+    transition:flex-basis .18s ease, width .18s ease, padding .18s ease; }
+  .rail-head { display:grid; grid-template-columns:32px minmax(0,1fr) 30px; gap:8px; align-items:start; min-width:0; }
   .rail-logo { width:30px; height:30px; border-radius:10px; display:grid; place-items:center;
     color:#fff; background:var(--accent); font-size:15px; font-weight:700; line-height:1; }
+  .rail-brand { min-width:0; padding-top:1px; }
+  .rail-brand .titleline { display:block; line-height:1.2; white-space:normal; }
+  .rail-brand .titleline h1 { font-size:14px; }
+  .rail-brand .titleline .muted { display:block; margin-top:2px; font-size:11px; }
+  .rail-brand .statusline { margin-top:7px; align-items:flex-start; white-space:normal; font-size:10.5px; line-height:1.35; }
+  .rail-brand .statusline .dot { margin-top:3px; }
+  #railToggle { width:30px; height:30px; padding:0; border-radius:8px; font-size:16px; }
+  .rail-section-label { padding:0 8px; color:var(--muted); font-size:10px; font-weight:600;
+    letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+  #rail .tabnav { display:flex; flex-direction:column; gap:4px; margin:0; padding:0; background:transparent;
+    border-radius:0; align-self:stretch; }
+  #rail .tabbtn { position:relative; width:100%; min-height:38px; display:grid;
+    grid-template-columns:24px minmax(0,1fr); gap:8px; align-items:center; padding:7px 9px;
+    border:1px solid transparent; border-radius:8px; color:var(--ink2); text-align:left; }
+  #rail .tabbtn::before { content:""; position:absolute; left:-10px; top:7px; bottom:7px; width:3px;
+    border-radius:0 3px 3px 0; background:transparent; }
+  #rail .tabbtn:hover { background:var(--grid); color:var(--ink); }
+  #rail .tabbtn.active { background:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 25%, transparent);
+    color:var(--ink); font-weight:600; box-shadow:none; }
+  #rail .tabbtn.active::before { background:var(--accent); }
+  .tab-icon { width:24px; height:24px; display:grid; place-items:center; border-radius:6px;
+    color:var(--muted); }
+  .tab-icon svg, .settings-icon svg { width:22px; height:22px; display:block; overflow:visible;
+    fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;
+    filter:drop-shadow(0 1px 0 color-mix(in srgb, var(--surface) 75%, transparent)); }
+  #rail .tabbtn.active .tab-icon { color:var(--accent); }
+  .tab-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .rail-spacer { flex:1 1 auto; }
-  #rail button { width:32px; height:32px; display:grid; place-items:center; padding:0;
-    border-radius:999px; color:var(--ink2); }
-  #rail button:hover { color:var(--ink); }
-  #appShell { flex:1 1 auto; min-width:0; padding:10px 14px;
+  .rail-footer { display:flex; flex-direction:column; gap:5px; padding-top:10px; border-top:1px solid var(--border); }
+  #settings, #theme { width:100%; min-height:36px; display:grid; grid-template-columns:24px minmax(0,1fr);
+    gap:8px; align-items:center; padding:6px 9px; border-radius:8px; color:var(--ink2); text-align:left; }
+  #settings { cursor:default; }
+  #settings:hover, #theme:hover { color:var(--ink); }
+  .settings-icon, .theme-icon { width:24px; height:24px; display:grid; place-items:center; color:var(--muted); }
+  .theme-icon { font-size:16px; }
+  #settings:hover .settings-icon, #theme:hover .theme-icon { color:var(--ink); }
+  .rail-action-label { white-space:nowrap; }
+  body.sidebar-compact #rail { flex-basis:56px; width:56px; padding-inline:7px; }
+  body.sidebar-compact .rail-head { display:flex; flex-direction:column; align-items:center; gap:8px; }
+  body.sidebar-compact .rail-brand, body.sidebar-compact .rail-section-label,
+  body.sidebar-compact .tab-label, body.sidebar-compact .rail-action-label { display:none; }
+  body.sidebar-compact #railToggle { order:2; }
+  body.sidebar-compact #rail .tabbtn, body.sidebar-compact #settings, body.sidebar-compact #theme {
+    width:40px; grid-template-columns:24px; justify-content:center; padding-inline:7px; }
+  body.sidebar-compact #rail .tabbtn::before { left:-7px; }
+  #appShell { flex:1 1 auto; min-width:0; padding:8px 10px;
     display:flex; flex-direction:column; height:100vh; min-height:100vh; overflow:visible; }
   h1 { font-size:16px; font-weight:600; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  header.top { display:grid; grid-template-columns:auto 1fr auto; gap:16px; align-items:center; margin-bottom:6px; flex:none; }
-  .titleblock { display:flex; flex-direction:column; gap:2px; min-width:220px; }
+  header.top { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:12px; align-items:center;
+    margin-bottom:6px; flex:none; min-width:0; }
   .titleline { display:flex; gap:4px; align-items:baseline; white-space:nowrap; }
   .titleline .muted { color:var(--muted); font-weight:500; }
   .statusline { display:flex; gap:6px; align-items:center; color:var(--muted); font-size:11.5px; white-space:nowrap; }
   .statusline .dot { width:8px; height:8px; border-radius:50%; flex:none; background:var(--muted); }
   .statusline .num { color:var(--ink2); }
-  .controls { position:relative; display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-left:auto; }
+  .controls { position:relative; display:flex; gap:8px; align-items:center; flex-wrap:nowrap; margin-left:auto; }
   .overflowbtn { width:30px; padding:5px 0; font-weight:700; }
   .overflow-menu { position:absolute; top:calc(100% + 6px); right:0; z-index:15; display:flex; flex-direction:column; gap:6px;
     min-width:150px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:10px;
@@ -65,31 +108,38 @@
   button.primary:hover, .primary:hover { background:color-mix(in srgb, var(--accent) 88%, #000); }
   input[type=checkbox], input[type=range] { accent-color:var(--accent); }
   label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
-  /* sidebar + main body 2-column layout */
-  .layout { display:flex; align-items:flex-start; gap:16px; flex:1 1 auto; min-height:0; }
+  /* tab-specific sidebar + main body 2-column layout */
+  .layout { display:flex; align-items:stretch; gap:8px; flex:1 1 auto; min-height:0; }
   .layout > main { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; }
-  .sidebar { flex:0 0 240px; width:240px; box-sizing:border-box; background:var(--surface);
-    border:1px solid var(--border); border-radius:12px; padding:10px 12px;
-    position:sticky; top:14px; max-height:calc(100vh - 28px); overflow-y:auto; }
-  #sidebar { background:transparent; border:0; border-radius:0; padding:0;
-    box-shadow:none; top:0; max-height:100%; }
-  #sidebar .sidebar-content > h3, #sidebar #pickerCount { display:none; }
-  .sidebar-content h3 { margin-bottom:6px; }
-  .sidebar-content h3:not(:first-child) { margin-top:12px; }
-  .sidebar-content label.ctl { display:flex; margin-bottom:4px; }
+  .sidebar { box-sizing:border-box; background:var(--surface); border:1px solid var(--border);
+    border-radius:10px; padding:8px; min-height:0; max-height:100%; overflow-y:auto;
+    overscroll-behavior:contain; scrollbar-gutter:stable; }
+  .sidebar::-webkit-scrollbar { width:7px; }
+  .sidebar::-webkit-scrollbar-thumb { background:var(--axis); border-radius:999px; }
+  #sidebar { flex:0 0 216px; width:216px; background:transparent; border:0; border-radius:0;
+    padding:0 4px 0 0; box-shadow:none; }
+  #netsidebar { flex:0 0 228px; width:228px; }
+  .sidebar-content h3 { margin:0; }
+  .sidebar-content label.ctl { display:flex; margin:0; min-height:30px; }
+  .tabpanel[data-tabpanel="timeseries"] > .layout { height:100%; overflow:hidden; }
+  .picker-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px;
+    margin:0 0 5px; }
+  #sidebar .picker-head h3 { font-size:11px; text-transform:uppercase; }
+  #sidebar #pickerCount { margin:0; white-space:nowrap; }
   #banner { border-radius:8px; padding:8px 12px; font-size:13px; flex:none; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
-  header.top #banner { margin:0; text-align:center; }
-  #runscard { display:flex; flex-direction:column; gap:8px; margin-bottom:8px; flex:none; padding:9px 12px 10px; }
+  header.top #banner { min-width:0; margin:0; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #runscard { display:grid; grid-template-columns:auto minmax(260px,1fr) minmax(280px,.55fr);
+    gap:10px; align-items:center; margin-bottom:8px; flex:none; padding:7px 10px; }
   .runs-head { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   .runs-title { display:flex; align-items:baseline; gap:6px; font-weight:600; color:var(--ink); }
   .runs-title .subnote { margin:0; }
   .runs-actions { display:flex; gap:6px; align-items:center; }
-  #seedbar { display:flex; gap:8px; flex-wrap:wrap; padding-bottom:2px; flex:none; }
+  #seedbar { display:flex; gap:8px; flex-wrap:nowrap; min-width:0; overflow-x:auto; padding-bottom:2px; flex:none; }
   #seedbar::-webkit-scrollbar { height:6px; }
   #seedbar::-webkit-scrollbar-thumb { background:var(--axis); border-radius:999px; }
-  .pattern-group { flex:1 1 300px; min-width:260px; border:1px solid var(--border); border-radius:9px;
+  .pattern-group { flex:0 0 clamp(260px,30vw,360px); min-width:260px; border:1px solid var(--border); border-radius:9px;
     background:color-mix(in srgb, var(--grid) 42%, transparent); overflow:hidden; }
   .pattern-summary { width:100%; display:flex; align-items:center; gap:7px; border:0; border-radius:0;
     padding:6px 8px; background:transparent; color:var(--ink2); text-align:left; }
@@ -119,10 +169,10 @@
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
   /* compact runs display: omit run directory names and minimize the runs footprint */
-  #runscard.compact { padding:5px 10px 6px; gap:4px; }
+  #runscard.compact { padding:5px 10px 6px; gap:6px; }
   #runscard.compact .runs-title { font-size:11px; }
   #runscard.compact #seedbar { gap:3px; }
-  #runscard.compact .pattern-group { flex:0 1 auto; min-width:0; }
+  #runscard.compact .pattern-group { flex:0 0 auto; min-width:0; }
   #runscard.compact .pattern-summary { padding:3px 5px; }
   #runscard.compact .pattern-summary .pattern-name { display:none; }
   #runscard.compact .pattern-statuses { margin-left:0; }
@@ -133,30 +183,46 @@
   #runscard.compact .chip .dot { width:6px; height:6px; }
   #runscard.compact .chip .pct + .pct { display:none; }
   #runscard.compact .scrubrow { gap:6px; }
-  #pickerCount { margin-bottom:6px; }
-  #pickerSearch { width:100%; margin:0 0 8px; color:var(--ink); background:var(--surface);
-    border:1px solid var(--border); border-radius:8px; padding:7px 9px; font:12.5px system-ui,sans-serif; }
+  #pickerSearch { width:100%; min-height:32px; margin:0 0 6px; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:7px; padding:5px 8px; font:12px system-ui,sans-serif; }
   #pickerSearch:focus { outline:2px solid var(--accent-soft); border-color:var(--accent); }
-  #pickerlist { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
-  .picker-group { display:flex; flex-direction:column; gap:6px; }
-  .picker-heading { font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; }
-  #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  #pickerlist .resetbtn { width:100%; margin-top:2px; }
-  .duo, .trio { display:flex; flex-wrap:wrap; gap:12px; }
+  #pickerlist { display:flex; flex-direction:column; gap:5px; }
+  .picker-group { display:flex; flex-direction:column; gap:1px; }
+  .picker-heading { width:100%; min-height:30px; display:grid; grid-template-columns:12px minmax(0,1fr) auto;
+    gap:5px; align-items:center; padding:3px; border:0; border-radius:5px; background:transparent;
+    color:var(--muted); font:600 11px system-ui,sans-serif; text-align:left; text-transform:uppercase; }
+  .picker-heading:hover, .picker-heading:focus-visible { background:var(--grid); color:var(--ink2); }
+  .picker-heading:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .picker-chevron { font-size:10px; text-align:center; }
+  .picker-heading-count { font-size:10px; font-weight:500; font-variant-numeric:tabular-nums; }
+  .picker-items { display:flex; flex-direction:column; gap:1px; }
+  .picker-group[hidden], .picker-items[hidden], #pickerlist label[hidden] { display:none; }
+  #pickerlist label { display:flex; gap:6px; align-items:center; min-height:30px; padding:2px 3px;
+    border-radius:5px; font-size:12px; color:var(--ink2); cursor:pointer; white-space:nowrap;
+    overflow:hidden; text-overflow:ellipsis; }
+  #pickerlist label:hover { background:var(--grid); }
+  #pickerlist label input { flex:none; }
+  #pickerlist .resetbtn { width:100%; min-height:32px; margin-top:1px; }
+  .duo, .trio { display:flex; flex-wrap:wrap; gap:8px; }
   /* Metric charts live in a wrapping grid (2-3 columns, auto-reflow by
      container width) instead of a fixed carousel+featured-row layout. A
      card's size is set by whether it carries .featured; the ⤢ button on each
      card toggles that (at most 2 featured at once, oldest evicted first). */
-  #gridWrap { display:grid; gap:10px; flex:1 1 auto; min-height:0; }
-  .metriccard { position:relative; min-width:0; min-height:0; overflow:hidden; }
-  #gridWrap .metriccard { display:flex; flex-direction:column; }
+  #gridWrap { display:grid; gap:6px 8px; flex:1 1 auto; min-height:0; }
+  .metriccard { position:relative; min-width:0; min-height:0; overflow:hidden;
+    background:transparent; border:0; border-top:1px solid var(--border); border-radius:0;
+    padding:5px 4px 1px; box-shadow:none; }
+  .metriccard:hover, .metriccard:focus-within { box-shadow:none; border-top-color:var(--axis); }
+  #gridWrap .metriccard { display:flex; flex-direction:column; background:transparent; border:0;
+    border-top:1px solid var(--border); border-radius:0; box-shadow:none; }
+  #gridWrap .metriccard:hover, #gridWrap .metriccard:focus-within {
+    border-top-color:var(--axis); box-shadow:none; }
   #gridWrap .metriccard .cardbody { flex:1 1 auto; min-height:0; display:flex; overflow:hidden; }
   #gridWrap .metriccard svg { width:100%; height:100%; }
   .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
     z-index:1; background:none; border:none; }
-  .enlargebtn:hover { background:var(--grid); color:var(--ink); }
+  .enlargebtn:hover, .enlargebtn:focus-visible { background:var(--grid); color:var(--ink); }
   .panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px 6px;
     box-shadow:0 1px 2px rgba(16,24,40,.05); }
   .panel:hover { box-shadow:0 1px 2px rgba(16,24,40,.05); }
@@ -171,24 +237,39 @@
      used for the big section wrappers, which aren't individually resized. */
   .panel.card { display:flex; flex-direction:column; position:relative;
     resize:both; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
+  /* Chart cards use whitespace, headings and a single separator instead of a
+     raised surface. Plain .panel remains unchanged for Runs and controls. */
+  .panel.card { background:transparent; border:0; border-top:1px solid var(--border);
+    border-radius:0; padding:5px 4px 1px; box-shadow:none; }
+  .panel.card:hover, .panel.card:focus-within { box-shadow:none; border-top-color:var(--axis); }
+  :root[data-theme="dark"] .panel.card:not(.drop-before):not(.drop-after),
+  :root[data-theme="dark"] .panel.card:not(.drop-before):not(.drop-after):hover { box-shadow:none; }
   .trio > .panel.card { flex-basis:260px; }
   .duo > .panel.card { flex-basis:420px; }
   .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
   .cardbody canvas { width:100%; height:100%; display:block; }
-  .draghandle { position:absolute; top:6px; right:8px; cursor:grab; color:var(--muted);
-    font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1; }
-  .draghandle:hover { background:var(--grid); color:var(--ink); }
+  .draghandle { position:absolute; top:4px; right:5px; cursor:grab; color:var(--muted);
+    font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1;
+    opacity:.38; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .panel.card:hover .draghandle, .panel.card:focus-within .draghandle,
+  .draghandle:hover, .draghandle:focus-visible { opacity:1; background:var(--grid); color:var(--ink); }
+  .draghandle:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+  .draghandle:active { cursor:grabbing; }
+  /* Native resize handles cannot be themed consistently. This marker reveals
+     the bottom-right resize target only while a resizable chart is engaged. */
+  .duo > .panel.card::after, .trio > .panel.card::after { content:""; position:absolute; right:1px; bottom:1px;
+    width:11px; height:11px; pointer-events:none; opacity:0;
+    background:linear-gradient(135deg, transparent 48%, var(--muted) 49% 57%, transparent 58% 68%, var(--muted) 69% 77%, transparent 78%); }
+  .duo > .panel.card:hover::after, .trio > .panel.card:hover::after,
+  .duo > .panel.card:focus-within::after, .trio > .panel.card:focus-within::after { opacity:.75; }
   .panel.card.dragging { opacity:0.35; }
   .panel.card.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
   .panel.card.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
   .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
-  /* tabs: 3-way split (time series / opinion / network), the rest of the
-     always-visible header (title, stat tiles, controls, banner, chips) stays
-     outside the tabpanels below. */
-  .tabnav { display:flex; gap:3px; align-self:flex-start; margin-bottom:8px; padding:3px;
-    background:var(--grid); border-radius:999px; flex:none; }
+  /* tabs: 3-way split (time series / opinion / network), rendered once in the
+     app sidebar while the shared controls and Runs stay above the tabpanels. */
   .tabbtn { background:transparent; border:1px solid transparent; border-radius:999px;
     padding:6px 14px; font:13px system-ui,sans-serif; color:var(--muted); cursor:pointer; }
   .tabbtn:hover { background:color-mix(in srgb, var(--surface) 64%, transparent); color:var(--ink2); }
@@ -200,7 +281,7 @@
      right = 2-D outcome plane (~40%), both fitted to the tab's full height.
      Manual card resize (and its persisted size) is disabled here — a stored
      size would otherwise fight the flex split. */
-  .tabpanel[data-tabpanel="opinion"] { flex-direction:row; gap:12px; }
+  .tabpanel[data-tabpanel="opinion"] { flex-direction:row; gap:8px; }
   .tabpanel[data-tabpanel="opinion"] > [data-card="opinion"].panel.card { flex:3 1 0; }
   .tabpanel[data-tabpanel="opinion"] > [data-card="plane"].panel.card { flex:2 1 0; }
   .tabpanel[data-tabpanel="opinion"] > .panel.card { resize:none; min-width:0; min-height:0; }
@@ -240,6 +321,36 @@
   .scrubrow button.live { color:var(--accent); border-color:var(--accent); }
   .scrubrow .subnote { margin:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
   #runscard .scrubrow { margin:0; }
+  @media (max-width:1279px) {
+    #rail { flex-basis:56px; width:56px; padding-inline:7px; }
+    #rail .rail-head { display:flex; flex-direction:column; align-items:center; gap:8px; }
+    #rail .rail-brand, #rail .rail-section-label, #rail .tab-label, #rail .rail-action-label { display:none; }
+    #rail #railToggle { order:2; }
+    #rail .tabbtn, #rail #settings, #rail #theme { width:40px; grid-template-columns:24px; justify-content:center; padding-inline:7px; }
+    #rail .tabbtn::before { left:-7px; }
+    body.sidebar-expanded #rail { flex-basis:216px; width:216px; padding-inline:10px; }
+    body.sidebar-expanded #rail .rail-head { display:grid; grid-template-columns:32px minmax(0,1fr) 30px;
+      align-items:start; gap:8px; }
+    body.sidebar-expanded #rail .rail-brand { display:block; }
+    body.sidebar-expanded #rail .rail-section-label { display:block; }
+    body.sidebar-expanded #rail .tab-label, body.sidebar-expanded #rail .rail-action-label { display:block; }
+    body.sidebar-expanded #rail #railToggle { order:initial; }
+    body.sidebar-expanded #rail .tabbtn, body.sidebar-expanded #rail #settings, body.sidebar-expanded #rail #theme {
+      width:100%; grid-template-columns:24px minmax(0,1fr); justify-content:initial; padding-inline:9px; }
+    body.sidebar-expanded #rail .tabbtn::before { left:-10px; }
+    #runscard { grid-template-columns:minmax(0,1fr) minmax(260px,.75fr); align-items:start; }
+    #runscard .runs-head { grid-column:1 / -1; }
+    #seedbar { flex-wrap:wrap; overflow-x:visible; }
+    .pattern-group { flex:1 1 260px; }
+    #cursorRow { flex-wrap:wrap; }
+    #cursorScrub { flex-basis:220px; min-width:160px; }
+  }
+  @media (max-width:760px) {
+    #appShell { padding-inline:7px; }
+    header.top { grid-template-columns:minmax(0,1fr); }
+    .controls { width:100%; overflow-x:auto; padding-bottom:2px; margin-left:0; }
+    #runscard { grid-template-columns:minmax(0,1fr); }
+  }
   .leg { display:flex; gap:10px; flex-wrap:wrap; font-size:11px; color:var(--ink2); padding:4px 2px 2px; }
   .leg span { display:flex; gap:4px; align-items:center; }
   .leg i { width:10px; height:10px; border-radius:2px; display:inline-block; }
@@ -262,19 +373,28 @@
   .colorbar-row .cb-chips { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
   .colorbar-row .cb-chips span { border-radius:999px; padding:3px 8px; background:var(--grid); }
   .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
-  #netsidebar .sidebar-content { display:flex; flex-direction:column; gap:10px; }
+  #netsidebar .sidebar-content { display:flex; flex-direction:column; gap:7px; }
   #netsidebar .sidebar-content h3 { margin:0; font-size:11px; font-weight:600; color:var(--muted); text-transform:uppercase; }
-  #netsidebar .sidebar-content h3:not(:first-child) { margin-top:0; }
-  .net-control-card { display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--surface);
-    border:1px solid var(--border); border-radius:12px; }
-  .net-field { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
-  .net-field select, .net-field input[type=number] { width:100%; }
+  .net-control-card { display:flex; flex-direction:column; gap:5px; padding:7px; background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; }
+  .net-field { display:grid; grid-template-columns:minmax(82px,1fr) minmax(0,1fr); gap:6px;
+    align-items:center; min-height:30px; font-size:11px; color:var(--muted); }
+  .net-field select, .net-field input[type=number] { width:100%; min-width:0; min-height:30px; padding:4px 7px; }
   .net-field input[type=number] { box-sizing:border-box; color:var(--ink); background:var(--surface);
-    border:1px solid var(--border); border-radius:8px; padding:6px 8px; font:12px system-ui,sans-serif; }
-  .net-setting-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-  .net-setting-grid .wide { grid-column:1/-1; }
-  .net-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
-  .net-actions button { width:100%; min-width:0; }
+    border:1px solid var(--border); border-radius:7px; font:12px system-ui,sans-serif; }
+  .net-setting-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:2px; }
+  .net-setting-grid .wide { grid-column:auto; }
+  .net-setting-grid label.ctl { min-height:30px; }
+  .net-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:5px; }
+  .net-actions button, .net-control-card > button { width:100%; min-width:0; min-height:30px; padding:4px 6px; }
+  #netsidebar #netcolorbar { gap:5px; margin:0; }
+  #netsidebar .colorbar-row .cb-scale { min-width:0; flex:1 1 128px; }
+  #netsidebar .colorbar-row .cb-gradbar,
+  #netsidebar .colorbar-row .cb-ticks { width:100%; min-width:128px; }
+  #netsidebar #netcolorctl { gap:5px; margin:0; }
+  #netsidebar #netcolorctl button, #netsidebar #netcolorctl select,
+  #netsidebar #netcolorctl input { min-height:30px; }
+  #netsidebar > .sidebar-content > .subnote { margin:0; line-height:1.35; }
   #netreheat { width:100%; }
   #netleg span { border-radius:999px; padding:3px 8px; }
   #netleg span:nth-child(1) { background:color-mix(in srgb, var(--bad) 14%, transparent); }
@@ -284,18 +404,52 @@
   .net-badges { display:flex; gap:6px; flex-wrap:wrap; }
   .net-badge { background:var(--grid); color:var(--ink2); border-radius:999px; padding:3px 8px;
     font-size:11px; font-weight:500; white-space:nowrap; }
-  /* network snapshot (Phase 4): controls live in the dedicated #netsidebar now,
-     so the card itself is just the canvas filling the tab's full remaining
-     height/width — no compact/expanded toggle needed any more. */
+  /* Network Graph / Metrics are exclusive local views. The shared toolbar
+     remains visible above both; only Metrics owns vertical metric scrolling. */
+  .tabpanel[data-tabpanel="network"] { min-height:0; overflow:hidden; }
+  .network-localbar { display:flex; align-items:center; justify-content:space-between; gap:10px;
+    flex:none; min-width:0; margin-bottom:6px; padding:5px 7px; background:var(--surface);
+    border:1px solid var(--border); border-radius:9px; }
+  .network-view-tabs { display:flex; gap:3px; padding:3px; background:var(--grid);
+    border-radius:8px; flex:none; }
+  .netviewbtn { min-height:30px; padding:4px 12px; border:1px solid transparent;
+    border-radius:6px; background:transparent; color:var(--muted); font:12px system-ui,sans-serif; }
+  .netviewbtn:hover { color:var(--ink2); background:color-mix(in srgb, var(--surface) 60%, transparent); }
+  .netviewbtn.active { color:var(--ink); background:var(--surface); border-color:var(--border);
+    font-weight:600; box-shadow:0 1px 2px rgba(16,24,40,.05); }
+  .netviewbtn:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .network-context { display:flex; align-items:center; justify-content:flex-end; gap:8px;
+    min-width:0; flex-wrap:wrap; }
+  .network-context .net-field { display:flex; gap:5px; min-height:30px; white-space:nowrap; }
+  .network-context .net-field select { width:auto; min-width:120px; max-width:min(260px,28vw); }
+  .network-view { flex:1 1 auto; min-height:0; }
+  .network-view[hidden] { display:none; }
+  #networkGraphView { overflow:hidden; }
+  #networkGraphView > .layout { height:100%; min-height:0; align-items:stretch; overflow:hidden; }
+  #networkGraphView #netsidebar { height:100%; }
+  #networkGraphView main { height:100%; }
   #netsnapshotSection { flex:1 1 auto; min-width:0; min-height:0; resize:none; }
-  /* the structural-metrics section below .layout can grow tall with real data;
-     without a floor here the snapshot canvas gets squeezed to 0 height inside
-     this fixed-viewport column, so it keeps a floor and the tab scrolls instead. */
-  .tabpanel[data-tabpanel="network"] { overflow-y:auto; }
-  .tabpanel[data-tabpanel="network"] > .layout { flex:1 1 auto; min-height:50vh; align-items:stretch; }
-  .tabpanel[data-tabpanel="network"] main { height:100%; }
-  .tabpanel[data-tabpanel="network"] #netsnapshotSection { display:flex; flex-direction:column; overflow:hidden; }
-  #network { flex:1 1 auto; min-width:0; min-height:0; width:100%; height:100%; display:block; }
+  #networkGraphView #netsnapshotSection { display:flex; flex-direction:column; overflow:hidden; }
+  #network { flex:1 1 auto; min-width:0; min-height:0; width:100%; height:100%; display:block;
+    border-radius:2px !important; }
+  #networkMetricsView { overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain;
+    scrollbar-gutter:stable; padding:2px 5px 12px 2px; }
+  .network-metrics-head { display:flex; align-items:baseline; justify-content:space-between;
+    gap:10px; margin:0 2px 7px; }
+  .network-metrics-head h3 { font-size:13px; color:var(--ink); }
+  .network-metric-section { padding:8px 4px 10px; border-top:1px solid var(--border); }
+  .network-metric-section:first-of-type { border-top:0; }
+  .network-metric-section > h3 { margin-bottom:4px; color:var(--ink2); font-size:12px; }
+  .network-metric-section > .subnote { margin:0 0 7px; line-height:1.4; }
+  #networkMetricsView .panel.card { max-width:100%; }
+  #polarizationStructRow { margin-top:0; }
+  @media (max-width:760px) {
+    .network-localbar { align-items:stretch; flex-direction:column; }
+    .network-view-tabs { align-self:flex-start; }
+    .network-context { justify-content:flex-start; }
+    .network-context .net-field { flex:1 1 150px; }
+    .network-context .net-field select { min-width:0; max-width:none; flex:1 1 auto; }
+  }
   #empty { color:var(--muted); padding:40px; text-align:center; }
   /* in-page color picker (replaces the OS-native <input type=color> dialog,
      whose position/layout a web page cannot control): centered modal with an
@@ -328,19 +482,54 @@
 </head>
 <body>
 
-<nav id="rail" aria-label="dashboard rail">
-  <div class="rail-logo" aria-hidden="true">E</div>
+<aside id="rail" aria-label="app sidebar">
+  <div class="rail-head">
+    <div class="rail-logo" aria-hidden="true">E</div>
+    <div class="rail-brand">
+      <div class="titleline"><h1>Echo Chamber</h1><span class="muted">Live dashboard</span></div>
+      <div class="statusline" id="runStatus" aria-live="polite"><span class="dot"></span><span>loading runs...</span></div>
+    </div>
+    <button id="railToggle" type="button" title="toggle app sidebar" aria-label="compact app sidebar" aria-expanded="true">&#8249;</button>
+  </div>
+  <div class="rail-section-label">Views</div>
+  <nav class="tabnav" id="tabnav" aria-label="dashboard views">
+    <button class="tabbtn" data-tab="timeseries" title="Time Series">
+      <span class="tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M3 17.5 8.1 10l4.3 5.1L19.8 4.8"/><circle cx="3" cy="17.5" r="1.25"/><circle cx="8.1" cy="10" r="1.25"/><circle cx="12.4" cy="15.1" r="1.25"/><circle cx="19.8" cy="4.8" r="1.25"/></svg>
+      </span>
+      <span class="tab-label">Time Series</span>
+    </button>
+    <button class="tabbtn" data-tab="opinion" title="Opinion / Outcome">
+      <span class="tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><rect x="3.1" y="3.2" width="6.2" height="6.2" rx="2.2"/><rect x="14.7" y="3.2" width="6.2" height="6.2" rx="2.2"/><path d="M3.1 15.4c0-1.2 1-2.2 2.2-2.2h1.8c1.2 0 2.2 1 2.2 2.2v3.2c0 1.2-1 2.2-2.2 2.2H5.3c-1.2 0-2.2-1-2.2-2.2zM14.7 15.4c0-1.2 1-2.2 2.2-2.2h1.8c1.2 0 2.2 1 2.2 2.2v3.2c0 1.2-1 2.2-2.2 2.2h-1.8"/><path d="M12 8.2v11.1"/></svg>
+      </span>
+      <span class="tab-label">Opinion / Outcome</span>
+    </button>
+    <button class="tabbtn" data-tab="network" title="Network">
+      <span class="tab-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="m7.1 7.1 3.1 3.1m3.6 0 3.1-3.1m0 9.8-3.1-3.1m-3.6 0-3.1 3.1"/><circle cx="5.2" cy="5.2" r="2.2"/><circle cx="18.8" cy="5.2" r="2.2"/><circle cx="12" cy="12" r="2.5"/><circle cx="5.2" cy="18.8" r="2.2"/><circle cx="18.8" cy="18.8" r="2.2"/></svg>
+      </span>
+      <span class="tab-label">Network</span>
+    </button>
+  </nav>
   <div class="rail-spacer"></div>
-  <button id="theme" title="toggle theme" aria-label="toggle theme">&#9681;</button>
-</nav>
+  <div class="rail-footer">
+    <button id="settings" type="button" title="Settings (coming soon)" aria-label="Settings (coming soon)" aria-disabled="true">
+      <span class="settings-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24"><path d="M9.7 2.8h4.6l.6 2.3 1.4.8 2.3-.7 2.3 4-1.7 1.6v1.6l1.7 1.6-2.3 4-2.3-.7-1.4.8-.6 2.3H9.7l-.6-2.3-1.4-.8-2.3.7-2.3-4 1.7-1.6v-1.6L3.1 9.2l2.3-4 2.3.7 1.4-.8z"/><circle cx="12" cy="11.6" r="3.2"/></svg>
+      </span>
+      <span class="rail-action-label">Settings</span>
+    </button>
+    <button id="theme" title="toggle theme" aria-label="toggle light and dark theme">
+      <span class="theme-icon" aria-hidden="true">&#9681;</span>
+      <span class="rail-action-label">Theme</span>
+    </button>
+  </div>
+</aside>
 
 <div id="appShell">
 
 <header class="top">
-  <div class="titleblock">
-    <div class="titleline"><h1>Echo Chamber</h1><span class="muted">/ Live dashboard</span></div>
-    <div class="statusline" id="runStatus"><span class="dot"></span><span>loading runs...</span></div>
-  </div>
   <div id="banner" hidden></div>
   <div class="controls">
     <label class="ctl"><input type="checkbox" id="smooth"> smooth</label>
@@ -374,18 +563,14 @@
   </div>
 </div>
 
-<nav class="tabnav" id="tabnav">
-  <button class="tabbtn" data-tab="timeseries">time series</button>
-  <button class="tabbtn" data-tab="opinion">opinion / outcome</button>
-  <button class="tabbtn" data-tab="network">network</button>
-</nav>
-
 <div class="tabpanel" data-tabpanel="timeseries">
 <div class="layout">
 <aside id="sidebar" class="sidebar">
   <div id="sidebarContent" class="sidebar-content">
-    <h3>display metrics</h3>
-    <div id="pickerCount" class="subnote"></div>
+    <div class="picker-head">
+      <h3>display metrics</h3>
+      <div id="pickerCount" class="subnote"></div>
+    </div>
     <input type="search" id="pickerSearch" placeholder="Search metrics..." autocomplete="off">
     <div id="pickerlist"></div>
   </div>
@@ -418,19 +603,27 @@
 </div>
 
 <div class="tabpanel" data-tabpanel="network">
-<div class="layout">
-<aside id="netsidebar" class="sidebar">
-  <div id="netsidebarContent" class="sidebar-content">
-    <section class="net-control-card">
-    <h3>snapshot</h3>
+<div class="network-localbar">
+  <div class="network-view-tabs" role="tablist" aria-label="Network views">
+    <button id="networkGraphTab" class="netviewbtn" type="button" role="tab"
+      data-netview="graph" aria-controls="networkGraphView">Graph</button>
+    <button id="networkMetricsTab" class="netviewbtn" type="button" role="tab"
+      data-netview="metrics" aria-controls="networkMetricsView">Metrics</button>
+  </div>
+  <div class="network-context" aria-label="Shared network snapshot">
     <label class="net-field">Seed <select id="netseed"></select></label>
     <select id="nettype" hidden>
       <option value="follow">follow graph</option>
       <option value="repost">repost graph</option>
     </select>
     <label class="net-field">Step <select id="netstep"><option value="latest">latest</option></select></label>
-    </section>
+  </div>
+</div>
 
+<div id="networkGraphView" class="network-view" role="tabpanel" aria-labelledby="networkGraphTab">
+<div class="layout">
+<aside id="netsidebar" class="sidebar">
+  <div id="netsidebarContent" class="sidebar-content">
     <section class="net-control-card">
     <h3>appearance</h3>
     <label class="net-field">Node size <select id="netsize"></select></label>
@@ -485,23 +678,47 @@
   </section>
 </main>
 </div>
+</div>
 
-  <!-- structural metrics wired to echo-chamber data (phase 4, Unit B) -->
-  <section class="panel" style="margin-top:12px">
-    <h3>network structure <span id="structinfo" class="subnote"></span></h3>
-    <div class="subnote">same seed/step as the network snapshot above (undirected, giant-component-only for
-      betweenness/&lambda;<sub>2</sub> &mdash; matches journal.tex's convention; degree distribution and
-      clustering coefficient always describe the follow graph, the only one Java writes per-step CSVs for).
-      Degree panels below plot the empirical CCDF P(X&ge;x) on log-log axes (Clauset/Newman/Shalizi
-      convention); the dashed line, when shown, is the fitted power law for x&ge;x<sub>min</sub>.</div>
+<div id="networkMetricsView" class="network-view" role="tabpanel"
+  aria-labelledby="networkMetricsTab" tabindex="0" hidden>
+  <div class="network-metrics-head">
+    <h3>Network metrics</h3>
+    <span id="structinfo" class="subnote" aria-live="polite"></span>
+  </div>
+
+  <section class="network-metric-section" aria-labelledby="degreeHeading">
+    <h3 id="degreeHeading">Degree</h3>
+    <div class="subnote">Follow-graph in-degree, out-degree, and total-degree distributions.
+      Panels plot the empirical CCDF P(X&ge;x) on log-log axes; the dashed line, when shown,
+      is the fitted power law for x&ge;x<sub>min</sub>.</div>
     <div id="degreeGrid" class="trio"></div>
-    <div id="structRow" class="trio" style="margin-top:10px"></div>
+  </section>
+
+  <section class="network-metric-section" aria-labelledby="topologyHeading">
+    <h3 id="topologyHeading">Topology / Connectivity</h3>
+    <div class="subnote">Clustering describes the follow graph. Betweenness and
+      &lambda;<sub>2</sub> use its undirected giant component, matching the journal convention;
+      giant-component fraction reports snapshot connectivity.</div>
+    <div id="structRow" class="trio"></div>
+  </section>
+
+  <section class="network-metric-section" aria-labelledby="polarizationHeading">
+    <h3 id="polarizationHeading">Polarization / Segregation</h3>
+    <div class="subnote">Snapshot controversy and opinion multimodality are shown with the
+      selected run's modularity and E-I time series for the same shared Seed / Step context.</div>
+    <div id="polarizationStructRow" class="duo"></div>
     <div id="qsignEiRow" class="duo" style="margin-top:10px"></div>
+  </section>
+
+  <section class="network-metric-section" aria-labelledby="exposureHeading">
+    <h3 id="exposureHeading">Exposure / Echo chamber</h3>
     <div class="subnote" style="margin-top:12px">Echo-chamber diet (Cinelli et&nbsp;al. 2021): each node's own opinion (x)
       vs. the mean opinion of the accounts it follows (y). A tight positive diagonal = echo chambers
       (you mostly hear your own side); a shapeless blob = a well-mixed feed. Ringed = intervened hub.</div>
     <div id="echoScatter" style="margin-top:4px"></div>
   </section>
+</div>
 
   <!-- no repost / bounded-confidence / post-probability data in the echo-chamber layout -->
   <section class="panel" style="margin-top:12px" hidden>
@@ -555,6 +772,37 @@ const BINS_DARK  = ["#3987e5","#6da7ec","#77756f","#e88a8a","#e66767"];
 const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
 const DEFAULT_METRICS = ["modularity","opinion_var","opinion_mean",
                          "diversity_bias_mean","screen_diversity_mean","active_users"];
+const METRIC_GENRES = [
+  {key:"opinion", title:"Opinion"},
+  {key:"diversity", title:"Diversity"},
+  {key:"network", title:"Network"},
+  {key:"activity", title:"Activity / Dynamics"},
+  {key:"other", title:"Other / Discovered"},
+];
+// Stable semantic classification for known metric ids and class-family base
+// ids. Unknown and dynamically discovered ids deliberately fall back to
+// Other / Discovered instead of being inferred from their display labels.
+const METRIC_GENRE_BY_ID = Object.freeze({
+  opinion:"opinion",
+  opinion_mean:"opinion",
+  opinion_var:"opinion",
+  opinion_std:"opinion",
+  opinion_abs_mean:"opinion",
+  diversity_bias:"diversity",
+  diversity_bias_mean:"diversity",
+  screen_diversity:"diversity",
+  screen_diversity_mean:"diversity",
+  modularity:"network",
+  modularity_mean:"network",
+  communities:"network",
+  triangles:"network",
+  EI_index:"network",
+  active_users:"activity",
+  effective_mu:"activity",
+  effective_mu_SUPPRESSION:"activity",
+  effective_mu_AMPLIFICATION:"activity",
+  effective_mu_INDIFFERENCE:"activity",
+});
 const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed",
                       stalled:"&#9208; stalled"};
 
@@ -588,6 +836,9 @@ const state = {
   lastUpdate: null,
 };
 const TABS=["timeseries","opinion","network"];
+const NETWORK_VIEWS=["graph","metrics"];
+let networkView=store("networkView","graph");
+if(!NETWORK_VIEWS.includes(networkView)) networkView="graph";
 
 function theme(){ const t=document.documentElement.dataset.theme;
   if(t) return t; return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }
@@ -859,8 +1110,11 @@ function setTab(tab){
   applyTab();
 }
 function applyTab(){
-  for(const btn of document.querySelectorAll(".tabbtn"))
+  for(const btn of document.querySelectorAll(".tabbtn")){
     btn.classList.toggle("active", btn.dataset.tab===state.tab);
+    if(btn.dataset.tab===state.tab) btn.setAttribute("aria-current","page");
+    else btn.removeAttribute("aria-current");
+  }
   for(const panel of document.querySelectorAll(".tabpanel"))
     panel.hidden = panel.dataset.tabpanel!==state.tab;
   onTabActivated(state.tab);
@@ -869,25 +1123,109 @@ function onTabActivated(tab){
   if(tab==="timeseries"){ renderGrid(); }
   else if(tab==="opinion"){ maybeRefetchTrajectories(); renderOpinion(); renderPlane(); }
   else if(tab==="network"){
+    applyNetworkView(false);
     if(!netState.data){ fetchNetwork(); return; }
     // the cursor may have moved while this tab was hidden (line/plane tabs
     // stay live-updating); snap to it now. If that kicks off a refetch,
     // fetchNetwork()'s own completion handles startSim()/sizing below.
     if(syncNetworkToCursor()) return;
-    const s=netState.sim; if(!s) return;
-    // the canvas has zero size while its tabpanel was display:none, so its
-    // backing buffer needs a resync to the now-visible clientWidth/Height
-    // before drawing again. A real canvas-size change also performs one fit.
-    const cv=$("#network"), W=cv.clientWidth||s.W, H=cv.clientHeight||s.H;
-    if(W&&H){ const dpr=devicePixelRatio||1, resized=s.W!==W||s.H!==H;
-      cv.width=W*dpr; cv.height=H*dpr;
-      cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); s.W=W; s.H=H;
-      if(resized){ s.baseView=fitView(s); s.uz=1; s.upx=0; s.upy=0; } }
-    if(!s.layoutPaused&&s.alpha>0.005&&!s.raf) loop(); else drawNet();
-    updateLayoutRunButton();
+    if(networkView==="graph") resumeNetworkGraph();
+    else pauseNetworkAnimationForView();
   }
 }
 document.querySelectorAll(".tabbtn").forEach(btn=>btn.addEventListener("click",()=>setTab(btn.dataset.tab)));
+
+function pauseNetworkAnimationForView(){
+  const s=netState.sim; if(!s) return;
+  if(s.raf) cancelAnimationFrame(s.raf);
+  s.raf=0;
+  updateLayoutRunButton();
+}
+function resumeNetworkGraph(){
+  const s=netState.sim; if(!s || state.tab!=="network" || networkView!=="graph") return;
+  requestAnimationFrame(()=>{
+    if(state.tab!=="network" || networkView!=="graph") return;
+    const cv=$("#network"), W=cv.clientWidth||s.W, H=cv.clientHeight||s.H;
+    if(W&&H){
+      const dpr=devicePixelRatio||1, resized=s.W!==W||s.H!==H;
+      cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+      cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); s.W=W; s.H=H;
+      if(resized){ s.baseView=fitView(s); s.uz=1; s.upx=0; s.upy=0; }
+    }
+    if(!s.layoutPaused&&s.alpha>0.005&&!s.raf) loop(); else drawNet();
+    updateLayoutRunButton();
+  });
+}
+function applyNetworkView(persist=true, focus=false){
+  for(const btn of document.querySelectorAll("[data-netview]")){
+    const active=btn.dataset.netview===networkView;
+    btn.classList.toggle("active",active);
+    btn.setAttribute("aria-selected",active?"true":"false");
+    btn.tabIndex=active?0:-1;
+    if(active&&focus) btn.focus();
+  }
+  $("#networkGraphView").hidden=networkView!=="graph";
+  $("#networkMetricsView").hidden=networkView!=="metrics";
+  if(persist) save("networkView",networkView);
+  if(state.tab!=="network") return;
+  if(networkView==="metrics") pauseNetworkAnimationForView();
+  else resumeNetworkGraph();
+}
+function setNetworkView(view, focus=false){
+  if(!NETWORK_VIEWS.includes(view)) view=NETWORK_VIEWS[0];
+  const changed=view!==networkView;
+  networkView=view;
+  applyNetworkView(true,focus);
+  if(changed&&networkView==="metrics"){
+    requestAnimationFrame(()=>{
+      const metrics=$("#networkMetricsView");
+      if(!metrics.hidden) metrics.scrollTop=0;
+    });
+  }
+}
+document.querySelectorAll("[data-netview]").forEach(btn=>{
+  btn.addEventListener("click",()=>setNetworkView(btn.dataset.netview));
+  btn.addEventListener("keydown",ev=>{
+    const current=NETWORK_VIEWS.indexOf(btn.dataset.netview);
+    let next=null;
+    if(ev.key==="ArrowRight"||ev.key==="ArrowDown") next=NETWORK_VIEWS[(current+1)%NETWORK_VIEWS.length];
+    else if(ev.key==="ArrowLeft"||ev.key==="ArrowUp") next=NETWORK_VIEWS[(current-1+NETWORK_VIEWS.length)%NETWORK_VIEWS.length];
+    else if(ev.key==="Home") next=NETWORK_VIEWS[0];
+    else if(ev.key==="End") next=NETWORK_VIEWS[NETWORK_VIEWS.length-1];
+    if(next!==null){ ev.preventDefault(); setNetworkView(next,true); }
+  });
+});
+
+const savedSidebarExpanded=store("appSidebarExpanded", null);
+let sidebarExpanded=typeof savedSidebarExpanded==="boolean"
+  ? savedSidebarExpanded : matchMedia("(min-width: 1280px)").matches;
+let shellResizeTimer=null;
+function redrawActiveViewAfterShellResize(){
+  clearTimeout(shellResizeTimer);
+  shellResizeTimer=setTimeout(()=>{
+    if(state.tab==="timeseries") renderGrid();
+    else if(state.tab==="opinion"){ renderOpinion(); renderPlane(); }
+    else if(state.tab==="network") onTabActivated("network");
+  }, 210);
+}
+function setSidebarExpanded(expanded, persist=true, redraw=true){
+  sidebarExpanded=!!expanded;
+  document.body.classList.toggle("sidebar-expanded", sidebarExpanded);
+  document.body.classList.toggle("sidebar-compact", !sidebarExpanded);
+  const toggle=$("#railToggle");
+  toggle.setAttribute("aria-expanded", sidebarExpanded?"true":"false");
+  toggle.setAttribute("aria-label", sidebarExpanded?"compact app sidebar":"expand app sidebar");
+  toggle.title=toggle.getAttribute("aria-label");
+  toggle.innerHTML=sidebarExpanded?"&#8249;":"&#8250;";
+  if(persist) save("appSidebarExpanded", sidebarExpanded);
+  if(redraw) redrawActiveViewAfterShellResize();
+}
+$("#railToggle").addEventListener("click",()=>setSidebarExpanded(!sidebarExpanded));
+$("#rail").addEventListener("transitionend",ev=>{
+  if(ev.propertyName==="width" || ev.propertyName==="flex-basis") redrawActiveViewAfterShellResize();
+});
+window.addEventListener("resize",redrawActiveViewAfterShellResize);
+setSidebarExpanded(sidebarExpanded, false, false);
 
 function renderSeedbar(){
   const bar=$("#seedbar"); bar.innerHTML="";
@@ -950,49 +1288,73 @@ function togglePin(rid){
   renderSeedbar(); renderGrid();
 }
 
+const collapsedMetricGenres=new Set();
+
 function renderPicker(){
   const cols=state.summary.columns||[];
   const families=state.summary.families||{};
-  // one entry per plain column plus one per family (base id, "(5 classes)" label)
-  const items=[...cols.map(c=>({id:c,label:metricLabel(c)})),
-               ...Object.keys(families).map(b=>({id:b,label:`${b} (5 classes)`}))]
-    .sort((a,b)=>a.label.localeCompare(b.label));
+  // One stable entry per id. If a family base is also present as a plain
+  // column, the family entry wins so selecting it keeps the existing family
+  // chart behavior without displaying a duplicate checkbox.
+  const itemById=new Map(cols.map(c=>[c,{id:c,label:metricLabel(c),family:false}]));
+  for(const [base,members] of Object.entries(families)){
+    itemById.set(base,{
+      id:base,
+      label:`${metricLabel(base)} (${members.length} classes)`,
+      family:true,
+    });
+  }
+  const items=[...itemById.values()].sort((a,b)=>a.label.localeCompare(b.label));
   const list=$("#pickerlist"); list.innerHTML="";
   $("#pickerCount").textContent = `${state.metrics.length} shown / ${items.length} available`;
-  const groups=[
-    {key:"selected", title:"Selected", items:[]},
-    {key:"metrics", title:"Metrics", items:[]},
-    {key:"families", title:"Class families", items:[]},
-    {key:"discovered", title:"Discovered", items:[]},
-  ];
+  const groups=METRIC_GENRES.map(genre=>({...genre,items:[]}));
   const byKey=Object.fromEntries(groups.map(g=>[g.key,g]));
   for(const it of items){
-    if(state.metrics.includes(it.id)) byKey.selected.items.push(it);
-    else if(families[it.id]) byKey.families.items.push(it);
-    else if(it.id.includes(".")) byKey.discovered.items.push(it);
-    else byKey.metrics.items.push(it);
+    const genre=METRIC_GENRE_BY_ID[it.id]||"other";
+    byKey[genre].items.push(it);
   }
   const search=$("#pickerSearch");
   if(search) search.value = search.value || "";
   for(const group of groups){
-    if(!group.items.length) continue;
-    const groupEl=document.createElement("div");
+    const groupEl=document.createElement("section");
     groupEl.className="picker-group";
-    const head=document.createElement("div");
+    groupEl.dataset.genre=group.key;
+    const head=document.createElement("button");
+    head.type="button";
     head.className="picker-heading";
-    head.textContent=group.title;
-    groupEl.appendChild(head);
+    const itemsEl=document.createElement("div");
+    itemsEl.className="picker-items";
+    const selectedCount=group.items.filter(it=>state.metrics.includes(it.id)).length;
+    const collapsed=collapsedMetricGenres.has(group.key);
+    const chevron=document.createElement("span");
+    chevron.className="picker-chevron";
+    chevron.textContent=collapsed?"▸":"▾";
+    const title=document.createElement("span");
+    title.textContent=group.title;
+    const count=document.createElement("span");
+    count.className="picker-heading-count";
+    count.textContent=`${selectedCount}/${group.items.length}`;
+    head.append(chevron,title,count);
+    head.setAttribute("aria-expanded",collapsed?"false":"true");
+    head.addEventListener("click",()=>{
+      if(collapsedMetricGenres.has(group.key)) collapsedMetricGenres.delete(group.key);
+      else collapsedMetricGenres.add(group.key);
+      applyPickerSearch();
+    });
     for(const it of group.items){
       const lab=document.createElement("label");
       lab.dataset.search = (it.id+" "+it.label).toLowerCase();
+      lab.dataset.metricId=it.id;
+      lab.title=it.label;
       const cb=document.createElement("input"); cb.type="checkbox"; cb.checked=state.metrics.includes(it.id);
       cb.addEventListener("change",()=>{
         state.metrics = cb.checked ? [...state.metrics,it.id] : state.metrics.filter(m=>m!==it.id);
         save("metrics",state.metrics); refresh();
       });
       lab.append(cb, document.createTextNode(it.label));
-      groupEl.appendChild(lab);
+      itemsEl.appendChild(lab);
     }
+    groupEl.append(head,itemsEl);
     list.appendChild(groupEl);
   }
   const reset=document.createElement("button");
@@ -1022,12 +1384,22 @@ function applyPickerSearch(){
   const q=input.value.trim().toLowerCase();
   for(const group of list.querySelectorAll(".picker-group")){
     let shown=0;
-    for(const lab of group.querySelectorAll("label")){
+    for(const lab of group.querySelectorAll(".picker-items label")){
       const hit=!q || (lab.dataset.search||"").includes(q);
       lab.hidden=!hit;
       if(hit) shown++;
     }
-    group.hidden=shown===0;
+    group.hidden=!!q && shown===0;
+    const genre=group.dataset.genre;
+    const expanded=!!q || !collapsedMetricGenres.has(genre);
+    const head=group.querySelector(".picker-heading");
+    const items=group.querySelector(".picker-items");
+    if(head){
+      head.setAttribute("aria-expanded",expanded?"true":"false");
+      const chevron=head.querySelector(".picker-chevron");
+      if(chevron) chevron.textContent=expanded?"▾":"▸";
+    }
+    if(items) items.hidden=!expanded;
   }
 }
 
@@ -1128,6 +1500,10 @@ function getOrder(key){
   return out;
 }
 function saveOrder(key, order){ save("cardOrder."+key, order); }
+function saveOrderSubset(key, subsetOrder){
+  const subset=new Set(subsetOrder), queue=subsetOrder.slice();
+  saveOrder(key, getOrder(key).map(id=>subset.has(id)?queue.shift():id));
+}
 
 // true while a resize or reorder drag is in flight, so a poll-triggered
 // rebuild (renderGrid etc. tear down and recreate their cards from scratch)
@@ -1200,6 +1576,7 @@ function makeCard(container, id, groupKey, onReorder){
   card.className="panel card"; card.dataset.card=id;
   const handle=document.createElement("span");
   handle.className="draghandle"; handle.textContent="✦"; handle.draggable=true;
+  handle.tabIndex=0;
   handle.title="drag to reorder · drag corner to resize";
   card.appendChild(handle);
   const body=document.createElement("div"); body.className="cardbody";
@@ -1222,6 +1599,7 @@ function initStaticCard(el, id, groupKey, container, onReorder, fitViewport){
   if(groupKey){
     handle=document.createElement("span");
     handle.className="draghandle"; handle.draggable=true; handle.textContent="✦";
+    handle.tabIndex=0;
     handle.title="drag to reorder · drag corner to resize";
     el.insertBefore(handle, el.firstChild);
   }
@@ -1229,7 +1607,7 @@ function initStaticCard(el, id, groupKey, container, onReorder, fitViewport){
   // the network snapshot and (canvas-backed) opinion-trajectory cards both need
   // an explicit repaint on resize — canvas has no CSS-viewBox auto-scaling like
   // the SVG-based cards do, so its backing buffer would otherwise stay stale.
-  const onResize = id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); })
+  const onResize = id==="netsnapshot" ? (()=>{ if(netState.sim&&state.tab==="network"&&networkView==="graph") startSim(); })
     : id==="opinion" ? (()=>renderOpinion()) : null;
   watchCardSize(el, id, onResize);
   if(groupKey) attachDrag(container, el, handle, groupKey, onReorder);
@@ -2332,7 +2710,12 @@ function fillAttrSelect(sel, keys, current){
 
 function startSim(){
   const d=netState.data, cv=$("#network");
-  const W=cv.clientWidth||900, H=cv.clientHeight||640;
+  // A hidden Graph view reports a zero-sized canvas. Keep the last real
+  // dimensions while Metrics is active so background fetches/observers do not
+  // reset the user's camera to the fallback size before Graph is shown again.
+  const graphVisible=state.tab==="network"&&networkView==="graph";
+  const W=(graphVisible&&cv.clientWidth)||(netState.sim&&netState.sim.W)||900;
+  const H=(graphVisible&&cv.clientHeight)||(netState.sim&&netState.sim.H)||640;
   const dpr=devicePixelRatio||1;
   cv.width=W*dpr; cv.height=H*dpr;
   const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -2635,9 +3018,11 @@ function setLayoutPaused(paused){
 function loop(){
   const s=netState.sim;
   if(!s) return;
-  // pause the force-layout dynamics while the network tab isn't showing (R3);
-  // onTabActivated() resumes it on switching back in.
-  if(state.tab!=="network"||s.layoutPaused){ s.raf=0; updateLayoutRunButton(); return; }
+  // Metrics and hidden top-level tabs transiently suspend animation without
+  // changing layoutPaused, which remains the user's explicit Stop / Start state.
+  if(state.tab!=="network"||networkView!=="graph"||s.layoutPaused){
+    s.raf=0; updateLayoutRunButton(); return;
+  }
   const tick = netState.layout==="forceAtlas2" ? simTickFA2 : simTick;
   if(s.alpha>0.005){ tick(s,netState.data); drawNet();
     s.raf=requestAnimationFrame(loop);
@@ -2651,11 +3036,14 @@ function renderStructural(){
   const d=netState.data, s=d && d.structural;
   const dg=$("#degreeGrid"); dg.innerHTML="";
   const row=$("#structRow"); row.innerHTML="";
+  const pol=$("#polarizationStructRow"); pol.innerHTML="";
   const info=$("#structinfo");
   drawEchoScatter($("#echoScatter"), d && d.nodes);  // only needs op/nbrOp, not structural
   if(!s){
     info.textContent = d && d.structuralError ? ("structural: not available — "+d.structuralError) : "";
     dg.innerHTML = `<div class="subnote">no structural data for this snapshot yet.</div>`;
+    row.innerHTML = `<div class="subnote">no topology data for this snapshot yet.</div>`;
+    pol.innerHTML = `<div class="subnote">no snapshot polarization data available.</div>`;
     renderQsignEiCharts();
     return;
   }
@@ -2668,9 +3056,12 @@ function renderStructural(){
     drawDegreeChart(body, degLabel[key], s.degree && s.degree[key], s.degreeFit && s.degreeFit[key]);
   }
 
+  const polarizationKeys=new Set(["rwc","dip"]);
   for(const key of getOrder("structstats")){
-    const {card,body}=makeCard(row, key, "structstats", o=>saveOrder("structstats",o));
-    row.appendChild(card);
+    const target=polarizationKeys.has(key)?pol:row;
+    const group=polarizationKeys.has(key)?"structstats.polarization":"structstats.topology";
+    const {card,body}=makeCard(target, key, group, o=>saveOrderSubset("structstats",o));
+    target.appendChild(card);
     if(key==="rwc"){
       const r=s.rwc;
       if(r && r.rwc!=null){
