@@ -6,22 +6,22 @@
 <title>echo-chamber live dashboard</title>
 <style>
   :root {
-    --page:#fbfbfc; --surface:#ffffff; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
+    --page:#fbfbfc; --surface:#ffffff; --rail:#f7f8fb; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
     --grid:#f4f5f8; --axis:#d4d8de; --border:#e4e7ec;
     --good:#1ea765; --bad:#d03b3b; --warn:#e8912d; --accent:#5b5bd6; --accent-soft:#eeeeff;
   }
   @media (prefers-color-scheme: dark) { :root {
-    --page:#101114; --surface:#1a1c20; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
+    --page:#101114; --surface:#1a1c20; --rail:#15171b; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
     --grid:#26282d; --axis:#3a3d43; --border:rgba(255,255,255,.10);
     --good:#38bd7f; --bad:#ef5a5a; --warn:#f0a13d; --accent:#7b7bf0; --accent-soft:#29294c;
   } }
   :root[data-theme="light"] {
-    --page:#fbfbfc; --surface:#ffffff; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
+    --page:#fbfbfc; --surface:#ffffff; --rail:#f7f8fb; --ink:#1c2024; --ink2:#4b5563; --muted:#8b93a1;
     --grid:#f4f5f8; --axis:#d4d8de; --border:#e4e7ec;
     --good:#1ea765; --bad:#d03b3b; --warn:#e8912d; --accent:#5b5bd6; --accent-soft:#eeeeff;
   }
   :root[data-theme="dark"] {
-    --page:#101114; --surface:#1a1c20; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
+    --page:#101114; --surface:#1a1c20; --rail:#15171b; --ink:#f2f3f5; --ink2:#c0c5cd; --muted:#7d8490;
     --grid:#26282d; --axis:#3a3d43; --border:rgba(255,255,255,.10);
     --good:#38bd7f; --bad:#ef5a5a; --warn:#f0a13d; --accent:#7b7bf0; --accent-soft:#29294c;
   }
@@ -32,7 +32,7 @@
     display:flex; min-height:100vh; overflow-x:hidden; overflow-y:auto; }
   #rail { flex:0 0 48px; width:48px; min-height:100vh; padding:12px 8px;
     display:flex; flex-direction:column; align-items:center; gap:12px;
-    background:#f7f8fb; border-right:1px solid var(--border);
+    background:var(--rail); border-right:1px solid var(--border);
     position:sticky; top:0; align-self:flex-start; height:100vh; }
   .rail-logo { width:30px; height:30px; border-radius:10px; display:grid; place-items:center;
     color:#fff; background:var(--accent); font-size:15px; font-weight:700; line-height:1; }
@@ -118,14 +118,18 @@
   .chip.running .pct { color:var(--warn); }
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
-  /* compact runs display: shrinks the seed chips and scrub row for a smaller footprint */
+  /* compact runs display: omit run directory names and minimize the runs footprint */
   #runscard.compact { padding:5px 10px 6px; gap:4px; }
   #runscard.compact .runs-title { font-size:11px; }
   #runscard.compact #seedbar { gap:3px; }
-  #runscard.compact .pattern-group { min-width:220px; }
+  #runscard.compact .pattern-group { flex:0 1 auto; min-width:0; }
   #runscard.compact .pattern-summary { padding:3px 5px; }
-  #runscard.compact .pattern-seeds { padding:2px 4px 4px 16px; }
+  #runscard.compact .pattern-summary .pattern-name { display:none; }
+  #runscard.compact .pattern-statuses { margin-left:0; }
+  #runscard.compact .pattern-statuses .zero { display:none; }
+  #runscard.compact .pattern-seeds { gap:2px; padding:1px 3px 3px 12px; }
   #runscard.compact .chip { padding:1px 5px 1px 4px; font-size:10px; gap:3px; }
+  #runscard.compact .chip > b { display:none; }
   #runscard.compact .chip .dot { width:6px; height:6px; }
   #runscard.compact .chip .pct + .pct { display:none; }
   #runscard.compact .scrubrow { gap:6px; }
@@ -264,7 +268,13 @@
   .net-control-card { display:flex; flex-direction:column; gap:8px; padding:10px; background:var(--surface);
     border:1px solid var(--border); border-radius:12px; }
   .net-field { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); }
-  .net-field select { width:100%; }
+  .net-field select, .net-field input[type=number] { width:100%; }
+  .net-field input[type=number] { box-sizing:border-box; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:8px; padding:6px 8px; font:12px system-ui,sans-serif; }
+  .net-setting-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .net-setting-grid .wide { grid-column:1/-1; }
+  .net-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+  .net-actions button { width:100%; min-width:0; }
   #netreheat { width:100%; }
   #netleg span { border-radius:999px; padding:3px 8px; }
   #netleg span:nth-child(1) { background:color-mix(in srgb, var(--bad) 14%, transparent); }
@@ -424,6 +434,12 @@
     <section class="net-control-card">
     <h3>appearance</h3>
     <label class="net-field">Node size <select id="netsize"></select></label>
+    <div class="net-setting-grid">
+      <label class="net-field">Minimum radius <input type="number" id="netrmin" min="0.25" max="100" step="0.25"></label>
+      <label class="net-field">Maximum radius <input type="number" id="netrmax" min="0.25" max="100" step="0.25"></label>
+      <label class="net-field wide">Uniform radius <input type="number" id="netruniform" min="0.25" max="100" step="0.25"></label>
+    </div>
+    <button id="netsizereset" type="button">Reset size range</button>
     <label class="net-field">Node color <select id="netcolor"></select></label>
     <div id="netcolorbar" class="colorbar-row"></div>
     <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
@@ -435,7 +451,19 @@
       <option value="force">force</option>
       <option value="forceAtlas2">ForceAtlas2</option>
     </select></label>
-    <button id="netreheat" title="restart the force layout">&#10227; Re-layout</button>
+    <div id="netfa2controls" class="net-setting-grid">
+      <label class="net-field">Repulsion (&times;) <input type="number" id="netrepulsion" min="0" max="20" step="0.1"></label>
+      <label class="net-field">Attraction (&times;) <input type="number" id="netattraction" min="0" max="20" step="0.1"></label>
+      <label class="net-field">Gravity (&times;) <input type="number" id="netgravity" min="0" max="20" step="0.1"></label>
+      <label class="net-field">Velocity retention <input type="number" id="netdamping" min="0.05" max="0.99" step="0.05"></label>
+      <label class="ctl wide"><input type="checkbox" id="netpreventoverlap"> prevent overlap</label>
+    </div>
+    <div class="net-actions">
+      <button id="netlayouttoggle" type="button">&#9208; Stop</button>
+      <button id="netreheat" type="button" title="restart the force layout">&#10227; Re-layout</button>
+      <button id="netfit" type="button" title="fit the current layout in the canvas">Fit graph</button>
+      <button id="netlayoutreset" type="button">Reset settings</button>
+    </div>
     <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
     <label class="ctl" title="experimental: convex hull per opinion-sign group"><input type="checkbox" id="nethull"> hull (experimental)</label>
     </section>
@@ -445,8 +473,8 @@
       node radius and color are mapped from the attributes chosen above (default radius &prop; &radic;in-degree,
       color = opinion, red &minus;1 &harr; blue +1).
       Positions carry over between snapshots, so stepping through time shows the sorting happen.
-      Wheel to zoom, drag the background to pan (double-click resets), drag a node to pin it while the
-      layout runs.</div>
+      Wheel to zoom, drag the background to pan, and use Fit graph or double-click to fit the current layout.
+      Drag a node to pin it while the layout runs.</div>
   </div>
 </aside>
 <main>
@@ -592,6 +620,11 @@ function rollmean(vals,k){ if(k<2) return vals;
     if(q.length>k){ const o=q.shift(); if(o!=null&&!Number.isNaN(o)){sum-=o;cnt--;} }
     out[i]=cnt>0?sum/cnt:NaN; }
   return out; }
+function smoothValues(vals){
+  if(!$("#smooth").checked || vals.length<5) return vals;
+  const k=vals.length<=20 ? 2 : vals.length<=60 ? 3 : Math.max(3,Math.round(vals.length/120));
+  return rollmean(vals,k);
+}
 
 /* ---------- data fetch ---------- */
 async function jget(url){ const r=await fetch(url); if(!r.ok) throw new Error(r.status); return r.json(); }
@@ -844,11 +877,14 @@ function onTabActivated(tab){
     const s=netState.sim; if(!s) return;
     // the canvas has zero size while its tabpanel was display:none, so its
     // backing buffer needs a resync to the now-visible clientWidth/Height
-    // before drawing again (positions/zoom/pan are untouched).
+    // before drawing again. A real canvas-size change also performs one fit.
     const cv=$("#network"), W=cv.clientWidth||s.W, H=cv.clientHeight||s.H;
-    if(W&&H){ const dpr=devicePixelRatio||1; cv.width=W*dpr; cv.height=H*dpr;
-      cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); s.W=W; s.H=H; }
-    if(s.alpha>0.005 && !s.raf) loop(); else drawNet();
+    if(W&&H){ const dpr=devicePixelRatio||1, resized=s.W!==W||s.H!==H;
+      cv.width=W*dpr; cv.height=H*dpr;
+      cv.getContext("2d").setTransform(dpr,0,0,dpr,0,0); s.W=W; s.H=H;
+      if(resized){ s.baseView=fitView(s); s.uz=1; s.upx=0; s.upy=0; } }
+    if(!s.layoutPaused&&s.alpha>0.005&&!s.raf) loop(); else drawNet();
+    updateLayoutRunButton();
   }
 }
 document.querySelectorAll(".tabbtn").forEach(btn=>btn.addEventListener("click",()=>setTab(btn.dataset.tab)));
@@ -870,8 +906,10 @@ function renderSeedbar(){
       `<span class="pattern-dot" style="background:${groupColor(group).mean}"></span>`+
       `<span class="pattern-name"></span><span class="pattern-n" title="runs included in the pattern aggregate">n=${aggregateCount}</span>`+
       `<span class="pattern-statuses">`+
-        `<span class="done">${counts.done} done</span><span class="running">${counts.running} running</span>`+
-        `<span class="stalled">${counts.stalled} stalled</span><span class="failed">${counts.failed} failed</span>`+
+        `<span class="done${counts.done?"":" zero"}">${counts.done} done</span>`+
+        `<span class="running${counts.running?"":" zero"}">${counts.running} running</span>`+
+        `<span class="stalled${counts.stalled?"":" zero"}">${counts.stalled} stalled</span>`+
+        `<span class="failed${counts.failed?"":" zero"}">${counts.failed} failed</span>`+
       `</span>`;
     summary.querySelector(".pattern-name").textContent=patternLabel(group);
     const seeds=document.createElement("div"); seeds.className="pattern-seeds"; seeds.hidden=!expanded;
@@ -1013,7 +1051,7 @@ function seriesFor(metric){
     if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
       let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
       if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
-    if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
+    vals=smoothValues(vals);
     const {full}=seedColor(s.run);
     out.push({seed:s.run, group:groupOf(s), status:s.status, steps, vals, color:full});
   }
@@ -1285,7 +1323,7 @@ function drawFamilyChart(host, base, subcols){
       if(state.zoom){ const [z0,z1]=state.zoom; const i0=steps.findIndex(v=>v>=z0);
         let i1=steps.length-1; while(i1>0&&steps[i1]>z1) i1--;
         if(i0<0||i1<i0) continue; steps=steps.slice(i0,i1+1); vals=vals.slice(i0,i1+1); }
-      if($("#smooth").checked && vals.length>50) vals=rollmean(vals, Math.max(2,Math.round(vals.length/120)));
+      vals=smoothValues(vals);
       S.push({seed:"class "+cls, cls, steps, vals, color:B[cls], dash:null});
     }
   }
@@ -1819,10 +1857,27 @@ function renderOpinionTraj(){
    color over opinion in [-1,1], r ~ sqrt(degree), animated tick loop.
    Reimplemented dependency-free on canvas (n=1000, m~10k needs it); repulsion
    uses a coarse-grid approximation instead of Barnes-Hut for compactness. */
+const NET_SIZE_DEFAULTS={min:2,max:11,uniform:4.5};
+const FA2_DEFAULTS={repulsion:1,attraction:1,gravity:1,damping:0.6,preventOverlap:false};
+const storedNetSizes=store("netsizes",{}), storedFA2=store("netfa2",{});
+function boundedNumber(value,fallback,min,max){
+  const n=Number(value); return Number.isFinite(n)?Math.min(max,Math.max(min,n)):fallback;
+}
 const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
   layout:store("netlayout","force"),
+  sizeMin:boundedNumber(storedNetSizes.min,NET_SIZE_DEFAULTS.min,0.25,100),
+  sizeMax:boundedNumber(storedNetSizes.max,NET_SIZE_DEFAULTS.max,0.25,100),
+  sizeUniform:boundedNumber(storedNetSizes.uniform,NET_SIZE_DEFAULTS.uniform,0.25,100),
+  fa2:{
+    repulsion:boundedNumber(storedFA2.repulsion,FA2_DEFAULTS.repulsion,0,20),
+    attraction:boundedNumber(storedFA2.attraction,FA2_DEFAULTS.attraction,0,20),
+    gravity:boundedNumber(storedFA2.gravity,FA2_DEFAULTS.gravity,0,20),
+    damping:boundedNumber(storedFA2.damping,FA2_DEFAULTS.damping,0.05,0.99),
+    preventOverlap:Boolean(storedFA2.preventOverlap),
+  },
   data:null, loading:false, sim:null, hover:-1 };
+if(netState.sizeMin>netState.sizeMax) [netState.sizeMin,netState.sizeMax]=[netState.sizeMax,netState.sizeMin];
 
 /* ---- configurable node encoding ----
    every value below is available per-node in the /api/network payload. "size"
@@ -1966,8 +2021,8 @@ function colorDomain(key){
 }
 /* fill s.r[] from the chosen size attribute (area-proportional: r ~ sqrt(value)) */
 function sizeNodes(s,d){
-  const RMIN=2, RMAX=11, key=netState.sizeBy;
-  if(key==="uniform"){ for(let i=0;i<s.n;i++) s.r[i]=4.5; return; }
+  const RMIN=netState.sizeMin, RMAX=netState.sizeMax, key=netState.sizeBy;
+  if(key==="uniform"){ for(let i=0;i<s.n;i++) s.r[i]=netState.sizeUniform; return; }
   const get=NODE_ATTRS[key].get;
   let vmax=0; for(const nd of d.nodes){ const v=Math.abs(get(nd)); if(v>vmax) vmax=v; }
   vmax=vmax||1;
@@ -2248,6 +2303,16 @@ function renderNetControls(){
   st.value=netState.step;
   fillAttrSelect($("#netsize"), SIZE_KEYS, netState.sizeBy);
   fillAttrSelect($("#netcolor"), COLOR_KEYS, netState.colorBy);
+  $("#netrmin").value=netState.sizeMin;
+  $("#netrmax").value=netState.sizeMax;
+  $("#netruniform").value=netState.sizeUniform;
+  $("#netfa2controls").hidden=netState.layout!=="forceAtlas2";
+  $("#netrepulsion").value=netState.fa2.repulsion;
+  $("#netattraction").value=netState.fa2.attraction;
+  $("#netgravity").value=netState.fa2.gravity;
+  $("#netdamping").value=netState.fa2.damping;
+  $("#netpreventoverlap").checked=netState.fa2.preventOverlap;
+  updateLayoutRunButton();
   renderColorLegend();
   renderColorControls();
   updateNetLegend();
@@ -2277,26 +2342,35 @@ function startSim(){
   const n=d.nodes.length;
   const key=netState.seed+"/"+netState.type;
   let s=netState.sim;
+  let resetView=false;
   if(!s || s.n!==n || s.key!==key){
     /* fresh graph: seed x by opinion so the camps take shape immediately.
-       fx/fy = drag-pinned position (NaN = free); uz/upx/upy = user zoom/pan. */
+       fx/fy = drag-pinned position (NaN = free); baseView is the explicit
+       fit-to-canvas camera; uz/upx/upy are user zoom/pan on top of it. */
     s={ n, key, W, H, alpha:1,
         x:new Float32Array(n), y:new Float32Array(n),
         vx:new Float32Array(n), vy:new Float32Array(n),
         fx:new Float32Array(n).fill(NaN), fy:new Float32Array(n).fill(NaN),
         r:new Float32Array(n), deg:new Float32Array(n),
-        uz:1, upx:0, upy:0, raf:0 };
+        uz:1, upx:0, upy:0, baseView:null, layoutPaused:false, raf:0 };
     for(let i=0;i<n;i++){
       s.x[i]=W/2 + (d.nodes[i].op||0)*W*0.22 + (Math.random()-0.5)*W*0.25;
       s.y[i]=H/2 + (Math.random()-0.5)*H*0.8;
     }
-  } else { s.alpha=Math.max(s.alpha,0.35); s.W=W; s.H=H; } /* same graph: reheat, keep positions */
+    resetView=true;
+  } else {
+    resetView=s.W!==W||s.H!==H;
+    s.alpha=Math.max(s.alpha,0.35); s.W=W; s.H=H;
+    if(s.layoutPaused==null) s.layoutPaused=false;
+  } /* same graph: reheat, keep positions */
   for(let i=0;i<n;i++){ s.deg[i]=0; }
   for(const [u,v] of d.edges){ s.deg[u]++; s.deg[v]++; }
   sizeNodes(s,d);          /* radius from the chosen size attribute */
   colorNodes(s,d);         /* fill s.col[] from the chosen color attribute */
+  if(resetView){ s.baseView=fitView(s); s.uz=1; s.upx=0; s.upy=0; }
   netState.sim=s;
-  if(!s.raf) loop();
+  updateLayoutRunButton();
+  if(!s.layoutPaused&&!s.raf) loop(); else drawNet();
 }
 
 function simTick(s,d){
@@ -2358,11 +2432,18 @@ function simTick(s,d){
    with distance (not squared); attraction is a simple distance-proportional
    pull with no spring rest length; a light central gravity keeps disconnected
    components on screen. Its equilibrium spread routinely exceeds the canvas —
-   drawNet()'s fit-to-view plus the user zoom/pan is how the full extent is
-   viewed, so nothing is clamped here. */
+   the explicit Fit graph action plus user zoom/pan is how the full extent is
+   brought back into view, so nothing is clamped here. */
 function simTickFA2(s,d){
   const {n,x,y,vx,vy}=s, a=s.alpha;
-  const KA=0.008, KR=0.02, GRAV=0.03;
+  const KA=0.008*netState.fa2.attraction;
+  const KR=0.02*netState.fa2.repulsion;
+  const GRAV=0.03*netState.fa2.gravity;
+  const DAMP=netState.fa2.damping;
+  const preventOverlap=netState.fa2.preventOverlap;
+  const radiusToWorld=1/Math.max(1e-6,(s.baseView&&s.baseView.k)||1);
+  let maxWorldRadius=0;
+  if(preventOverlap) for(let i=0;i<n;i++) maxWorldRadius=Math.max(maxWorldRadius,s.r[i]*radiusToWorld);
   const wdeg=i=>1+d.nodes[i].indeg;
   for(const [u,v] of d.edges){
     const dx=x[v]-x[u], dy=y[v]-y[u], f=KA*a;
@@ -2381,16 +2462,22 @@ function simTickFA2(s,d){
   for(let c=0;c<G*G;c++) if(cm[c]){ cmx[c]/=cm[c]; cmy[c]/=cm[c]; }
   for(let i=0;i<n;i++){
     const c=ci(i), gx=c%G, gy=(c-gx)/G, wi=wdeg(i);
+    const nearX=preventOverlap?Math.max(1,Math.ceil((s.r[i]*radiusToWorld+maxWorldRadius)/cw)):1;
+    const nearY=preventOverlap?Math.max(1,Math.ceil((s.r[i]*radiusToWorld+maxWorldRadius)/ch)):1;
     let fx=0, fy=0;
     for(let c2=0;c2<G*G;c2++){
       if(!cm[c2]) continue;
       const gx2=c2%G, gy2=(c2-gx2)/G;
-      if(Math.abs(gx2-gx)<=1 && Math.abs(gy2-gy)<=1){
+      if(Math.abs(gx2-gx)<=nearX && Math.abs(gy2-gy)<=nearY){
         for(const j of cell[c2]){ if(j===i) continue;
           let dx=x[i]-x[j], dy=y[i]-y[j];
           let dist=Math.sqrt(dx*dx+dy*dy);
           if(dist<1){ dx=Math.random()-0.5; dy=Math.random()-0.5; dist=1; }
-          const f=KR*wi*wdeg(j)*a/dist;
+          let f=KR*wi*wdeg(j)*a/dist;
+          if(preventOverlap){
+            const overlap=(s.r[i]+s.r[j])*radiusToWorld-dist;
+            if(overlap>0) f+=overlap*0.25*a;
+          }
           fx+=dx/dist*f; fy+=dy/dist*f; }
       } else {
         let dx=x[i]-cmx[c2], dy=y[i]-cmy[c2];
@@ -2403,7 +2490,7 @@ function simTickFA2(s,d){
     vy[i]+=fy+(s.H/2-y[i])*GRAV*a;
   }
   for(let i=0;i<n;i++){
-    vx[i]*=0.6; vy[i]*=0.6;
+    vx[i]*=DAMP; vy[i]*=DAMP;
     x[i]+=vx[i]; y[i]+=vy[i];
     if(!Number.isNaN(s.fx[i])){ x[i]=s.fx[i]; y[i]=s.fy[i]; vx[i]=0; vy[i]=0; }
   }
@@ -2418,14 +2505,12 @@ function drawNet(){
   const cross=$("#netcross").checked;
   const hull=$("#nethull").checked;
   const {x,y}=s;
-  /* fit the current layout bbox into ~90% of the canvas (centered), so nodes
-     never collect on the walls whatever the simulation's absolute spread is.
-     Node radii stay in screen px; only positions are scaled. The user wheel
-     zoom / drag pan (uz/upx/upy) composes on top of that base transform, and
-     the composed transform is what hover/drag hit-testing uses too. */
-  const base=fitView(s);
-  const k=base.k*s.uz, ox=base.ox*s.uz+s.upx, oy=base.oy*s.uz+s.upy;
+  /* baseView is fitted only on initial load, resize or an explicit Fit graph
+     action. Keeping it stable makes ForceAtlas2 spacing changes visible instead
+     of silently normalizing the graph back to the same canvas footprint. */
+  const {k,ox,oy}=composedNetView(s);
   s.view={k,ox,oy};
+  const nodeScale=s.uz;
   const PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
   if(hull) drawCommunityHulls(ctx, s, d, PX, PY);
   ctx.lineWidth=0.8; ctx.strokeStyle=cssVar("--axis"); ctx.globalAlpha=cross?0.25:0.7;
@@ -2445,19 +2530,19 @@ function drawNet(){
   }
   ctx.globalAlpha=1;
   const ink=cssVar("--ink"), surf=cssVar("--surface");
-  ctx.lineWidth=0.4; ctx.strokeStyle="#000";
+  ctx.lineWidth=0.4*nodeScale; ctx.strokeStyle="#000";
   for(let i=0;i<s.n;i++){
     const nd=d.nodes[i];
-    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i],0,6.2832);
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]*nodeScale,0,6.2832);
     ctx.fillStyle=(s.col&&s.col[i])||opColor(nd.op); ctx.fill();
     ctx.stroke();
   }
   if(netState.hover>=0){
     const i=netState.hover;
-    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]+2.5,0,6.2832);
-    ctx.lineWidth=2; ctx.strokeStyle=ink; ctx.stroke();
-    ctx.beginPath(); ctx.arc(PX(i),PY(i),s.r[i]+4.5,0,6.2832);
-    ctx.lineWidth=1.5; ctx.strokeStyle=surf; ctx.stroke();
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),(s.r[i]+2.5)*nodeScale,0,6.2832);
+    ctx.lineWidth=2*nodeScale; ctx.strokeStyle=ink; ctx.stroke();
+    ctx.beginPath(); ctx.arc(PX(i),PY(i),(s.r[i]+4.5)*nodeScale,0,6.2832);
+    ctx.lineWidth=1.5*nodeScale; ctx.strokeStyle=surf; ctx.stroke();
   }
 }
 /* Experimental (R6): convex hull per opinion-sign group, drawn as a background
@@ -2512,8 +2597,39 @@ function fitView(s){
   let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
   for(let i=0;i<n;i++){ if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i]; if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i]; }
   const spanX=(mxx-mnx)||1, spanY=(mxy-mny)||1;
-  const k=Math.min(6, 0.9*Math.min(s.W/spanX, s.H/spanY));
+  let maxRadius=0; if(s.r) for(let i=0;i<n;i++) maxRadius=Math.max(maxRadius,s.r[i]);
+  const pad=Math.max(12,maxRadius+6);
+  const k=Math.min(6, Math.min(Math.max(1,s.W-2*pad)/spanX,Math.max(1,s.H-2*pad)/spanY));
   return {k, ox:s.W/2-(mnx+mxx)/2*k, oy:s.H/2-(mny+mxy)/2*k};
+}
+
+function composedNetView(s){
+  const base=s.baseView||(s.baseView=fitView(s));
+  return {k:base.k*s.uz, ox:base.ox*s.uz+s.upx, oy:base.oy*s.uz+s.upy};
+}
+function fitNetView(){
+  const s=netState.sim; if(!s) return;
+  s.baseView=fitView(s); s.uz=1; s.upx=0; s.upy=0; s.view=composedNetView(s);
+  if(!s.raf) drawNet();
+}
+function updateLayoutRunButton(){
+  const btn=$("#netlayouttoggle"); if(!btn) return;
+  const s=netState.sim;
+  const running=Boolean(s&&!s.layoutPaused&&(s.raf||s.alpha>0.005));
+  btn.innerHTML=running?"&#9208; Stop":"&#9654; Start";
+  btn.setAttribute("aria-pressed",running?"true":"false");
+}
+function setLayoutPaused(paused){
+  const s=netState.sim; if(!s) return;
+  s.layoutPaused=paused;
+  if(paused){
+    if(s.raf) cancelAnimationFrame(s.raf);
+    s.raf=0; drawNet();
+  } else {
+    s.alpha=Math.max(s.alpha,0.35);
+    if(!s.raf) loop();
+  }
+  updateLayoutRunButton();
 }
 
 function loop(){
@@ -2521,11 +2637,11 @@ function loop(){
   if(!s) return;
   // pause the force-layout dynamics while the network tab isn't showing (R3);
   // onTabActivated() resumes it on switching back in.
-  if(state.tab!=="network"){ s.raf=0; return; }
+  if(state.tab!=="network"||s.layoutPaused){ s.raf=0; updateLayoutRunButton(); return; }
   const tick = netState.layout==="forceAtlas2" ? simTickFA2 : simTick;
   if(s.alpha>0.005){ tick(s,netState.data); drawNet();
     s.raf=requestAnimationFrame(loop);
-  } else { drawNet(); s.raf=0; }
+  } else { drawNet(); s.raf=0; updateLayoutRunButton(); }
 }
 
 /* ---------- network-structure panel: degree/clustering/betweenness/lambda2/Q_sign/EI ---------- */
@@ -2787,14 +2903,18 @@ function drawEchoScatter(host, nodes){
 /* node hit-test in screen px via the composed transform drawNet uses */
 function netNodeAt(mx,my){
   const s=netState.sim; if(!s) return -1;
-  const v=s.view||fitView(s);
-  let best=-1, bd=170;
-  for(let i=0;i<s.n;i++){ const q=(v.ox+s.x[i]*v.k-mx)**2+(v.oy+s.y[i]*v.k-my)**2; if(q<bd){bd=q;best=i;} }
+  const v=s.view||composedNetView(s);
+  let best=-1, bd=Infinity;
+  for(let i=0;i<s.n;i++){
+    const q=(v.ox+s.x[i]*v.k-mx)**2+(v.oy+s.y[i]*v.k-my)**2;
+    const hitRadius=Math.max(4,(s.r[i]+2.5)*s.uz);
+    if(q<=hitRadius*hitRadius&&q<bd){bd=q;best=i;}
+  }
   return best;
 }
-/* zoom / pan / node-drag (phase-2 port): wheel zooms at the cursor, dragging
-   the background pans, dragging a node pins it (released on mouseup),
-   double-click resets the view. */
+/* zoom / pan / node-drag (phase-2 port): wheel zooms in at the cursor and
+   zooms out toward the canvas center, dragging the background pans, dragging
+   a node pins it (released on mouseup), double-click resets the view. */
 let netDrag=null, netPan=null;
 $("#network").addEventListener("mousedown",evt=>{
   const s=netState.sim; if(!s) return;
@@ -2802,7 +2922,7 @@ $("#network").addEventListener("mousedown",evt=>{
   const mx=evt.clientX-r.left, my=evt.clientY-r.top;
   const i=netNodeAt(mx,my);
   if(i>=0){
-    const v=s.view||fitView(s);
+    const v=s.view||composedNetView(s);
     netDrag=i;
     s.fx[i]=(mx-v.ox)/v.k; s.fy[i]=(my-v.oy)/v.k;
     s.alpha=Math.max(s.alpha,0.2); if(!s.raf) loop();
@@ -2818,7 +2938,7 @@ $("#network").addEventListener("mousemove",evt=>{
   const r=$("#network").getBoundingClientRect();
   const mx=evt.clientX-r.left, my=evt.clientY-r.top;
   if(netDrag!=null){
-    const v=s.view||fitView(s);
+    const v=s.view||composedNetView(s);
     s.fx[netDrag]=(mx-v.ox)/v.k; s.fy[netDrag]=(my-v.oy)/v.k;
     s.alpha=Math.max(s.alpha,0.15); if(!s.raf) loop();
     return;
@@ -2849,18 +2969,58 @@ $("#network").addEventListener("wheel",evt=>{
   const r=$("#network").getBoundingClientRect();
   const mx=evt.clientX-r.left, my=evt.clientY-r.top;
   const nz=Math.min(8,Math.max(0.2,s.uz*Math.exp(-evt.deltaY*0.001)));
-  /* keep the point under the cursor fixed: screen = base*uz + up */
-  const bx=(mx-s.upx)/s.uz, by=(my-s.upy)/s.uz;
-  s.upx=mx-bx*nz; s.upy=my-by*nz; s.uz=nz;
+  /* Zooming out pulls off-screen content toward the canvas center, which
+     makes a lost graph easier to recover. Zooming in stays cursor-focused. */
+  const ax=nz<s.uz?s.W/2:mx, ay=nz<s.uz?s.H/2:my;
+  const bx=(ax-s.upx)/s.uz, by=(ay-s.upy)/s.uz;
+  s.upx=ax-bx*nz; s.upy=ay-by*nz; s.uz=nz;
   if(!s.raf) drawNet();
 },{passive:false});
 $("#network").addEventListener("dblclick",()=>{
-  const s=netState.sim; if(!s) return;
-  s.uz=1; s.upx=0; s.upy=0;
-  if(!s.raf) drawNet();
+  fitNetView();
 });
 $("#network").addEventListener("mouseleave",()=>{ hideTip();
   if(netState.hover>=0){ netState.hover=-1; if(netState.sim&&!netState.sim.raf) drawNet(); } });
+
+function persistNodeSizes(){
+  save("netsizes",{min:netState.sizeMin,max:netState.sizeMax,uniform:netState.sizeUniform});
+}
+function syncNodeSizeInputs(){
+  $("#netrmin").value=netState.sizeMin;
+  $("#netrmax").value=netState.sizeMax;
+  $("#netruniform").value=netState.sizeUniform;
+}
+function applyNodeSizeSetting(key,value){
+  if(!Number.isFinite(value)){ syncNodeSizeInputs(); return; }
+  value=Math.min(100,Math.max(0.25,value));
+  if(key==="min"){
+    netState.sizeMin=value;
+    if(netState.sizeMax<value) netState.sizeMax=value;
+  } else if(key==="max"){
+    netState.sizeMax=value;
+    if(netState.sizeMin>value) netState.sizeMin=value;
+  } else netState.sizeUniform=value;
+  persistNodeSizes(); syncNodeSizeInputs();
+  const s=netState.sim,d=netState.data;
+  if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); }
+}
+function persistFA2(){ save("netfa2",netState.fa2); }
+function syncFA2Inputs(){
+  $("#netrepulsion").value=netState.fa2.repulsion;
+  $("#netattraction").value=netState.fa2.attraction;
+  $("#netgravity").value=netState.fa2.gravity;
+  $("#netdamping").value=netState.fa2.damping;
+  $("#netpreventoverlap").checked=netState.fa2.preventOverlap;
+}
+function applyFA2Number(key,value){
+  if(!Number.isFinite(value)){ syncFA2Inputs(); return; }
+  const limits=key==="damping"?[0.05,0.99]:[0,20];
+  netState.fa2[key]=Math.min(limits[1],Math.max(limits[0],value));
+  persistFA2(); syncFA2Inputs();
+  const s=netState.sim;
+  if(s){ s.alpha=Math.max(s.alpha,0.7); if(!s.layoutPaused&&!s.raf) loop(); }
+}
+
 $("#netseed").addEventListener("change",e=>{ stopCursorPlay(); netState.seed=e.target.value; save("netseed",netState.seed); fetchNetwork(); });
 $("#nettype").addEventListener("change",e=>{ stopCursorPlay(); netState.type=e.target.value; save("nettype",netState.type); fetchNetwork(); });
 $("#netstep").addEventListener("change",e=>{ stopCursorPlay(); netState.step=e.target.value; save("netstep",netState.step);
@@ -2872,19 +3032,44 @@ $("#netstep").addEventListener("change",e=>{ stopCursorPlay(); netState.step=e.t
   fetchNetwork(); });
 $("#netsize").addEventListener("change",e=>{ netState.sizeBy=e.target.value; save("netsize",netState.sizeBy);
   const s=netState.sim,d=netState.data; if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); } });
+$("#netrmin").addEventListener("change",e=>applyNodeSizeSetting("min",e.target.valueAsNumber));
+$("#netrmax").addEventListener("change",e=>applyNodeSizeSetting("max",e.target.valueAsNumber));
+$("#netruniform").addEventListener("change",e=>applyNodeSizeSetting("uniform",e.target.valueAsNumber));
+$("#netsizereset").addEventListener("click",()=>{
+  netState.sizeMin=NET_SIZE_DEFAULTS.min; netState.sizeMax=NET_SIZE_DEFAULTS.max;
+  netState.sizeUniform=NET_SIZE_DEFAULTS.uniform; persistNodeSizes(); syncNodeSizeInputs();
+  const s=netState.sim,d=netState.data; if(s&&d){ sizeNodes(s,d); if(!s.raf) drawNet(); }
+});
 $("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; save("netcolor",netState.colorBy);
   renderColorLegend(); renderColorControls();
   const s=netState.sim,d=netState.data; if(s&&d) colorNodes(s,d); updateNetLegend(); if(s&&!s.raf) drawNet(); });
 $("#netlayout").addEventListener("change",e=>{ netState.layout=e.target.value; save("netlayout",netState.layout);
-  const s=netState.sim; if(s){ s.alpha=Math.max(s.alpha,1); if(!s.raf) loop(); } });
+  $("#netfa2controls").hidden=netState.layout!=="forceAtlas2";
+  const s=netState.sim; if(s){ s.alpha=1; s.layoutPaused=false; if(!s.raf) loop(); }
+  updateLayoutRunButton(); });
+for(const [id,key] of [["netrepulsion","repulsion"],["netattraction","attraction"],
+                        ["netgravity","gravity"],["netdamping","damping"]])
+  $("#"+id).addEventListener("change",e=>applyFA2Number(key,e.target.valueAsNumber));
+$("#netpreventoverlap").addEventListener("change",e=>{
+  netState.fa2.preventOverlap=e.target.checked; persistFA2();
+  const s=netState.sim; if(s){ s.alpha=Math.max(s.alpha,0.7); if(!s.layoutPaused&&!s.raf) loop(); }
+});
 $("#netcross").checked=store("netcross",false);
 $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").checked); renderNetControls();
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#nethull").checked=store("nethull",false);
 $("#nethull").addEventListener("change",()=>{ save("nethull",$("#nethull").checked);
   if(netState.sim&&!netState.sim.raf) drawNet(); });
+$("#netlayouttoggle").addEventListener("click",()=>{ const s=netState.sim;
+  if(s) setLayoutPaused(!s.layoutPaused&&(Boolean(s.raf)||s.alpha>0.005)); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
-  if(s){ s.alpha=1; if(!s.raf) loop(); } });
+  if(s){ s.alpha=1; s.layoutPaused=false; if(!s.raf) loop(); updateLayoutRunButton(); } });
+$("#netfit").addEventListener("click",fitNetView);
+$("#netlayoutreset").addEventListener("click",()=>{
+  netState.fa2={...FA2_DEFAULTS}; persistFA2(); syncFA2Inputs();
+  const s=netState.sim; if(s){ s.alpha=1; s.layoutPaused=false; if(!s.raf) loop(); }
+  updateLayoutRunButton();
+});
 
 /* ---- in-page color picker: wiring (see openColorPicker/renderColorPicker) ---- */
 $("#cpHandle").addEventListener("mousedown",ev=>{
