@@ -4,93 +4,124 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>run.sh live dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+  /* design tokens (see docs/tasks/dashboard_design_refinement/) */
   :root {
-    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+    --page:#f6f7f9; --surface:#ffffff; --panel-soft:#f0f2f5; --ink:#0b0f19; --ink2:#5b6472; --muted:#98a2b3;
+    --grid:#e4e7ec; --axis:#c7ccd3; --border:#e4e7ec;
+    --good:#16a34a; --bad:#dc2626; --warn:#d97706; --accent:#2563eb;
+    --lapis-mid:#3b82f6; --lapis-ink:#1d4ed8; --lapis-100:#dbeafe; --lapis-50:#eff6ff;
+    --gold:#0891b2;
+    --shadow-card:0 1px 2px rgba(11,15,25,.05);
   }
   @media (prefers-color-scheme: dark) { :root {
-    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+    --page:#0a0d12; --surface:#12161f; --panel-soft:#171c26; --ink:#f2f4f8; --ink2:#9aa4b2; --muted:#5b6472;
+    --grid:#1f2530; --axis:#333b48; --border:#1f2530;
+    --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; --accent:#3b82f6;
+    --lapis-mid:#60a5fa; --lapis-ink:#93c5fd; --lapis-100:#16283f; --lapis-50:#101c2c;
+    --gold:#22d3ee;
+    --shadow-card:0 1px 2px rgba(0,0,0,.4);
   } }
   :root[data-theme="light"] {
-    --page:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
-    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#eda100; --accent:#2a78d6;
+    --page:#f6f7f9; --surface:#ffffff; --panel-soft:#f0f2f5; --ink:#0b0f19; --ink2:#5b6472; --muted:#98a2b3;
+    --grid:#e4e7ec; --axis:#c7ccd3; --border:#e4e7ec;
+    --good:#16a34a; --bad:#dc2626; --warn:#d97706; --accent:#2563eb;
+    --lapis-mid:#3b82f6; --lapis-ink:#1d4ed8; --lapis-100:#dbeafe; --lapis-50:#eff6ff;
+    --gold:#0891b2;
+    --shadow-card:0 1px 2px rgba(11,15,25,.05);
   }
   :root[data-theme="dark"] {
-    --page:#0d0d0d; --surface:#1a1a19; --ink:#ffffff; --ink2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --good:#0ca30c; --bad:#d03b3b; --warn:#c98500; --accent:#3987e5;
+    --page:#0a0d12; --surface:#12161f; --panel-soft:#171c26; --ink:#f2f4f8; --ink2:#9aa4b2; --muted:#5b6472;
+    --grid:#1f2530; --axis:#333b48; --border:#1f2530;
+    --good:#22c55e; --bad:#ef4444; --warn:#f59e0b; --accent:#3b82f6;
+    --lapis-mid:#60a5fa; --lapis-ink:#93c5fd; --lapis-100:#16283f; --lapis-50:#101c2c;
+    --gold:#22d3ee;
+    --shadow-card:0 1px 2px rgba(0,0,0,.4);
   }
   * { box-sizing:border-box; margin:0; }
   body { background:var(--page); color:var(--ink);
-    font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif; padding:14px 18px 40px; }
-  h1 { font-size:16px; font-weight:600; }
+    font:14px/1.45 'Inter',-apple-system,system-ui,"Segoe UI",sans-serif; padding:34px 38px 48px; }
+  h1 { font-size:21px; font-weight:800; letter-spacing:-0.02em; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  header.top { display:flex; gap:16px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
-  .grow { flex:1; min-width:140px; }
+  h3.big { font-size:15px; font-weight:700; color:var(--ink); }
+  .eyebrow { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; }
+  .sectiontitle { font-size:15px; font-weight:700; color:var(--ink); margin-top:4px; }
+  header.top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:20px; }
+  .titleblock { display:flex; flex-direction:column; gap:6px; }
+  .statusline { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); }
+  .statusline svg { flex:none; }
+  .grow { flex:1; min-width:140px; align-self:center; }
   .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
   .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
-  #ostats { font-size:12px; color:var(--ink2); white-space:nowrap; }
+  #ostats { white-space:nowrap; }
   .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  button, select { font:12.5px system-ui,sans-serif; color:var(--ink); background:var(--surface);
-    border:1px solid var(--border); border-radius:6px; padding:4px 10px; cursor:pointer; }
+  button, select { font:11.5px/1 'Inter',sans-serif; font-weight:600; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:999px; padding:7px 14px; cursor:pointer; }
   button:hover, select:hover { border-color:var(--muted); }
-  label.ctl { font-size:12.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
+  button.iconbtn { width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+  input[type="text"], input[type="number"] { font:11.5px 'Inter',sans-serif; color:var(--ink); background:var(--surface);
+    border:1px solid var(--border); border-radius:6px; padding:3px 8px; }
+  label.ctl { font-size:11.5px; color:var(--ink2); display:flex; gap:4px; align-items:center; cursor:pointer; }
   input[type="color"] {
     -webkit-appearance: none; border: 1px solid var(--border); border-radius: 6px;
     width: 28px; height: 22px; padding: 0; cursor: pointer; background: none; vertical-align: middle;
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
-  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
+  #banner { border-radius:10px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
-  #seedbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  #seedbar { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; margin-bottom:10px; }
   .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
-    border-radius:14px; padding:3px 8px 3px 6px; font-size:12px; cursor:pointer; user-select:none; }
-  .chip.off { opacity:.38; }
-  .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; }
-  .chip .st { font-size:11px; }
+    border-radius:999px; padding:7px 14px; font-size:11.5px; cursor:pointer; user-select:none; }
+  .chip.off { opacity:.4; }
+  .chip .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .chip b { font-weight:700; }
+  .chip .st { font-size:11px; font-weight:600; }
   .chip .st.done { color:var(--good); } .chip .st.failed { color:var(--bad); } .chip .st.running { color:var(--warn); }
   .chip .pct { color:var(--muted); font-variant-numeric:tabular-nums; }
   .chip .logbtn { border:none; background:none; padding:0 0 0 2px; color:var(--muted); font-size:12px; }
   .chip .logbtn:hover { color:var(--ink); }
-  details#picker { margin-bottom:10px; font-size:12.5px; }
+  #metricChips { display:flex; gap:8px; flex-wrap:wrap; margin:14px 0 16px; }
+  .metricchip { padding:6px 13px; border-radius:999px; font-size:11.5px; font-weight:600; cursor:pointer;
+    border:1px solid var(--border); background:var(--surface); color:var(--ink2); user-select:none; }
+  .metricchip.active { color:#fff; border:none;
+    background:linear-gradient(135deg, var(--lapis-mid), var(--accent)); box-shadow:0 2px 8px rgba(30,58,114,.28); }
+  details#picker { margin-bottom:10px; font-size:11.5px; }
   details#picker summary { cursor:pointer; color:var(--ink2); width:fit-content; }
   #pickerlist { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 14px;
-    background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; margin-top:6px;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-top:6px;
     max-height:260px; overflow-y:auto; }
   #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .duo, .trio { display:flex; flex-wrap:wrap; gap:12px; }
+  .duo, .trio { display:flex; flex-wrap:wrap; gap:20px; }
   /* Metric charts live in a fixed 2-tier layout instead of free-resize:
      row 1 = a horizontal carousel of small cards (~4.5 visible, any number),
      row 2 = up to 2 large "featured" cards. A card's size is set by which row
-     it is in; the ⤢ button on each card moves it between rows (promote to row 2
+     it is in; the enlarge button on each card moves it between rows (promote to row 2
      evicts the oldest featured card back to the carousel when row 2 is full). */
-  .carousel-wrap { display:flex; align-items:stretch; gap:6px; margin-bottom:12px; }
+  .carousel-wrap { display:flex; align-items:stretch; gap:6px; margin-bottom:16px; }
   .carbtn { flex:0 0 auto; border:1px solid var(--border); background:var(--surface);
-    border-radius:8px; cursor:pointer; color:var(--ink2); font-size:18px; padding:0 8px; line-height:1; }
-  .carbtn:hover { background:var(--grid); color:var(--ink); }
+    border-radius:10px; cursor:pointer; color:var(--ink2); font-size:18px; padding:0 8px; line-height:1; }
+  .carbtn:hover { background:var(--panel-soft); color:var(--ink); }
   .carbtn[disabled] { opacity:0.3; cursor:default; }
-  #gridCarousel { display:flex; gap:12px; overflow-x:auto; scroll-snap-type:x proximity;
+  #gridCarousel { display:flex; gap:20px; overflow-x:auto; scroll-snap-type:x proximity;
     scroll-behavior:smooth; flex:1 1 auto; padding-bottom:4px; }
   #gridCarousel > .metriccard { flex:0 0 clamp(240px, 22%, 340px); scroll-snap-align:start; }
-  #gridFeature { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; }
+  #gridFeature { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:16px; }
   #gridFeature:empty { display:none; }
-  #gridFeature > .metriccard { flex:1 1 calc(50% - 6px); min-width:min(100%, 420px); }
+  #gridFeature > .metriccard { flex:1 1 calc(50% - 10px); min-width:min(100%, 420px); }
   .metriccard { position:relative; }
-  .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
+  .enlargebtn { position:absolute; top:8px; right:10px; cursor:pointer; color:var(--muted);
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
     z-index:1; background:none; border:none; }
-  .enlargebtn:hover { background:var(--grid); color:var(--ink); }
-  .panel { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px 6px; }
+  .enlargebtn:hover { background:var(--panel-soft); color:var(--ink); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px 12px;
+    box-shadow:var(--shadow-card); }
   .panel svg { display:block; width:100%; height:auto; }
-  /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone —
+  /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone -
      used for the big section wrappers, which aren't individually resized. */
   .panel.card { display:flex; flex-direction:column; position:relative;
     resize:vertical; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
@@ -98,22 +129,22 @@
   .duo > .panel.card { flex-basis:420px; }
   .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
   /* dynamic mini-cards (makeCard()) put text/values at the very top of the body,
-     which the absolutely-positioned .draghandle (top:6px) can sit on top of —
+     which the absolutely-positioned .draghandle (top:8px) can sit on top of -
      push their content down a bit so it clears the handle. Static full-bleed
      cards (network canvas, 2-D plane, opinion heatmap) don't use this class,
      since they fill the card edge-to-edge and don't have that overlap problem. */
   .cardbody-pad { padding-top:14px; }
   .cardbody canvas { width:100%; height:100%; display:block; }
-  .draghandle { position:absolute; top:6px; right:8px; cursor:grab; color:var(--muted);
+  .draghandle { position:absolute; top:8px; right:10px; cursor:grab; color:var(--muted);
     font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1; }
-  .draghandle:hover { background:var(--grid); color:var(--ink); }
+  .draghandle:hover { background:var(--panel-soft); color:var(--ink); }
   .panel.card.dragging { opacity:0.35; }
   .panel.card.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
   .panel.card.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
-  .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:10px 12px; }
+  .stattile { background:var(--panel-soft); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
-  /* compact list of value-only structural stats (no chart), bundled into one card */
+  /* compact list of value-only structural stats (no chart) bundled into one card */
   .statlist { display:flex; flex-direction:column; gap:9px; }
   .statlist .stat-row { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
   .statlist .stat-row .lbl { font-size:11.5px; color:var(--ink2); }
@@ -123,10 +154,13 @@
   table.bctable td, table.bctable th { padding:2px 6px; text-align:right; border-bottom:1px solid var(--grid); }
   table.bctable th { color:var(--muted); font-weight:600; text-align:right; }
   table.bctable td:first-child, table.bctable th:first-child { text-align:left; }
+  /* deliberately NOT 'Inter' here: Inter's tabular figures render wider than
+     system-ui at this size and clip axis labels against the charts' tight,
+     fixed-pixel left margins (e.g. drawHistChart's HG.L=28) */
   svg text { font:10.5px system-ui,sans-serif; fill:var(--muted); }
-  svg .title { font-size:12px; font-weight:600; fill:var(--ink2); }
+  svg .title { font-size:12px; font-weight:600; fill:var(--ink); }
   #tooltip { position:fixed; z-index:10; background:var(--surface); border:1px solid var(--border);
-    border-radius:8px; padding:6px 10px; font-size:11.5px; pointer-events:none;
+    border-radius:10px; padding:6px 10px; font-size:11.5px; pointer-events:none;
     box-shadow:0 4px 14px rgba(0,0,0,.18); max-width:280px; }
   #tooltip .trow { display:flex; gap:8px; justify-content:space-between; font-variant-numeric:tabular-nums; }
   #tooltip .trow .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
@@ -165,7 +199,7 @@
   .colorbar-row .cb-ticks { display:flex; justify-content:space-between; width:180px;
     font-size:10px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums; }
   .colorbar-row .cb-chips { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; color:var(--ink2); align-items:center; }
-  .colorbar-row .cb-chips span { border-radius:999px; padding:3px 8px; background:var(--grid); }
+  .colorbar-row .cb-chips span { border-radius:999px; padding:3px 8px; background:var(--panel-soft); }
   .colorbar-row .cb-chips i { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:4px; }
   /* in-page color picker (replaces the OS-native <input type=color> dialog, whose
      position/layout a web page cannot control): centered modal with an SV square +
@@ -174,12 +208,12 @@
   .cp-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; }
   .cp-modal[hidden] { display:none; }
   .cp-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); }
-  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:14px;
     padding:16px; width:260px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
   .cp-handle { cursor:move; font-size:10.5px; color:var(--muted); text-align:center;
     margin:-16px -16px 10px; padding:5px; border-bottom:1px solid var(--border);
-    border-radius:10px 10px 0 0; user-select:none; }
-  .cp-sv { position:relative; width:100%; height:150px; border-radius:6px; cursor:crosshair; margin-bottom:10px;
+    border-radius:14px 14px 0 0; user-select:none; }
+  .cp-sv { position:relative; width:100%; height:150px; border-radius:8px; cursor:crosshair; margin-bottom:10px;
     background-image:linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 100%),
                       linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%); }
   .cp-svcursor { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff;
@@ -199,9 +233,14 @@
 <body>
 
 <header class="top">
-  <h1>run.sh live dashboard</h1>
+  <div class="titleblock">
+    <h1>run.sh live dashboard</h1>
+    <div class="statusline">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+      <span id="ostats">–</span>
+    </div>
+  </div>
   <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
-  <span id="ostats">–</span>
   <div class="controls">
     <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
     <select id="interval" title="refresh interval">
@@ -209,18 +248,23 @@
       <option value="10">10s</option><option value="30">30s</option>
     </select>
     <label class="ctl"><input type="checkbox" id="smooth"> smooth
-      <input type="number" id="smoothWindow" min="2" step="1" placeholder="auto" style="width:52px"
+      <input type="number" id="smoothWindow" min="2" step="1" placeholder="auto" style="width:64px"
         title="moving-average window, in samples. Blank = auto (~120 points across the visible range)."></label>
     <label class="ctl"><input type="checkbox" id="showmean"> show mean</label>
     <button id="resetzoom" hidden>reset zoom</button>
-    <button id="theme" title="toggle theme">&#9681;</button>
+    <button id="theme" class="iconbtn" title="toggle theme">&#9681;</button>
   </div>
 </header>
 
 <div id="banner" hidden></div>
 <div id="seedbar"></div>
 
-<details id="picker"><summary>metrics&hellip;</summary><div id="pickerlist"></div></details>
+<div style="margin-top:30px">
+  <div class="eyebrow">Metrics</div>
+  <div class="sectiontitle">Trends over time</div>
+  <div id="metricChips"></div>
+  <details id="picker"><summary>more metrics&hellip;</summary><div id="pickerlist"></div></details>
+</div>
 
 <main>
   <div class="carousel-wrap">
@@ -231,7 +275,7 @@
   <div id="gridFeature"></div>
   <div class="duo" id="topPairRow">
     <section class="panel card" data-card="plane">
-      <h3>2-D outcome plane
+      <h3 class="big">Outcome Plane
         <select id="px"></select> &times; <select id="py"></select>
       </h3>
       <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = scrub position (zoom window applies); drag the slider to rewind</div>
@@ -244,15 +288,15 @@
       <div id="plane" class="cardbody"></div>
     </section>
     <section class="panel card" data-card="opinion">
-      <h3>opinion distribution over time <select id="opseed"></select></h3>
+      <h3 class="big">Opinion Distribution <select id="opseed"></select></h3>
       <div class="subnote">density heatmap: per-step share of agents across opinion bins
         (&minus;1 bottom &harr; +1 top), color = share (results/&hellip;/opinion/opinion_result.csv).</div>
       <div id="opinion" class="cardbody"></div>
       <div class="leg" id="opleg"></div>
     </section>
   </div>
-  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot" style="margin-top:12px">
-    <h3>network snapshot
+  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot" style="margin-top:30px">
+    <h3 class="big">Network Snapshot
       <select id="netseed"></select>
       <select id="nettype">
         <option value="follow">follow graph</option>
@@ -263,9 +307,9 @@
       <label class="ctl">color <select id="netcolor"></select></label>
       <label class="ctl" title="set network link edge color">edge color <input type="color" id="netedgecolor"></label>
       <label class="ctl" title="only draw/simulate edges whose weight (repost graph: repost count on that edge) falls in this range. Leave a box empty for no bound on that side.">weight
-        <input type="number" id="netwmin" min="0" step="1" placeholder="min" style="width:4.5em">
+        <input type="number" id="netwmin" min="0" step="1" placeholder="min" style="width:5.5em">
         &ndash;
-        <input type="number" id="netwmax" min="0" step="1" placeholder="max" style="width:4.5em">
+        <input type="number" id="netwmax" min="0" step="1" placeholder="max" style="width:5.5em">
       </label>
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
       <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
@@ -283,12 +327,13 @@
       <input type="range" id="netScrub" min="0" max="0" value="0" step="1">
       <span id="netScrubLabel" class="subnote">&ndash;</span>
     </div>
-    <canvas id="network" class="cardbody" style="border-radius:6px; min-height:550px"></canvas>
+    <canvas id="network" class="cardbody" style="border-radius:10px; min-height:550px; background:var(--panel-soft)"></canvas>
     <div class="leg" id="netleg"></div>
   </section>
 
-  <section class="panel" style="margin-top:12px">
-    <h3>network structure <span id="structinfo" class="subnote"></span></h3>
+  <section class="panel" style="margin-top:30px">
+    <div class="eyebrow">Structure</div>
+    <h3 class="big">Network Structure <span id="structinfo" class="subnote"></span></h3>
     <div class="subnote">same seed/step as the network snapshot above (undirected, giant-component-only for
       betweenness/&lambda;<sub>2</sub> &mdash; matches journal.tex's convention; degree distribution and
       clustering coefficient always describe the follow graph, the only one Java writes per-step CSVs for).
@@ -299,8 +344,9 @@
     <div id="qsignEiRow" class="duo" style="margin-top:10px"></div>
   </section>
 
-  <section class="panel" style="margin-top:12px">
-    <h3>agent behavior &amp; attributes <span id="attrSeedNote" class="subnote"></span></h3>
+  <section class="panel" style="margin-top:30px">
+    <div class="eyebrow">Behavior</div>
+    <h3 class="big">Agent Behavior &amp; Attributes <span id="attrSeedNote" class="subnote"></span></h3>
     <div class="subnote">same seed/step as the network snapshot/structure above (use the seed selector there
       to change it). bounded-confidence / post-prob: GEXF node attributes at that seed/step (snapshot, not a
       time series). repost depth/virality/share below: full time series for that seed, posts/repost_cascades.csv.</div>
@@ -338,11 +384,11 @@
 <script>
 "use strict";
 /* ---------- palettes (dataviz skill reference palette, light+dark steps) ---------- */
-const SERIES_LIGHT = ["#2a78d6","#1baf7a","#eda100","#008300","#4a3aa7","#e34948","#e87ba4","#eb6834"];
-const SERIES_DARK  = ["#3987e5","#199e70","#c98500","#008300","#9085e9","#e66767","#d55181","#d95926"];
+const SERIES_LIGHT = ["#2563eb","#0891b2","#16a34a","#d97706","#dc2626","#4a3aa7","#e87ba4","#eb6834"];
+const SERIES_DARK  = ["#3b82f6","#22d3ee","#22c55e","#f59e0b","#ef4444","#9085e9","#d55181","#d95926"];
 /* diverging blue<->red for opinion bins (-1 .. +1), gray midpoint */
-const BINS_LIGHT = ["#256abf","#86b6ef","#b0aea7","#f0a3a2","#e34948"];
-const BINS_DARK  = ["#3987e5","#6da7ec","#77756f","#e88a8a","#e66767"];
+const BINS_LIGHT = ["#2563eb","#93b8f0","#c9ccd3","#f0a99a","#dc2626"];
+const BINS_DARK  = ["#3b82f6","#7fa8e8","#7b828f","#e39a8d","#ef4444"];
 const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
 /* "cRateMean" here is a FAMILY id (see state.summary.families), not a literal
    results.csv column — rendered as one class-colored chart, not five. */
@@ -426,9 +472,9 @@ async function refresh(){
   try{
     const summary = await jget("/api/summary");
     state.summary = summary;
-    // Q_sign/EI_index (network-structure panel) and repostShare (behavior panel)
+    // Q_sign/Q_sign_repost/EI_index (network-structure panel) and repostShare (behavior panel)
     // are read directly by those panels regardless of picker state.
-    const cols = new Set([state.px, state.py, "Q_sign", "EI_index", "repostShare"]);
+    const cols = new Set([state.px, state.py, "Q_sign", "Q_sign_repost", "EI_index", "repostShare"]);
     for(const m of state.metrics) for(const c of expandMetric(m)) cols.add(c);
     const s = await jget("/api/series?cols="+encodeURIComponent([...cols].join(","))+"&max=1200");
     state.series = s.seeds;
@@ -466,10 +512,31 @@ function visibleSeeds(){ return seedList().filter(s=>!state.hidden.has(s.seed));
 
 /* ---------- render: header/seedbar/picker ---------- */
 function renderAll(){
-  renderHeader(); renderSeedbar(); renderPicker();
+  renderHeader(); renderSeedbar(); renderPicker(); renderMetricChips();
   renderGrid(); renderPlane(); renderOpinion();
   renderQsignEiCharts(); renderBehavior();
   $("#resetzoom").hidden = !state.zoom;
+}
+
+/* always-visible gradient pill per currently-selected metric/family (mirrors
+   the checkbox state in #pickerlist below); click hides that metric's chart,
+   same effect as unchecking it there. */
+function renderMetricChips(){
+  const host=$("#metricChips"); if(!host) return;
+  host.innerHTML="";
+  for(const m of state.metrics){
+    const chip=document.createElement("span");
+    chip.className="metricchip active";
+    chip.textContent=m;
+    chip.title="click to hide this metric's chart";
+    chip.addEventListener("click",()=>{
+      state.metrics=state.metrics.filter(x=>x!==m);
+      state.featured=state.featured.filter(x=>x!==m);
+      save("metrics",state.metrics); save("featured",state.featured);
+      refresh();
+    });
+    host.appendChild(chip);
+  }
 }
 
 function renderHeader(){
@@ -629,7 +696,7 @@ function seBandPath(s, xs, ys, stride){
 const DEFAULT_ORDER = {
   degree: ["in", "out", "total"],
   structstats: ["summary", "clustering", "betweenness", "echo"],
-  qsignei: ["qsign", "ei"],
+  qsignei: ["qsign", "qsignrepost", "ei"],
   repostpair: ["depth", "virality", "share"],
   attrpair: ["bc", "pp"],
 };
@@ -1203,7 +1270,7 @@ const COLOR_KEYS = ["op","indeg","outdeg","total","pp","bc","opsign","hub"];
 
 function opColor(v){ /* diverging blue -1 <-> gray 0 <-> red +1 (hover-tip fallback) */
   const dark=theme()==="dark";
-  const neg=dark?[57,135,229]:[42,120,214], mid=dark?[119,117,111]:[176,174,167], pos=dark?[230,103,103]:[227,73,72];
+  const neg=dark?[59,130,246]:[37,99,235], mid=dark?[123,130,143]:[201,204,211], pos=dark?[239,68,68]:[220,38,38];
   const t=Math.max(-1,Math.min(1,v??0));
   const a=t<0?neg:pos, k=Math.abs(t);
   const c=mid.map((m,i)=>Math.round(m+(a[i]-m)*k));
@@ -1228,8 +1295,8 @@ function toHexColor(c){ if(c.startsWith("#")) return c;
   return "#"+m.map(v=>v.toString(16).padStart(2,"0")).join(""); }
 function stopsDefault(){ /* opinion -1 = blue, +1 = red, neutral gray midpoint (matches opColor) */
   return theme()==="dark"
-    ? [{pos:0,color:"#3987e5"},{pos:0.5,color:"#383835"},{pos:1,color:"#e66767"}]
-    : [{pos:0,color:"#2a78d6"},{pos:0.5,color:"#b3b1a9"},{pos:1,color:"#e34948"}]; }
+    ? [{pos:0,color:"#3b82f6"},{pos:0.5,color:"#333b48"},{pos:1,color:"#ef4444"}]
+    : [{pos:0,color:"#2563eb"},{pos:0.5,color:"#c9ccd3"},{pos:1,color:"#dc2626"}]; }
 function getGradStops(){ const g=store("netstops",null);
   return (Array.isArray(g)&&g.length>=2)?g:stopsDefault(); }
 function saveGradStops(stops){ save("netstops", stops.map(({pos,color})=>({pos,color}))); }
@@ -1884,6 +1951,7 @@ function renderQsignEiCharts(){
   host.innerHTML="";
   const spec={
     qsign: ["Q_sign (modularity, undirected sign-modularity)", "Q_sign", true],
+    qsignrepost: ["Q_sign — repost graph (systematic-B calibration target: Conover et al. 2011 ~0.7-0.8)", "Q_sign_repost", true],
     ei: ["E-I index (echo chamber; +1=all cross-camp, -1=all same-camp)", "EI_index", false],
   };
   for(const key of getOrder("qsignei")){
@@ -1957,7 +2025,7 @@ function drawSimpleSeries(host, title, S){
 
 /* Linear histogram (values already bounded, e.g. clustering coeff in [0,1]) */
 function drawHistChart(host, values, lo, hi, nbins){
-  const HG={W:260,H:120,L:28,R:8,T:8,B:18};
+  const HG={W:260,H:120,L:34,R:8,T:8,B:18};
   const arr=(values||[]).filter(v=>v!=null && !Number.isNaN(v));
   if(!arr.length){ host.innerHTML=`<svg viewBox="0 0 ${HG.W} ${HG.H}"><text x="${HG.W/2}" y="${HG.H/2}" text-anchor="middle" font-size="10" fill="var(--muted)">no data</text></svg>`; return; }
   const counts=new Array(nbins).fill(0), w=(hi-lo)/nbins;

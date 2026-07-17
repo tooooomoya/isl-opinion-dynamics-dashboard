@@ -360,9 +360,17 @@ def api_network(qs):
             result = {"steps": steps, "step": s, "stale": i > 0, **payload}
             if want_structural:
                 try:
+                    # 2026-07-15: repost graph structural CSVs are a distinct pair
+                    # (Writer.writeRepostDegrees/writeRepostClusteringCoefficients) written from
+                    # the SAME windowed repostNetwork matrix repostGephi exports here — using the
+                    # follow-graph CSVs for net=repost would silently describe the wrong graph
+                    # (the bug this migration fixes: the degree/clustering panel used to always
+                    # read the follow-graph CSVs regardless of which graph was on screen).
+                    deg_prefix = "repost_degree_result_" if net == "repost" else "degree_result_"
+                    clu_prefix = "repost_clustering_result_" if net == "repost" else "clustering_result_"
                     result["structural"] = compute_structural(
-                        snaps[s], d / "degrees" / f"degree_result_{s}.csv",
-                        d / "clusterings" / f"clustering_result_{s}.csv")
+                        snaps[s], d / "degrees" / f"{deg_prefix}{s}.csv",
+                        d / "clusterings" / f"{clu_prefix}{s}.csv")
                 except Exception as e:
                     result["structuralError"] = f"{type(e).__name__}: {e}"
             return result

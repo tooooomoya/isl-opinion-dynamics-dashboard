@@ -20,6 +20,7 @@ METRICS = [
     ("opinionAssortativity", "opinion assortativity"),
     ("crossCuttingFraction", "cross-cutting fraction"),
     ("Q_sign", "modularity (Q_sign)"),
+    ("Q_sign_repost", "repost-graph modularity (Q_sign)"),
     ("bimodalityCoeff", "bimodality coeff."),
     ("opinionKurtosis", "opinion kurtosis"),
     ("disagreement", "disagreement"),
@@ -204,6 +205,7 @@ def api_summary():
                           "target": max(target, step), "tag": tag})
         cols.discard("step")
         cols.discard("Q_sign")
+        cols.discard("Q_sign_repost")
 
         families = {}
         for c in list(cols):
@@ -267,11 +269,14 @@ def api_series(qs):
                 col = st.main.column(c)
                 if col is not None:
                     entry["cols"][c] = [rnd(col[i]) for i in idx]
-            if "Q_sign" in want:
-                qstep, qval = st.mod.column("step"), st.mod.column("Q_sign")
-                if qstep:
-                    entry["aux"] = {"Q_sign": {"step": [int(v) for v in qstep],
-                                                "values": [rnd(v) for v in qval]}}
+            # Q_sign/Q_sign_repost both live in modularity.csv (Writer.writeModularity),
+            # tailed separately from st.main since they're written on a sparser (5000-step) cadence.
+            for aux_name in ("Q_sign", "Q_sign_repost"):
+                if aux_name in want:
+                    qstep, qval = st.mod.column("step"), st.mod.column(aux_name)
+                    if qstep:
+                        entry.setdefault("aux", {})[aux_name] = {
+                            "step": [int(v) for v in qstep], "values": [rnd(v) for v in qval]}
             out[str(seed)] = entry
         return {"seeds": out}
 
