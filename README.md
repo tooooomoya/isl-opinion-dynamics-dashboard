@@ -464,7 +464,14 @@ opinionの値はカテゴリカルパレットとは別の、diverging青↔赤�
 
 ## 独立リポジトリとの同期ワークフロー (Git Subtree)
 
-本リポジトリ内の `dashboard/` ディレクトリは、Git Subtree 機能によって独立した別リポジトリ（ダッシュボード単独公開用リポジトリ）と同期されています。これにより、メインリポジトリでコードを追跡しつつ、ダッシュボード機能だけを軽量な状態で外部公開・配布することが可能になっています。
+本リポジトリ内の `dashboard/` ディレクトリは、Git Subtree 機能によって独立した別リポジトリ（ダッシュボード単独公開用リポジトリ、`ISL-opinion-dynamics-dashboard`）と同期されています。これにより、メインリポジトリでコードを追跡しつつ、ダッシュボード機能だけを軽量な状態で外部公開・配布することが可能になっています。
+
+**ブランチモデル(2026-07-18改訂):** 外部リポジトリの `main` は特定モデルに依存しない汎用版で、
+共同研究者(yabe)を含む複数フォークの「いいとこどり」ベースとして維持する。このリポジトリ
+(polarized-vocal-minority-model)の `dashboard/` は**このプロジェクト専用のフォーク**であり、
+外部リポジトリの `toomoya` ブランチに対応する。したがって以降の push/pull は `main` ではなく
+`toomoya` を対象にすること — `main` へ直接pushしない(詳細は
+`docs/report/2026-07-18-dashboard-branch-restructure.md`)。
 
 ### リモートリポジトリの登録
 初期設定として、ダッシュボード専用の外部リモートリポジトリを登録します。
@@ -475,15 +482,15 @@ git remote add dashboard-remote <外部リポジトリのGit-URL>
 ### 双方向同期コマンド
 
 #### 1. メインリポジトリの変更を外部リポジトリへ送信する (Push)
-メインリポジトリの `dashboard/` ディレクトリ内で加えた変更（コミット）を、外部リポジトリの `main` ブランチに反映させます。
+メインリポジトリの `dashboard/` ディレクトリ内で加えた変更（コミット）を、外部リポジトリの `toomoya` ブランチ(このプロジェクト専用フォーク)に反映させます。
 ```bash
-git subtree push --prefix=dashboard dashboard-remote main
+git subtree push --prefix=dashboard dashboard-remote toomoya
 ```
 
 #### 2. 外部リポジトリの変更をメインリポジトリへ取り込む (Pull)
-外部リポジトリ（他の開発者によるPRなど）での変更内容を、メインリポジトリの `dashboard/` ディレクトリに取り込みます。履歴を簡潔に保つため `--squash` の併用を推奨します。
+外部リポジトリの `toomoya` ブランチでの変更内容を、メインリポジトリの `dashboard/` ディレクトリに取り込みます。履歴を簡潔に保つため `--squash` の併用を推奨します。
 ```bash
-git subtree pull --prefix=dashboard dashboard-remote main --squash
+git subtree pull --prefix=dashboard dashboard-remote toomoya --squash
 ```
 
 > [!NOTE]
