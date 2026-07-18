@@ -39,7 +39,9 @@ DERIVED = {
     "EI_index": (("crossCuttingFraction",), lambda c: 2 * c - 1),
 }
 DERIVED_IN_PICKER = ("apparentPolarization", "repostShare")
-FAMILY_RE = re.compile(r"^(.+)_([0-4])$")
+# Groups per-bin metric families (e.g. "postShare_0".."postShare_3") into one
+# picker entry. Bin count is whatever the data provides, not hardcoded.
+FAMILY_RE = re.compile(r"^(.+)_(\d+)$")
 
 STORES = {}          # seed -> SeedStore
 LOCK = threading.Lock()
@@ -145,13 +147,11 @@ class SeedStore:
         self.main = CsvTail(d / "metrics" / "results.csv")
         self.mod = CsvTail(d / "metrics" / "modularity.csv")
         self.op = CsvTail(d / "opinion" / "opinion_result.csv", max_rows=2000)
-        self.repost = CsvTail(d / "posts" / "repost_cascades.csv", max_rows=8000)
 
     def poll(self):
         self.main.poll()
         self.mod.poll()
         self.op.poll()
-        self.repost.poll()
 
 
 def poll_all():
@@ -207,17 +207,21 @@ def api_summary():
         cols.discard("Q_sign")
         cols.discard("Q_sign_repost")
 
-        families = {}
+        # Group any "<base>_<index>" columns into one family entry once every
+        # index 0..max is present for that base (bin count is data-driven).
+        raw_families = {}
         for c in list(cols):
             m = FAMILY_RE.match(c)
             if m:
-                families.setdefault(m.group(1), [None] * 5)[int(m.group(2))] = c
-        for base, arr in list(families.items()):
-            if all(arr):
+                raw_families.setdefault(m.group(1), {})[int(m.group(2))] = c
+        families = {}
+        for base, by_idx in raw_families.items():
+            n = max(by_idx) + 1
+            if set(by_idx) == set(range(n)):
+                arr = [by_idx[i] for i in range(n)]
+                families[base] = arr
                 for c in arr:
                     cols.discard(c)
-            else:
-                del families[base]
 
         for name in DERIVED_IN_PICKER:
             deps, _fn = DERIVED[name]
@@ -302,88 +306,13 @@ def api_opinion(qs):
         return {"step": [int(steps[i]) for i in idx], "bins": bins}
 
 
-def _cascade_virality(edges, root):
-    """Structural virality (Goel et al. 2015) of one reconstructed cascade tree."""
-    adj = {}
-    for a, b in edges:
-        adj.setdefault(a, []).append(b)
-        adj.setdefault(b, []).append(a)
-    if root not in adj:
-        return None
-    order, parent, seen = [], {root: None}, {root}
-    stack = [root]
-    while stack:
-        u = stack.pop()
-        order.append(u)
-        for v in adj[u]:
-            if v not in seen:
-                seen.add(v); parent[v] = u; stack.append(v)
-    n = len(order)
-    if n < 2:
-        return None
-    size = {u: 1 for u in order}
-    for u in reversed(order):
-        p = parent[u]
-        if p is not None:
-            size[p] += size[u]
-    wiener = sum(size[u] * (n - size[u]) for u in order if parent[u] is not None)
-    return (2.0 * wiener / (n * (n - 1)), n)
-
-
 def api_repost(qs):
-    """Repost behavior over time from posts/repost_cascades.csv."""
-    seed = int(qs.get("seed", ["-1"])[0])
-    bucket = max(1, int(qs.get("bucket", ["1000"])[0]))
-    with LOCK:
-        poll_all()
-        st = STORES.get(seed)
-        empty = {"step": [], "meanDepth": [], "structVirality": [], "depthHist": {}, "n": 0}
-        if st is None:
-            return empty
-        steps = st.repost.column("step")
-        depths = st.repost.column("depth")
-        if not steps:
-            return empty
-        roots = st.repost.column("rootPostId")
-        parents = st.repost.column("parentPostId")
-        posts = st.repost.column("postId")
-        buckets = {}
-        hist = {}
-        for s, dep in zip(steps, depths):
-            b = int(s // bucket) * bucket
-            sm, ct = buckets.get(b, (0.0, 0))
-            buckets[b] = (sm + dep, ct + 1)
-            di = int(dep)
-            hist[di] = hist.get(di, 0) + 1
-        bkeys = sorted(buckets)
-        vir_buckets = {}
-        if roots and parents and posts:
-            casc = {}
-            for s, r, pa, po in zip(steps, roots, parents, posts):
-                if any(math.isnan(v) for v in (r, pa, po)):
-                    continue
-                r, pa, po = int(r), int(pa), int(po)
-                c = casc.get(r)
-                if c is None:
-                    c = casc[r] = {"edges": [], "step": s}
-                c["edges"].append((pa, po))
-                if s < c["step"]:
-                    c["step"] = s
-            for r, c in casc.items():
-                res = _cascade_virality(c["edges"], r)
-                if res is None:
-                    continue
-                b = int(c["step"] // bucket) * bucket
-                sm, ct = vir_buckets.get(b, (0.0, 0))
-                vir_buckets[b] = (sm + res[0], ct + 1)
-        return {
-            "step": bkeys,
-            "meanDepth": [round(buckets[b][0] / buckets[b][1], 4) for b in bkeys],
-            "structVirality": [round(vir_buckets[b][0] / vir_buckets[b][1], 4)
-                               if b in vir_buckets else None for b in bkeys],
-            "depthHist": {str(k): v for k, v in sorted(hist.items())},
-            "n": len(steps),
-        }
+    """Repost cascade behavior over time. Stubbed in generic main: cascade
+    reconstruction needs a repost-cascade CSV schema (rootPostId/parentPostId/
+    postId/depth) that is specific to a given model's pipeline, not something
+    this dashboard can assume. Wire this up per-deployment if your model
+    writes that data (see README's plugin contract)."""
+    return {"step": [], "meanDepth": [], "structVirality": [], "depthHist": {}, "n": 0}
 
 
 def api_log(qs):

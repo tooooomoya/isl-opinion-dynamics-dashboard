@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>run.sh live dashboard</title>
+<title>Opinion Dynamics Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -572,9 +572,9 @@
 <aside id="helpdrawer" hidden>
   <header><span>Dashboard Help &amp; Reference</span><button id="helpclose">&times;</button></header>
   <div class="helpcontent">
-    <h2>Welcome to the Polarized Vocal Minority Simulator</h2>
-    <p>This interactive dashboard displays live data from the social network simulation. It tracks how agent opinions, posting behavior, and social networks co-evolve.</p>
-    
+    <h2>Welcome to the Opinion Dynamics Dashboard</h2>
+    <p>This interactive dashboard displays live data from an opinion-dynamics simulation. It tracks how agent opinions, behavior metrics, and (if present) the social network co-evolve over time — auto-discovering whatever series and network attributes your model's run data provides.</p>
+
     <h2>💡 How to Use the Dashboard</h2>
     <ul>
       <li><strong>Switching Tabs:</strong> Use the left sidebar to toggle between <strong>Time Series</strong> (general trend plots), <strong>Opinion/Outcome</strong> (opinions & phase plane), and <strong>Network</strong> (interactive graph visualization & metrics).</li>
@@ -592,65 +592,23 @@
 <script>
 "use strict";
 
-const METRIC_DESC = {
-  opinionVar: "Variance of actual opinions across the population, representing the overall degree of opinion polarization.",
-  postOpinionVar: "Variance of opinions expressed in posts. Represents the diversity of content posted in the network.",
-  exposureOpinionVar: "Variance of opinions that agents are exposed to (what they see in their feeds).",
-  exposureOpinionMean: "Average opinion of posts that agents are exposed to.",
-  apparentPolarization: "Calculated as <code>exposureOpinionVar - opinionVar</code>. Measures the mismatch between the polarization of feeds vs. the actual population. Positive values indicate an 'echo chamber effect' or 'vocal minority effect' where content feeds appear more polarized than the users actually are.",
-  repostShare: "The fraction of reposts among all content created at the current step: <code>reposts / (reposts + original posts)</code>.",
-  EI_index: "Krackhardt & Stern's E-I Index: <code>2 * crossCuttingFraction - 1</code>. Measures camp-level homophily from -1 (purely within-camp follow ties) to +1 (purely cross-camp follow ties).",
-  opinionAssortativity: "Newman's assortativity coefficient of the follow network with respect to agent opinions. Positive values indicate homophily (connecting to similar-opinion others).",
-  crossCuttingFraction: "The fraction of follow network edges that cross camp boundaries (connecting agents with positive vs. negative opinions).",
-  opinionKurtosis: "Excess kurtosis of the opinion distribution. Positive values mean peaked opinions; negative values mean flat or multi-modal (polarized) distributions.",
-  bimodalityCoeff: "Sarle's bimodality coefficient, computed from opinion skewness and excess kurtosis. Values &gt; 5/9 (&asymp; 0.555) suggest a bimodal or multimodal opinion distribution (extreme polarization). Excludes target hubs.",
-  disagreement: "Average squared opinion difference between connected neighbors: <code>&Sigma;<sub>(i,j)</sub> (x<sub>i</sub> - x<sub>j</sub>)<sup>2</sup> / M</code>. High values mean local conflict; low values mean local consensus.",
-  meanTolerance: "Average confidence threshold (&epsilon;) of agents. In bounded confidence models, agents only listen/interact if opinion distance is &le; &epsilon;.",
-  toleranceVar: "Variance of the confidence threshold (&epsilon;) among agents.",
-  shannonIndex: "Shannon-Wiener entropy index of the opinion distribution. Measures opinion diversity.",
-  opinionAvg: "Mean opinion of the population.",
-  interactionAssortativity: "Opinion assortativity coefficient of the cumulative repost network.",
-  interactionCrossCuttingFraction: "Fraction of cross-cutting reposts in the cumulative repost network.",
-  interactionAssortativityW: "Opinion assortativity coefficient of the sliding-window repost network.",
-  interactionCrossCuttingFractionW: "Fraction of cross-cutting reposts in the sliding-window repost network.",
-  cRateMean: "Mean content consumption (comfort) rate per opinion bin. Measures receptiveness to seen content.",
-  postShare: "Percentage share of total posts created by agents in each opinion bin, showing who is producing the most content.",
-  hostility: "Average hostility expressed in posts by agents in each opinion bin.",
-  feedPostOpinionMean: "Average opinion of posts in feeds for users in each opinion bin.",
-  feedPostOpinionVar: "Variance of opinions of posts in feeds for users in each opinion bin.",
-  cRateVar: "Variance of content comfort rate per opinion bin.",
-  highComfortRateNum: "Count of high-comfort (highly satisfied) consumption actions per opinion bin.",
-  outGroupBlockPropensity: "Probability that exposure to out-group content triggers a block action.",
-  outGroupSanctionRate: "Rate of out-group blocks/sanctions per active step.",
-  crossRepostRate: "Fraction of reposts that cross camp boundaries (sharing opposite-camp posts).",
-  blockCount: "Total number of block actions in this step.",
-  unfollowCount: "Total number of unfollow actions in this step.",
-  evictionCount: "Total number of feed/queue eviction events.",
-  originalPostCount: "Total number of original posts created in this step.",
-  repostCount: "Total number of reposts created in this step.",
-  feedForYouCountMean: "Average number of algorithmic ('For You') posts in user feeds.",
-  feedChronoCountMean: "Average number of chronological posts in user feeds.",
-  feedRepostCountMean: "Average number of reposts in user feeds.",
-  feedOriginalCountMean: "Average number of original posts in user feeds.",
-  giantComponentFrac: "Fraction of nodes belonging to the undirected giant component of the follow network.",
-  lambda2: "Algebraic connectivity (&lambda;<sub>2</sub>, Fiedler value) of the undirected giant component. Indicates network cohesiveness and resistance to fragmentation.",
-  betweennessMean: "Average betweenness centrality of nodes on the undirected giant component. Measures how much nodes lie on shortest paths.",
-  betweennessTop: "Betweenness centrality of the highest-degree hubs.",
-  Q_sign: "Modularity of the follow network based on camp boundaries (sign of opinion). High values indicate strong community separation.",
-  Q_sign_repost: "Modularity of the repost network based on camp boundaries (sign of opinion)."
-};
+// Generic main ships with no metric prose baked in — every entry here named a
+// column from one specific model's pipeline. Add your own model's metric
+// descriptions here (see README's "Plugin contract" section), or leave empty
+// and rely on the "No description available" fallback below.
+const METRIC_DESC = {};
 
 const SECTION_HELP = {
-  timeseries: "<b>Trends over Time</b>: Plots chronological data from <code>results.csv</code> for the active run. Drag horizontally on any chart to zoom into a step range. Enlarge cards with <code>⤢</code>, or hover over the <code>ⓘ</code> icon on a card to see what that specific metric measures.",
-  opinion: "<b>Opinion Distribution</b>: Visualizes the opinions of agents over time. In 'trajectories' view, it plots the opinion path of each agent (colored by final opinion) at sparse GEXF snapshot intervals. In '3D distribution' view, it plots a waterfall/ridgeline perspective of the 2D density surface over 100 sampled timesteps.",
-  plane: "<b>Outcome Plane</b>: Plots the phase-space trajectory of one metric against another (e.g. assortativity vs bimodality) over time. Use the scrubber slider to rewind time, or click Play to animate the trajectory. The fading trail goes from faint (early step) to solid (latest step).",
-  network: "<b>Network Snapshot</b>: A live 2D force-directed visualization of the social network (follow or repost graph). Node sizes are proportional to followers, colors map to opinions (blue &minus;1 &harr; red +1), and double-ringed nodes are intervened hubs.",
-  structure: "<b>Network Structure</b>: Plots structural statistics of the network. The degree charts show the empirical complementary cumulative distribution function (CCDF) P(X&ge;x) on log-log scales, with a power-law fit line. Also displays clustering, average betweenness centrality, algebraic connectivity (&lambda;<sub>2</sub>), E-I index, and modularity (Q<sub>sign</sub>).",
-  behavior: "<b>Agent Behavior & Attributes</b>: Displays distributions of individual agent attributes at the snapshot step (such as bounded-confidence tolerance &epsilon; and posting probability), alongside repost cascade depth, virality, and share time series."
+  timeseries: "<b>Trends over Time</b>: Plots chronological series for the active run, whatever columns your model's data exposes. Drag horizontally on any chart to zoom into a step range. Enlarge cards with <code>⤢</code>, or hover over the <code>ⓘ</code> icon on a card to see what that specific metric measures (if a description is configured).",
+  opinion: "<b>Opinion Distribution</b>: Visualizes the opinions of agents over time. In 'trajectories' view, it plots the opinion path of each agent (colored by final opinion) at sparse network-snapshot intervals. In '3D distribution' view, it plots a waterfall/ridgeline perspective of the 2D density surface over sampled timesteps.",
+  plane: "<b>Outcome Plane</b>: Plots the phase-space trajectory of one metric against another over time. Use the scrubber slider to rewind time, or click Play to animate the trajectory. The fading trail goes from faint (early step) to solid (latest step).",
+  network: "<b>Network Snapshot</b>: A live 2D force-directed visualization of the network, if your model exports one. Node size/color map to whichever attributes are configured in <code>NODE_ATTRS</code> below.",
+  structure: "<b>Network Structure</b>: Structural statistics computed directly from the network snapshot. The degree charts show the empirical complementary cumulative distribution function (CCDF) P(X&ge;x) on log-log scales, with a power-law fit line. Also displays clustering, average betweenness centrality, and algebraic connectivity (&lambda;<sub>2</sub>).",
+  behavior: "<b>Agent Behavior & Attributes</b>: Displays distributions of individual agent attributes at the snapshot step, and (if your model's data provides it) repost/interaction cascade depth, virality, and share time series."
 };
 
 function getMetricDesc(metric) {
-  const base = metric.replace(/_[0-4]$/, "");
+  const base = metric.replace(/_\d+$/, "");
   return METRIC_DESC[base] || METRIC_DESC[metric] || "No description available for this metric.";
 }
 
@@ -681,10 +639,11 @@ const SERIES_DARK  = ["#3b82f6","#22d3ee","#22c55e","#f59e0b","#ef4444","#9085e9
 const BINS_LIGHT = ["#2563eb","#93b8f0","#c9ccd3","#f0a99a","#dc2626"];
 const BINS_DARK  = ["#3b82f6","#7fa8e8","#7b828f","#e39a8d","#ef4444"];
 const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
-/* "cRateMean" here is a FAMILY id (see state.summary.families), not a literal
-   results.csv column — rendered as one class-colored chart, not five. */
-const DEFAULT_METRICS = ["cRateMean","postShare","disagreement","apparentPolarization",
-                         "unfollow","originalPostCount"];
+// Generic main ships with no metrics pre-selected — the picker starts empty
+// and is populated from whatever columns/families your model's data exposes
+// (see state.summary.columns / state.summary.families). Set your own
+// deployment's default selection here if you want charts shown on first load.
+const DEFAULT_METRICS = [];
 const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed"};
 
 const $ = s => document.querySelector(s);
@@ -2019,21 +1978,20 @@ function applyWeightFilter(){
    every value below is available per-node in the /api/network payload. "size"
    picks a numeric attr; "color" picks either a numeric attr (rendered with a
    user-editable arbitrary-stop gradient, with named presets) or a categorical
-   attr (rendered from a user-editable palette, one swatch per category). */
+   attr (rendered from a user-editable palette, one swatch per category).
+   This object is the extension point for your own model: add an entry here
+   for each extra GEXF node attribute your pipeline writes (see README's
+   "Plugin contract" section), then list its key in SIZE_KEYS/COLOR_KEYS. */
 const NODE_ATTRS = {
   op:     {label:"opinion",               get:n=>n.op, fixedDomain:[-1,1]},
   indeg:  {label:"followers (in-degree)", get:n=>n.indeg},
   outdeg: {label:"following (out-degree)",get:n=>n.outdeg},
   total:  {label:"total degree",          get:n=>n.indeg+n.outdeg},
-  pp:     {label:"post probability",      get:n=>n.pp},
-  bc:     {label:"bounded confidence",    get:n=>n.bc},
   opsign: {label:"opinion sign (−/0/+)", categorical:true, cats:["neg","neu","pos"],
            cat:n=> n.op<-0.05?"neg" : n.op>0.05?"pos" : "neu"},
-  hub:    {label:"intervened hub",        categorical:true, cats:["non-hub","hub"],
-           cat:n=> n.hub?"hub":"non-hub"},
 };
-const SIZE_KEYS  = ["indeg","outdeg","total","pp","bc","uniform"];
-const COLOR_KEYS = ["op","indeg","outdeg","total","pp","bc","opsign","hub"];
+const SIZE_KEYS  = ["indeg","outdeg","total","uniform"];
+const COLOR_KEYS = ["op","indeg","outdeg","total","opsign"];
 
 function opColor(v){ /* diverging blue -1 <-> gray 0 <-> red +1 (hover-tip fallback) */
   const dark=theme()==="dark";

@@ -1,5 +1,4 @@
 import os
-import csv
 import re
 import math
 import random
@@ -10,12 +9,11 @@ from .core import result_dir, rnd, decimate
 GRAPH_CACHE = {}
 GRAPH_LOCK = threading.Lock()
 
-# 2026-07-18: agents with |opinion| < this are excluded from every two-camp partition below
-# (RWC, boundary polarization, boundary rho) -- mirrors Analysis.java's isModerate()/
-# ExperimentConfig.moderateBandHalfWidth (Java default 0.2, kept in sync here). Rationale there
-# applies here too: a bare sign(opinion) split has no analog to Conover et al. 2011's "undecidable"
-# exclusion (~5-11% of actively-tweeting users, not force-assigned to a camp).
-MODERATE_BAND_HALF_WIDTH = 0.2
+# Agents with |opinion| < this are excluded from every two-camp partition below
+# (RWC, boundary polarization, boundary rho). Generic default is a plain
+# sign(opinion) split (0.0); set this per-deployment if your model wants a
+# Conover et al. 2011-style "undecidable"/moderate-band exclusion instead.
+MODERATE_BAND_HALF_WIDTH = 0.0
 
 
 def parse_gexf_cached(path: Path):
@@ -146,14 +144,6 @@ def api_trajectories(qs):
         "ids": [ids[a] for a in agent_sel],
         "shown": len(agent_sel), "total": total,
     }
-
-
-def _read_col(path: Path, col: str, caster):
-    try:
-        with open(path, newline="") as f:
-            return [caster(row[col]) for row in csv.DictReader(f)]
-    except (FileNotFoundError, KeyError, ValueError):
-        return None
 
 
 def fit_powerlaw(values):
@@ -435,8 +425,8 @@ STRUCT_CACHE = {}
 STRUCT_LOCK = threading.Lock()
 
 
-def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
-    """Snapshot-level structural metrics from follow/repost graph + Java outputs."""
+def compute_structural(gexf_path: Path):
+    """Snapshot-level structural metrics, computed directly from the GEXF graph."""
     st = os.stat(gexf_path)
     key = str(gexf_path)
     with STRUCT_LOCK:
@@ -484,14 +474,13 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
     dip = dip_diagnostics(opinions)
 
     degree = {
-        "in": _read_col(degree_csv, "inDegree", int),
-        "out": _read_col(degree_csv, "outDegree", int),
+        "in": [d for _, d in G.in_degree()],
+        "out": [d for _, d in G.out_degree()],
     }
-    if degree["in"] is not None and degree["out"] is not None:
-        degree["total"] = [a + b for a, b in zip(degree["in"], degree["out"])]
+    degree["total"] = [a + b for a, b in zip(degree["in"], degree["out"])]
     degree_fit = {k: fit_powerlaw(v) for k, v in degree.items()}
 
-    clustering_vals = _read_col(clustering_csv, "clusteringCoefficient", float)
+    clustering_vals = list(nx.clustering(Gu).values())
     clustering = {
         "values": clustering_vals,
         "mean": round(sum(clustering_vals) / len(clustering_vals), 6) if clustering_vals else None,
@@ -547,17 +536,7 @@ def api_network(qs):
             result = {"steps": steps, "step": s, "stale": i > 0, **payload}
             if want_structural:
                 try:
-                    # 2026-07-15: repost graph structural CSVs are a distinct pair
-                    # (Writer.writeRepostDegrees/writeRepostClusteringCoefficients) written from
-                    # the SAME windowed repostNetwork matrix repostGephi exports here — using the
-                    # follow-graph CSVs for net=repost would silently describe the wrong graph
-                    # (the bug this migration fixes: the degree/clustering panel used to always
-                    # read the follow-graph CSVs regardless of which graph was on screen).
-                    deg_prefix = "repost_degree_result_" if net == "repost" else "degree_result_"
-                    clu_prefix = "repost_clustering_result_" if net == "repost" else "clustering_result_"
-                    result["structural"] = compute_structural(
-                        snaps[s], d / "degrees" / f"{deg_prefix}{s}.csv",
-                        d / "clusterings" / f"{clu_prefix}{s}.csv")
+                    result["structural"] = compute_structural(snaps[s])
                 except Exception as e:
                     result["structuralError"] = f"{type(e).__name__}: {e}"
             return result
