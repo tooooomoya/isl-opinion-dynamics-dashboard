@@ -5,10 +5,17 @@ import math
 import random
 import threading
 from pathlib import Path
-from .core import result_dir, rnd
+from .core import result_dir, rnd, decimate
 
 GRAPH_CACHE = {}
 GRAPH_LOCK = threading.Lock()
+
+# 2026-07-18: agents with |opinion| < this are excluded from every two-camp partition below
+# (RWC, boundary polarization, boundary rho) -- mirrors Analysis.java's isModerate()/
+# ExperimentConfig.moderateBandHalfWidth (Java default 0.2, kept in sync here). Rationale there
+# applies here too: a bare sign(opinion) split has no analog to Conover et al. 2011's "undecidable"
+# exclusion (~5-11% of actively-tweeting users, not force-assigned to a camp).
+MODERATE_BAND_HALF_WIDTH = 0.2
 
 
 def parse_gexf_cached(path: Path):
@@ -22,7 +29,7 @@ def parse_gexf_cached(path: Path):
     G = nx.read_gexf(path)
     with GRAPH_LOCK:
         GRAPH_CACHE[key] = (st.st_size, G)
-        while len(GRAPH_CACHE) > 6:
+        while len(GRAPH_CACHE) > 128:
             GRAPH_CACHE.pop(next(iter(GRAPH_CACHE)))
     return G
 
@@ -51,6 +58,94 @@ def load_network(path: Path):
     edges = [[idx[u], idx[v], round(float(dat.get("weight") or 1.0), 4)]
              for u, v, dat in G.edges(data=True)]
     return {"n": len(nodes), "m": len(edges), "nodes": nodes, "edges": edges}
+
+
+TRAJ_MAX_STEPS = 300          # default per-agent opinion-trajectory decimation
+TRAJ_MAX_AGENTS = 2000        # above this, agents are subsampled (equal stride)
+
+
+def trajectory_data(seed: int, net: str = "follow"):
+    """Per-agent opinion trajectories at GEXF-snapshot cadence.
+
+    Ported from dashboard-remote/yabe's gexf_trajectory_data — but this repo's
+    Java Writer only ever emits a *binned* opinion_result.csv (see
+    core.api_opinion), never a per-agent series, so the GEXF network snapshots
+    already used by the Network Snapshot panel (api_network below) are the
+    only per-agent opinion source available here. Trajectories are therefore
+    only as dense as the snapshot cadence, not per-step — that's inherent to
+    what this pipeline writes, not a decimation choice.
+    """
+    d = result_dir(seed)
+    empty = {"step": [], "agents": [], "ids": []}
+    if d is None or not (d / "GEXF").is_dir():
+        return empty
+    if net == "repost":
+        sub = d / "GEXF" / "repostNW"
+    else:
+        subs = [p for p in (d / "GEXF").iterdir() if p.is_dir() and p.name != "repostNW"]
+        sub = subs[0] if subs else None
+    if sub is None or not sub.is_dir():
+        return empty
+    snaps = {}
+    for f in sub.glob("*.gexf"):
+        m = re.search(r"step_(\d+)\.gexf$", f.name)
+        if m:
+            snaps[int(m.group(1))] = f
+    if not snaps:
+        return empty
+    # nodes are matched across snapshots by GEXF id (a node absent from one
+    # snapshot doesn't desync the other agents' columns, just leaves a gap)
+    steps, agents, id_to_idx = [], [], {}
+    for s in sorted(snaps):
+        try:
+            G = parse_gexf_cached(snaps[s])
+        except Exception:
+            continue    # snapshot still being written; skip it
+        col = len(steps)
+        steps.append(s)
+        for nid in G.nodes:
+            op = G.nodes[nid].get("opinion")
+            if op is None:
+                continue
+            idx = id_to_idx.get(nid)
+            if idx is None:
+                idx = len(agents)
+                id_to_idx[nid] = idx
+                agents.append([None] * col)
+            arr = agents[idx]
+            while len(arr) < col:
+                arr.append(None)
+            arr.append(round(float(op), 4))
+    total = len(steps)
+    for arr in agents:
+        while len(arr) < total:
+            arr.append(None)
+    return {"step": steps, "agents": agents, "ids": list(id_to_idx)}
+
+
+def api_trajectories(qs):
+    """Per-agent opinion trajectories for the Opinion Distribution panel's
+    trajectory view (see trajectory_data). Decimated on both axes so the
+    response stays small even for large-n or long runs."""
+    seed = int(qs.get("seed", ["-1"])[0])
+    net = qs.get("net", ["follow"])[0]
+    max_steps = int(qs.get("max_steps", [str(TRAJ_MAX_STEPS)])[0])
+    data = trajectory_data(seed, net)
+    steps, agents, ids = data["step"], data["agents"], data["ids"]
+    if not steps or not agents:
+        return {"step": [], "agents": [], "ids": [], "shown": 0, "total": 0}
+    idx = decimate(list(range(len(steps))), max_steps)
+    total = len(agents)
+    agent_sel = list(range(total))
+    if total > TRAJ_MAX_AGENTS:
+        stride = math.ceil(total / TRAJ_MAX_AGENTS)
+        agent_sel = agent_sel[::stride]
+    return {
+        "step": [int(steps[i]) for i in idx],
+        "agents": [[rnd(agents[a][i]) for i in idx] for a in agent_sel],
+        "ids": [ids[a] for a in agent_sel],
+        "shown": len(agent_sel), "total": total,
+    }
 
 
 def _read_col(path: Path, col: str, caster):
@@ -207,8 +302,8 @@ def compute_rwc(Gg):
     try:
         nodes = list(Gg.nodes)
         op = {u: float(Gg.nodes[u].get("opinion", 0.0)) for u in nodes}
-        side_x = [u for u in nodes if op[u] >= 0]
-        side_y = [u for u in nodes if op[u] < 0]
+        side_x = [u for u in nodes if op[u] >= MODERATE_BAND_HALF_WIDTH]
+        side_y = [u for u in nodes if op[u] <= -MODERATE_BAND_HALF_WIDTH]
         if not side_x or not side_y:
             return {"unavailable": "one-sided"}
         k = min(max(3, int(round(0.01 * n))), len(side_x), len(side_y))
@@ -246,6 +341,96 @@ def compute_rwc(Gg):
         return {"unavailable": "error", "detail": f"{type(e).__name__}: {e}"[:200]}
 
 
+def _camps(Gg):
+    """Two-camp partition on Gg's 'opinion' node attribute, excluding the moderate band."""
+    op = {u: float(Gg.nodes[u].get("opinion", 0.0)) for u in Gg.nodes}
+    g1 = {u for u in Gg.nodes if op[u] >= MODERATE_BAND_HALF_WIDTH}
+    g2 = {u for u in Gg.nodes if op[u] <= -MODERATE_BAND_HALF_WIDTH}
+    return op, g1, g2
+
+
+def compute_boundary_polarization(Gg):
+    """Guerra et al. 2013's community-boundary polarization measure P.
+
+    Unlike modularity, which conflates homophily and antagonism in one number, P isolates
+    antagonism: for each "boundary" node (has >=1 edge to the other camp AND >=1 edge to an
+    own-camp neighbor that has NO edges to the other camp at all), compare how much it prefers
+    internal-only neighbors over opposite-boundary neighbors. P in (-0.5, +0.5); P>0 = boundary
+    nodes favor their own camp despite having crossed it (antagonism); P<0 = boundary nodes cross
+    more than expected (no polarization, e.g. NY Giants/Knicks fans in the source paper); P is
+    undefined (no boundary at all) when the two camps have zero edges between them.
+    """
+    try:
+        _, g1, g2 = _camps(Gg)
+        if not g1 or not g2:
+            return {"unavailable": "one-sided"}
+        touches_other = {}
+        for u in g1:
+            other = g2
+            touches_other[u] = any(v in other for v in Gg.neighbors(u))
+        for u in g2:
+            other = g1
+            touches_other[u] = any(v in other for v in Gg.neighbors(u))
+
+        def boundary_of(own):
+            b = set()
+            for u in own:
+                if not touches_other[u]:
+                    continue
+                if any(w in own and not touches_other.get(w, False) for w in Gg.neighbors(u)):
+                    b.add(u)
+            return b
+
+        b12 = boundary_of(g1)  # boundary nodes on the g1 side
+        b21 = boundary_of(g2)  # boundary nodes on the g2 side
+        boundary = b12 | b21
+        if not boundary:
+            return {"unavailable": "empty-boundary"}
+
+        p_vals = []
+        for v in boundary:
+            own, opp_boundary = (g1, b21) if v in g1 else (g2, b12)
+            d_int = sum(1 for w in Gg.neighbors(v) if w in own and w not in boundary)
+            d_b = sum(1 for w in Gg.neighbors(v) if w in opp_boundary)
+            denom = d_int + d_b
+            if denom == 0:
+                continue
+            p_vals.append(d_int / denom - 0.5)
+        if not p_vals:
+            return {"unavailable": "no-scorable-boundary-nodes"}
+        P = sum(p_vals) / len(p_vals)
+        return {"P": round(P, 4), "boundarySize": len(boundary), "b12": len(b12), "b21": len(b21)}
+    except Exception as e:
+        return {"unavailable": "error", "detail": f"{type(e).__name__}: {e}"[:200]}
+
+
+def compute_boundary_rho(Gg):
+    """Guerra et al. 2013 sec. 6: Spearman correlation between overall degree rank and
+    cross-camp-connection rank. High rho = popular nodes concentrate at the camp boundary
+    (absence of polarization -- popular nodes enjoy support from both sides); low rho = popular
+    nodes avoid the boundary (polarization -- extreme voices aren't endorsed cross-camp)."""
+    try:
+        _, g1, g2 = _camps(Gg)
+        nodes = list(g1 | g2)
+        if len(nodes) < 4:
+            return {"unavailable": "too-few", "n": len(nodes)}
+        deg = dict(Gg.degree())
+
+        def cross_count(u):
+            other = g2 if u in g1 else g1
+            return sum(1 for w in Gg.neighbors(u) if w in other)
+
+        r = [deg[u] for u in nodes]
+        rb = [cross_count(u) for u in nodes]
+        from scipy.stats import spearmanr
+        rho, pval = spearmanr(r, rb)
+        if rho != rho:  # NaN (e.g. rb is constant across all nodes)
+            return {"unavailable": "degenerate", "n": len(nodes)}
+        return {"rho": round(float(rho), 4), "p": round(float(pval), 4), "n": len(nodes)}
+    except Exception as e:
+        return {"unavailable": "error", "detail": f"{type(e).__name__}: {e}"[:200]}
+
+
 STRUCT_CACHE = {}
 STRUCT_LOCK = threading.Lock()
 
@@ -262,7 +447,7 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
     G = parse_gexf_cached(gexf_path)
     Gu = G.to_undirected()
     giant_frac, lambda2, bc_mean, bc_top = None, None, None, []
-    rwc = None
+    rwc, boundary_p, boundary_rho = None, None, None
     n_nodes, n_edges = Gu.number_of_nodes(), Gu.number_of_edges()
     avg_degree = round(2 * n_edges / n_nodes, 4) if n_nodes else None
     density = round(nx.density(Gu), 6) if n_nodes > 1 else None
@@ -292,6 +477,8 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
                 except Exception:
                     avg_path_length, diameter = None, None
         rwc = compute_rwc(Gg)
+        boundary_p = compute_boundary_polarization(Gg)
+        boundary_rho = compute_boundary_rho(Gg)
 
     opinions = [float(G.nodes[nid].get("opinion", 0.0)) for nid in G.nodes]
     dip = dip_diagnostics(opinions)
@@ -314,13 +501,13 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
         "giantComponentFrac": giant_frac, "lambda2": lambda2,
         "betweenness": {"mean": bc_mean, "top": bc_top},
         "degree": degree, "degreeFit": degree_fit, "clustering": clustering,
-        "rwc": rwc, "dip": dip,
+        "rwc": rwc, "dip": dip, "boundaryP": boundary_p, "boundaryRho": boundary_rho,
         "nNodes": n_nodes, "nEdges": n_edges, "avgDegree": avg_degree,
         "density": density, "avgPathLength": avg_path_length, "diameter": diameter,
     }
     with STRUCT_LOCK:
         STRUCT_CACHE[key] = (st.st_size, payload)
-        while len(STRUCT_CACHE) > 8:
+        while len(STRUCT_CACHE) > 128:
             STRUCT_CACHE.pop(next(iter(STRUCT_CACHE)))
     return payload
 

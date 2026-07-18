@@ -41,17 +41,95 @@
     --shadow-card:0 1px 2px rgba(0,0,0,.4);
   }
   * { box-sizing:border-box; margin:0; }
+  /* fixed-viewport app shell (ported from dashboard-remote/yabe): the page
+     itself no longer scrolls — #rail stays put and each active .tabpanel
+     manages its own internal scroll region, so switching tabs never loses
+     scroll position and the rail/header are always visible. */
+  html, body { height:100%; }
   body { background:var(--page); color:var(--ink);
-    font:14px/1.45 'Inter',-apple-system,system-ui,"Segoe UI",sans-serif; padding:34px 38px 48px; }
+    font:14px/1.45 'Inter',-apple-system,system-ui,"Segoe UI",sans-serif; padding:0;
+    display:flex; height:100vh; overflow:hidden; align-items:stretch; }
   h1 { font-size:21px; font-weight:800; letter-spacing:-0.02em; }
   h3 { font-size:12.5px; font-weight:600; color:var(--ink2); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   h3.big { font-size:15px; font-weight:700; color:var(--ink); }
   .eyebrow { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.09em; }
   .sectiontitle { font-size:15px; font-weight:700; color:var(--ink); margin-top:4px; }
-  header.top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:20px; }
-  .titleblock { display:flex; flex-direction:column; gap:6px; }
+  header.top { flex:none; display:flex; justify-content:flex-end; align-items:flex-start; gap:20px; flex-wrap:wrap; margin-bottom:20px; }
   .statusline { display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--muted); }
   .statusline svg { flex:none; }
+
+  /* ---------- app sidebar (rail) + tab structure ----------
+     Layout shape ported from dashboard-remote/yabe (sidebar navigation + 3-tab
+     split: Time Series / Opinion-Outcome / Network); colors/typography stay on
+     this dashboard's own design tokens rather than yabe's palette. Panel
+     contents/metrics are unchanged — this only regroups existing cards
+     under tabs and adds the rail shell around them. */
+  #rail { flex:0 0 216px; width:216px; min-height:100vh; padding:16px 12px;
+    display:flex; flex-direction:column; gap:14px; overflow:hidden;
+    background:var(--panel-soft); border-right:1px solid var(--border);
+    position:sticky; top:0; align-self:flex-start; height:100vh;
+    transition:flex-basis .18s ease, width .18s ease, padding .18s ease; }
+  .rail-head { display:grid; grid-template-columns:30px minmax(0,1fr) 26px; gap:8px; align-items:start; min-width:0; }
+  .rail-logo { width:30px; height:30px; border-radius:9px; display:grid; place-items:center;
+    color:#fff; background:var(--accent); font-size:15px; font-weight:700; line-height:1; }
+  .rail-brand { min-width:0; padding-top:1px; }
+  .rail-brand h1 { font-size:13.5px; font-weight:800; letter-spacing:-0.01em; line-height:1.25; white-space:normal; }
+  .rail-brand .statusline { margin-top:7px; align-items:flex-start; white-space:normal; font-size:10.5px; line-height:1.35; }
+  #railToggle { width:26px; height:26px; padding:0; border-radius:8px; font-size:14px; }
+  .rail-section-label { padding:0 8px; color:var(--muted); font-size:10px; font-weight:700;
+    letter-spacing:.08em; text-transform:uppercase; white-space:nowrap; }
+  .tabnav { display:flex; flex-direction:column; gap:4px; margin:0; padding:0; }
+  .tabbtn { position:relative; width:100%; min-height:38px; display:grid;
+    grid-template-columns:22px minmax(0,1fr); gap:8px; align-items:center; padding:7px 9px;
+    border:1px solid transparent; border-radius:8px; background:transparent; color:var(--ink2);
+    text-align:left; font:12.5px/1 'Inter',sans-serif; font-weight:600; cursor:pointer; }
+  .tabbtn::before { content:""; position:absolute; left:-9px; top:7px; bottom:7px; width:3px;
+    border-radius:0 3px 3px 0; background:transparent; }
+  .tabbtn:hover { background:var(--grid); color:var(--ink); }
+  .tabbtn.active { background:var(--lapis-50); border-color:var(--lapis-100); color:var(--ink); }
+  .tabbtn.active::before { background:var(--accent); }
+  .tab-icon { width:22px; height:22px; display:grid; place-items:center; color:var(--muted); }
+  .tab-icon svg { width:18px; height:18px; display:block; fill:none; stroke:currentColor; stroke-width:1.8;
+    stroke-linecap:round; stroke-linejoin:round; }
+  .tabbtn.active .tab-icon { color:var(--lapis-ink); }
+  .tab-label { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rail-spacer { flex:1 1 auto; }
+  .rail-footer { display:flex; flex-direction:column; gap:5px; padding-top:10px; border-top:1px solid var(--border); }
+  .rail-footer button { width:100%; display:grid; grid-template-columns:22px minmax(0,1fr); gap:8px;
+    align-items:center; padding:6px 9px; border-radius:8px; background:transparent; border:1px solid transparent;
+    color:var(--ink2); text-align:left; }
+  .rail-footer button:hover { background:var(--grid); color:var(--ink); }
+  .theme-icon, .help-icon { font-size:15px; text-align:center; }
+  .rail-action-label { white-space:nowrap; }
+  body.sidebar-compact #rail { flex-basis:56px; width:56px; padding-inline:7px; }
+  body.sidebar-compact .rail-head { grid-template-columns:1fr; justify-items:center; }
+  body.sidebar-compact .rail-brand, body.sidebar-compact .rail-section-label,
+  body.sidebar-compact .tab-label, body.sidebar-compact .rail-action-label { display:none; }
+  body.sidebar-compact .tabbtn, body.sidebar-compact .rail-footer button {
+    width:40px; grid-template-columns:22px; justify-content:center; padding-inline:7px; }
+  body.sidebar-compact #railToggle { transform:rotate(180deg); }
+  #appShell { flex:1 1 auto; min-width:0; height:100vh; min-height:100vh; overflow:hidden;
+    display:flex; flex-direction:column; padding:16px 24px 20px; }
+  /* the active tabpanel fills whatever height header/banner/seedbar leave behind
+     and scrolls its own content — the outer page (rail, header) never scrolls. */
+  .tabpanel { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  /* !important: the per-tab display:flex overrides below (higher specificity
+     than the browser default `[hidden]{display:none}`) would otherwise beat
+     a plain-specificity override and leave a hidden tabpanel rendered. */
+  .tabpanel[hidden] { display:none !important; }
+  #banner, #seedbar { flex:none; }
+  #metricsHeader { flex:none; margin-top:10px; }
+  .tabpanel[data-tabpanel="timeseries"] { display:flex; flex-direction:column; overflow:hidden; }
+  .tabpanel[data-tabpanel="timeseries"] > main { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  /* opinion/outcome tab: fills its full height instead of scrolling — trajectories/
+     heatmap (left) gets more width than the 2-D outcome plane (right), matching
+     yabe's 3:2 split for this pair. Ported from dashboard-remote/yabe. */
+  .tabpanel[data-tabpanel="opinion"] { display:flex; flex-direction:column; overflow:hidden; }
+  .tabpanel[data-tabpanel="opinion"] > #topPairRow { flex:1 1 auto; min-height:0; }
+  .tabpanel[data-tabpanel="opinion"] > #topPairRow > .panel.card { resize:none; min-width:0; min-height:0; }
+  .tabpanel[data-tabpanel="opinion"] #opinion svg, .tabpanel[data-tabpanel="opinion"] #plane svg { width:100%; height:100%; }
+  .tabpanel[data-tabpanel="opinion"] > #topPairRow > [data-card="opinion"].panel.card { flex:3 1 380px; }
+  .tabpanel[data-tabpanel="opinion"] > #topPairRow > [data-card="plane"].panel.card { flex:2 1 320px; }
   .grow { flex:1; min-width:140px; align-self:center; }
   .bar { height:6px; background:var(--grid); border-radius:3px; overflow:hidden; }
   .bar > div { height:100%; background:var(--accent); border-radius:3px; transition:width .5s; }
@@ -70,14 +148,14 @@
   }
   input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
   input[type="color"]::-webkit-color-swatch { border: none; border-radius: 5px; }
-  #banner { border-radius:10px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
+  #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
   #seedbar { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; margin-bottom:10px; }
   .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
     border-radius:999px; padding:7px 14px; font-size:11.5px; cursor:pointer; user-select:none; }
   .chip.off { opacity:.4; }
-  .chip .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .chip .dot { width:9px; height:9px; border-radius:50%; flex:none; }
   .chip b { font-weight:700; }
   .chip .st { font-size:11px; font-weight:600; }
   .chip .st.done { color:var(--good); } .chip .st.failed { color:var(--bad); } .chip .st.running { color:var(--warn); }
@@ -91,12 +169,17 @@
     background:linear-gradient(135deg, var(--lapis-mid), var(--accent)); box-shadow:0 2px 8px rgba(30,58,114,.28); }
   details#picker { margin-bottom:10px; font-size:11.5px; }
   details#picker summary { cursor:pointer; color:var(--ink2); width:fit-content; }
-  #pickerlist { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:2px 14px;
-    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; margin-top:6px;
+  /* denser single-column hover-list, ported from dashboard-remote/yabe's
+     #pickerlist — same flat "all available columns, alphabetical" content as
+     before, just tighter rows instead of a multi-column grid. */
+  #pickerlist { display:flex; flex-direction:column; gap:1px;
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:6px; margin-top:6px;
     max-height:260px; overflow-y:auto; }
-  #pickerlist label { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--ink2); cursor:pointer;
+  #pickerlist label { display:flex; gap:6px; align-items:center; min-height:30px; padding:2px 6px;
+    border-radius:6px; font-size:12px; color:var(--ink2); cursor:pointer;
     white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .duo, .trio { display:flex; flex-wrap:wrap; gap:20px; }
+  #pickerlist label:hover { background:var(--grid); }
+  .duo, .trio { display:flex; flex-wrap:wrap; gap:8px; }
   /* Metric charts live in a fixed 2-tier layout instead of free-resize:
      row 1 = a horizontal carousel of small cards (~4.5 visible, any number),
      row 2 = up to 2 large "featured" cards. A card's size is set by which row
@@ -107,26 +190,44 @@
     border-radius:10px; cursor:pointer; color:var(--ink2); font-size:18px; padding:0 8px; line-height:1; }
   .carbtn:hover { background:var(--panel-soft); color:var(--ink); }
   .carbtn[disabled] { opacity:0.3; cursor:default; }
-  #gridCarousel { display:flex; gap:20px; overflow-x:auto; scroll-snap-type:x proximity;
+  #gridCarousel { display:flex; gap:8px; overflow-x:auto; scroll-snap-type:x proximity;
     scroll-behavior:smooth; flex:1 1 auto; padding-bottom:4px; }
   #gridCarousel > .metriccard { flex:0 0 clamp(240px, 22%, 340px); scroll-snap-align:start; }
-  #gridFeature { display:flex; flex-wrap:wrap; gap:20px; margin-bottom:16px; }
+  #gridFeature { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   #gridFeature:empty { display:none; }
   #gridFeature > .metriccard { flex:1 1 calc(50% - 10px); min-width:min(100%, 420px); }
-  .metriccard { position:relative; }
-  .enlargebtn { position:absolute; top:8px; right:10px; cursor:pointer; color:var(--muted);
+  .enlargebtn { position:absolute; top:6px; right:8px; cursor:pointer; color:var(--muted);
     font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
-    z-index:1; background:none; border:none; }
-  .enlargebtn:hover { background:var(--panel-soft); color:var(--ink); }
-  .panel { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 18px 12px;
+    z-index:1; background:none; border:none; opacity:.38; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .metriccard:hover .enlargebtn, .metriccard:focus-within .enlargebtn,
+  .enlargebtn:hover, .enlargebtn:focus-visible { opacity:1; background:var(--panel-soft); color:var(--ink); }
+  .panel { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px 6px;
     box-shadow:var(--shadow-card); }
   .panel svg { display:block; width:100%; height:auto; }
+  /* Chart/metric cards (.metriccard, .panel.card) use whitespace + a single top
+     border instead of a raised boxed surface — ported from dashboard-remote/yabe's
+     flat grid-card treatment ("less visual noise" per docs/tasks/dashboard_design_refinement/).
+     Plain .panel (section wrappers like Network Structure/Behavior, stat tiles)
+     keeps the boxed look above, since those aren't individually drag/resize units. */
+  .metriccard { position:relative; background:transparent; border:0; border-top:1px solid var(--border);
+    border-radius:0; padding:5px 4px 1px; box-shadow:none; transition:border-color .12s ease; }
+  .metriccard:hover, .metriccard:focus-within { border-top-color:var(--axis); }
   /* .card = user-resizable/reorderable unit. Plain .panel (no .card) is left alone -
      used for the big section wrappers, which aren't individually resized. */
   .panel.card { display:flex; flex-direction:column; position:relative;
-    resize:vertical; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px; }
+    resize:vertical; overflow:hidden; min-width:220px; min-height:150px; flex:1 1 320px;
+    background:transparent; border:0; border-top:1px solid var(--border); border-radius:0;
+    padding:5px 4px 1px; box-shadow:none; transition:border-color .12s ease; }
+  .panel.card:hover, .panel.card:focus-within { border-top-color:var(--axis); }
   .trio > .panel.card { flex-basis:260px; }
   .duo > .panel.card { flex-basis:420px; }
+  /* native resize handle can't be themed consistently; reveal the bottom-right
+     drag target only on hover/focus so it doesn't add visual noise at rest. */
+  .duo > .panel.card::after, .trio > .panel.card::after { content:""; position:absolute; right:1px; bottom:1px;
+    width:11px; height:11px; pointer-events:none; opacity:0; transition:opacity .12s ease;
+    background:linear-gradient(135deg, transparent 48%, var(--muted) 49% 57%, transparent 58% 68%, var(--muted) 69% 77%, transparent 78%); }
+  .duo > .panel.card:hover::after, .trio > .panel.card:hover::after,
+  .duo > .panel.card:focus-within::after, .trio > .panel.card:focus-within::after { opacity:.75; }
   .cardbody { flex:1 1 auto; min-height:0; overflow:auto; }
   /* dynamic mini-cards (makeCard()) put text/values at the very top of the body,
      which the absolutely-positioned .draghandle (top:8px) can sit on top of -
@@ -135,13 +236,16 @@
      since they fill the card edge-to-edge and don't have that overlap problem. */
   .cardbody-pad { padding-top:14px; }
   .cardbody canvas { width:100%; height:100%; display:block; }
-  .draghandle { position:absolute; top:8px; right:10px; cursor:grab; color:var(--muted);
-    font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1; }
-  .draghandle:hover { background:var(--panel-soft); color:var(--ink); }
+  .draghandle { position:absolute; top:4px; right:5px; cursor:grab; color:var(--muted);
+    font-size:13px; user-select:none; padding:1px 4px; border-radius:4px; line-height:1.4; z-index:1;
+    opacity:.38; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .panel.card:hover .draghandle, .panel.card:focus-within .draghandle,
+  .draghandle:hover, .draghandle:focus-visible { opacity:1; background:var(--panel-soft); color:var(--ink); }
+  .draghandle:active { cursor:grabbing; }
   .panel.card.dragging { opacity:0.35; }
   .panel.card.drop-before { box-shadow: inset 3px 0 0 var(--accent); }
   .panel.card.drop-after { box-shadow: inset -3px 0 0 var(--accent); }
-  .stattile { background:var(--panel-soft); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+  .stattile { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; }
   .stattile .lbl { font-size:11px; color:var(--muted); }
   .stattile .val { font-size:20px; font-weight:600; font-variant-numeric:tabular-nums; }
   /* compact list of value-only structural stats (no chart) bundled into one card */
@@ -165,14 +269,42 @@
   #tooltip .trow { display:flex; gap:8px; justify-content:space-between; font-variant-numeric:tabular-nums; }
   #tooltip .trow .dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; }
   #tooltip .thead { color:var(--muted); margin-bottom:2px; }
-  #logdrawer { position:fixed; top:0; right:0; bottom:0; width:min(560px,90vw); background:var(--surface);
+  #logdrawer, #helpdrawer { position:fixed; top:0; right:0; bottom:0; width:min(560px,90vw); background:var(--surface);
     border-left:1px solid var(--border); box-shadow:-8px 0 24px rgba(0,0,0,.25); z-index:20;
     display:flex; flex-direction:column; }
-  #logdrawer[hidden] { display:none; }
-  #logdrawer header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px;
+  #logdrawer[hidden], #helpdrawer[hidden] { display:none; }
+  #logdrawer header, #helpdrawer header { display:flex; justify-content:space-between; align-items:center; padding:10px 14px;
     border-bottom:1px solid var(--border); font-size:13px; font-weight:600; }
   #logdrawer pre { flex:1; overflow:auto; margin:0; padding:12px 14px; font:11px/1.5 ui-monospace,Menlo,monospace;
     color:var(--ink2); white-space:pre-wrap; }
+  .helpcontent { flex:1; overflow-y:auto; margin:0; padding:16px 20px; font-size:12.5px; line-height:1.5; color:var(--ink2); }
+  .helpcontent h2 { font-size:14px; font-weight:700; color:var(--ink); margin:20px 0 10px; border-bottom:1px solid var(--border); padding-bottom:4px; }
+  .helpcontent h2:first-of-type { margin-top:0; }
+  .helpcontent p { margin:0 0 10px; }
+  .helpcontent ul { margin:0 0 12px; padding-left:20px; }
+  .helpcontent li { margin-bottom:6px; }
+  .helpcontent code { font-family:ui-monospace,Menlo,monospace; font-size:11px; background:var(--panel-soft); padding:2px 4px; border-radius:4px; }
+  .helpcontent .metric-entry { margin-bottom:12px; padding-bottom:10px; border-bottom:1px dashed var(--border); }
+  .helpcontent .metric-entry:last-child { border-bottom:none; }
+  .helpcontent .metric-name { font-weight:700; color:var(--ink); font-family:ui-monospace,Menlo,monospace; font-size:12.5px; }
+  .infobtn { position:absolute; top:6px; right:32px; cursor:pointer; color:var(--muted);
+    font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
+    z-index:1; background:none; border:none; opacity:.38; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .metriccard:hover .infobtn, .metriccard:focus-within .infobtn,
+  .infobtn:hover, .infobtn:focus-visible { opacity:1; background:var(--panel-soft); color:var(--ink); }
+  .savebtn { position:absolute; top:6px; right:56px; cursor:pointer; color:var(--muted);
+    font-size:14px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
+    z-index:1; background:none; border:none; opacity:.38; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .metriccard:hover .savebtn, .metriccard:focus-within .savebtn,
+  .savebtn:hover, .savebtn:focus-visible { opacity:1; background:var(--panel-soft); color:var(--ink); }
+  .card-save-btn { position:absolute; top:4px; right:28px; cursor:pointer; color:var(--muted);
+    font-size:12px; user-select:none; padding:1px 5px; border-radius:4px; line-height:1.4;
+    z-index:2; background:none; border:none; opacity:0; transition:opacity .12s ease, background .12s ease, color .12s ease; }
+  .panel.card:hover .card-save-btn, .panel.card:focus-within .card-save-btn,
+  .card-save-btn:hover, .card-save-btn:focus-visible { opacity:1; background:var(--panel-soft); color:var(--ink); }
+  .section-info-btn { display:inline-block; margin-left:6px; cursor:pointer; color:var(--muted);
+    font-size:13px; font-weight:normal; user-select:none; vertical-align:middle; background:none; border:none; padding:2px; }
+  .section-info-btn:hover { color:var(--ink); }
   .subnote { font-size:11px; color:var(--muted); margin:-2px 0 4px; }
   .scrubrow { display:flex; gap:8px; align-items:center; margin:2px 0 6px; }
   .scrubrow input[type=range] { flex:1; accent-color:var(--accent); }
@@ -208,12 +340,12 @@
   .cp-modal { position:fixed; inset:0; z-index:40; display:flex; align-items:center; justify-content:center; }
   .cp-modal[hidden] { display:none; }
   .cp-backdrop { position:absolute; inset:0; background:rgba(0,0,0,.35); }
-  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  .cp-box { position:relative; background:var(--surface); border:1px solid var(--border); border-radius:10px;
     padding:16px; width:260px; box-shadow:0 12px 40px rgba(0,0,0,.35); }
   .cp-handle { cursor:move; font-size:10.5px; color:var(--muted); text-align:center;
     margin:-16px -16px 10px; padding:5px; border-bottom:1px solid var(--border);
-    border-radius:14px 14px 0 0; user-select:none; }
-  .cp-sv { position:relative; width:100%; height:150px; border-radius:8px; cursor:crosshair; margin-bottom:10px;
+    border-radius:10px 10px 0 0; user-select:none; }
+  .cp-sv { position:relative; width:100%; height:150px; border-radius:6px; cursor:crosshair; margin-bottom:10px;
     background-image:linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 100%),
                       linear-gradient(to right, #fff 0%, rgba(255,255,255,0) 100%); }
   .cp-svcursor { position:absolute; width:12px; height:12px; border-radius:50%; border:2px solid #fff;
@@ -232,14 +364,43 @@
 </head>
 <body>
 
-<header class="top">
-  <div class="titleblock">
-    <h1>run.sh live dashboard</h1>
-    <div class="statusline">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
-      <span id="ostats">–</span>
+<aside id="rail" aria-label="app sidebar">
+  <div class="rail-head">
+    <div class="rail-logo">&#8776;</div>
+    <div class="rail-brand">
+      <h1>run.sh live dashboard</h1>
+      <div class="statusline">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span id="ostats">–</span>
+      </div>
     </div>
+    <button id="railToggle" type="button" title="toggle app sidebar" aria-label="compact app sidebar" aria-expanded="true">&#8249;</button>
   </div>
+  <div class="rail-section-label">Views</div>
+  <nav class="tabnav">
+    <button class="tabbtn active" data-tab="timeseries" title="Time Series">
+      <span class="tab-icon"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l4-5 4 3 5-7"/></svg></span>
+      <span class="tab-label">Time Series</span>
+    </button>
+    <button class="tabbtn" data-tab="opinion" title="Opinion / Outcome">
+      <span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg></span>
+      <span class="tab-label">Opinion / Outcome</span>
+    </button>
+    <button class="tabbtn" data-tab="network" title="Network">
+      <span class="tab-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="6" r="2.4"/><circle cx="19" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M6.9 7.2 10.4 16M17.1 7.2 13.6 16M7.4 6h9.2"/></svg></span>
+      <span class="tab-label">Network</span>
+    </button>
+  </nav>
+  <div class="rail-spacer"></div>
+  <div class="rail-footer">
+    <button id="helpbtn" title="show help and reference"><span class="help-icon">ⓘ</span><span class="rail-action-label">Help</span></button>
+    <button id="theme" title="toggle theme"><span class="theme-icon">&#9681;</span><span class="rail-action-label">Theme</span></button>
+  </div>
+</aside>
+
+<div id="appShell">
+
+<header class="top">
   <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
   <div class="controls">
     <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
@@ -252,30 +413,43 @@
         title="moving-average window, in samples. Blank = auto (~120 points across the visible range)."></label>
     <label class="ctl"><input type="checkbox" id="showmean"> show mean</label>
     <button id="resetzoom" hidden>reset zoom</button>
-    <button id="theme" class="iconbtn" title="toggle theme">&#9681;</button>
   </div>
 </header>
 
 <div id="banner" hidden></div>
 <div id="seedbar"></div>
 
-<div style="margin-top:30px">
-  <div class="eyebrow">Metrics</div>
-  <div class="sectiontitle">Trends over time</div>
-  <div id="metricChips"></div>
-  <details id="picker"><summary>more metrics&hellip;</summary><div id="pickerlist"></div></details>
+<div class="tabpanel" data-tabpanel="timeseries">
+  <div id="metricsHeader">
+    <div class="eyebrow">Metrics</div>
+    <div class="sectiontitle">Trends over time <button class="section-info-btn" data-help="timeseries" title="About this section">ⓘ</button></div>
+    <div id="metricChips"></div>
+    <details id="picker"><summary>more metrics&hellip;</summary><div id="pickerlist"></div></details>
+  </div>
+  <main>
+    <div class="carousel-wrap">
+      <button class="carbtn" id="carPrev" title="scroll left" aria-label="scroll left">&lsaquo;</button>
+      <div id="gridCarousel"></div>
+      <button class="carbtn" id="carNext" title="scroll right" aria-label="scroll right">&rsaquo;</button>
+    </div>
+    <div id="gridFeature"></div>
+  </main>
 </div>
 
-<main>
-  <div class="carousel-wrap">
-    <button class="carbtn" id="carPrev" title="scroll left" aria-label="scroll left">&lsaquo;</button>
-    <div id="gridCarousel"></div>
-    <button class="carbtn" id="carNext" title="scroll right" aria-label="scroll right">&rsaquo;</button>
-  </div>
-  <div id="gridFeature"></div>
+<div class="tabpanel" data-tabpanel="opinion" hidden>
   <div class="duo" id="topPairRow">
+    <section class="panel card" data-card="opinion">
+      <h3 class="big">Opinion Distribution <button class="section-info-btn" data-help="opinion" title="About this section">ⓘ</button> <select id="opseed"></select>
+        <select id="opview" title="trajectories = per-agent paths (x=step, y=opinion) at GEXF snapshot cadence; 3D distribution = waterfall plot showing 2D density surface">
+          <option value="traj">trajectories</option>
+          <option value="heat">3D distribution</option>
+        </select></h3>
+      <div class="subnote" id="opinionSubnote">per-agent trajectories: one faint line per agent, colored by final opinion (GEXF snapshot cadence, sparser than the 3D distribution).</div>
+      <div id="opinion" class="cardbody"></div>
+      <div class="leg" id="opleg"></div>
+    </section>
     <section class="panel card" data-card="plane">
-      <h3 class="big">Outcome Plane
+      <h3 class="big">Outcome Plane <button class="section-info-btn" data-help="plane" title="About this section">ⓘ</button>
         <select id="px"></select> &times; <select id="py"></select>
       </h3>
       <div class="subnote">trajectory per seed, faint&rarr;solid = early&rarr;late; dot = scrub position (zoom window applies); drag the slider to rewind</div>
@@ -287,16 +461,13 @@
       </div>
       <div id="plane" class="cardbody"></div>
     </section>
-    <section class="panel card" data-card="opinion">
-      <h3 class="big">Opinion Distribution <select id="opseed"></select></h3>
-      <div class="subnote">density heatmap: per-step share of agents across opinion bins
-        (&minus;1 bottom &harr; +1 top), color = share (results/&hellip;/opinion/opinion_result.csv).</div>
-      <div id="opinion" class="cardbody"></div>
-      <div class="leg" id="opleg"></div>
-    </section>
   </div>
-  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot" style="margin-top:30px">
-    <h3 class="big">Network Snapshot
+</div>
+
+<div class="tabpanel" data-tabpanel="network" hidden>
+  <main>
+  <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
+    <h3 class="big">Network Snapshot <button class="section-info-btn" data-help="network" title="About this section">ⓘ</button>
       <select id="netseed"></select>
       <select id="nettype">
         <option value="follow">follow graph</option>
@@ -312,14 +483,28 @@
         <input type="number" id="netwmax" min="0" step="1" placeholder="max" style="width:5.5em">
       </label>
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
+      <label class="ctl" title="force = d3-style spring/repulsion; ForceAtlas2 = Gephi-style, degree-weighted repulsion with linear falloff and central gravity">layout
+        <select id="netlayout">
+          <option value="force">force</option>
+          <option value="forceAtlas2">ForceAtlas2</option>
+        </select>
+      </label>
       <button id="netreheat" title="restart the force layout">&#10227; re-layout</button>
       <span id="netinfo" class="subnote"></span>
     </h3>
-    <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber):
-      node radius and color are mapped from the attributes chosen above (default radius &prop; &radic;followers,
-      color = opinion, blue &minus;1 &harr; red +1); ringed = intervened hub.
+    <div class="subnote">live force-directed layout (after soramame0518/Social-Media-Echo-Chamber; ForceAtlas2
+      variant ported from dashboard-remote/yabe): node radius and color are mapped from the attributes chosen
+      above (default radius &prop; &radic;followers, color = opinion, blue &minus;1 &harr; red +1); ringed = intervened hub.
       Positions carry over between snapshots, so stepping through time shows the sorting happen.
       Drag this card's bottom-right corner to resize the canvas.</div>
+    <div id="netfa2controls" class="scrubrow" style="flex-wrap:wrap" hidden>
+      <label class="ctl">repulsion <input type="number" id="netrepulsion" min="0" max="20" step="0.1" style="width:4.5em"></label>
+      <label class="ctl">attraction <input type="number" id="netattraction" min="0" max="20" step="0.1" style="width:4.5em"></label>
+      <label class="ctl">gravity <input type="number" id="netgravity" min="0" max="20" step="0.1" style="width:4.5em"></label>
+      <label class="ctl">velocity retention <input type="number" id="netdamping" min="0.05" max="0.99" step="0.05" style="width:4.5em"></label>
+      <label class="ctl"><input type="checkbox" id="netpreventoverlap"> prevent overlap</label>
+      <button id="netlayoutreset" type="button" title="reset ForceAtlas2 settings to defaults">reset layout settings</button>
+    </div>
     <div id="netcolorbar" class="colorbar-row"></div>
     <div id="netcolorctl" class="scrubrow" style="flex-wrap:wrap"></div>
     <div class="scrubrow">
@@ -327,13 +512,13 @@
       <input type="range" id="netScrub" min="0" max="0" value="0" step="1">
       <span id="netScrubLabel" class="subnote">&ndash;</span>
     </div>
-    <canvas id="network" class="cardbody" style="border-radius:10px; min-height:550px; background:var(--panel-soft)"></canvas>
+    <canvas id="network" class="cardbody" style="border-radius:10px; min-height:60vh; background:var(--panel-soft)"></canvas>
     <div class="leg" id="netleg"></div>
   </section>
-
+ 
   <section class="panel" style="margin-top:30px">
     <div class="eyebrow">Structure</div>
-    <h3 class="big">Network Structure <span id="structinfo" class="subnote"></span></h3>
+    <h3 class="big">Network Structure <button class="section-info-btn" data-help="structure" title="About this section">ⓘ</button> <span id="structinfo" class="subnote"></span></h3>
     <div class="subnote">same seed/step as the network snapshot above (undirected, giant-component-only for
       betweenness/&lambda;<sub>2</sub> &mdash; matches journal.tex's convention; degree distribution and
       clustering coefficient always describe the follow graph, the only one Java writes per-step CSVs for).
@@ -343,17 +528,20 @@
     <div id="structRow" class="trio" style="margin-top:10px"></div>
     <div id="qsignEiRow" class="duo" style="margin-top:10px"></div>
   </section>
-
+ 
   <section class="panel" style="margin-top:30px">
     <div class="eyebrow">Behavior</div>
-    <h3 class="big">Agent Behavior &amp; Attributes <span id="attrSeedNote" class="subnote"></span></h3>
+    <h3 class="big">Agent Behavior &amp; Attributes <button class="section-info-btn" data-help="behavior" title="About this section">ⓘ</button> <span id="attrSeedNote" class="subnote"></span></h3>
     <div class="subnote">same seed/step as the network snapshot/structure above (use the seed selector there
       to change it). bounded-confidence / post-prob: GEXF node attributes at that seed/step (snapshot, not a
       time series). repost depth/virality/share below: full time series for that seed, posts/repost_cascades.csv.</div>
     <div id="attrRow" class="duo"></div>
     <div id="repostRow" class="trio" style="margin-top:10px"></div>
   </section>
-</main>
+  </main>
+</div>
+
+</div>
 
 <div id="tooltip" hidden></div>
 <div id="colorPickerModal" class="cp-modal" hidden>
@@ -381,8 +569,111 @@
   <pre id="logtext"></pre>
 </aside>
 
+<aside id="helpdrawer" hidden>
+  <header><span>Dashboard Help &amp; Reference</span><button id="helpclose">&times;</button></header>
+  <div class="helpcontent">
+    <h2>Welcome to the Polarized Vocal Minority Simulator</h2>
+    <p>This interactive dashboard displays live data from the social network simulation. It tracks how agent opinions, posting behavior, and social networks co-evolve.</p>
+    
+    <h2>💡 How to Use the Dashboard</h2>
+    <ul>
+      <li><strong>Switching Tabs:</strong> Use the left sidebar to toggle between <strong>Time Series</strong> (general trend plots), <strong>Opinion/Outcome</strong> (opinions & phase plane), and <strong>Network</strong> (interactive graph visualization & metrics).</li>
+      <li><strong>Interactive Zoom:</strong> Click and drag horizontally on any time-series chart to zoom in on a specific step range. Click the <strong>Reset Zoom</strong> button in the top header to reset.</li>
+      <li><strong>Customizing Metric Cards:</strong> Use the "more metrics..." picker at the top to toggle charts on/off. Click the expand button (<code>⤢</code>) on any card to promote it to the larger featured row, or (<code>⤡</code>) to return it to the carousel.</li>
+      <li><strong>Rewinding &amp; Playing:</strong> In the Outcome Plane and Network views, drag the scrub sliders to travel back in time. Click Play (<code>▶</code>) to watch the historical progression of the network structure or outcome space.</li>
+      <li><strong>Network Layout:</strong> In the Network Snapshot view, choose between standard <em>Force</em> or Gephi-style <em>ForceAtlas2</em> layouts. You can tweak parameters (attraction, gravity, repulsion) and hit <strong>re-layout</strong> to adjust the visual structure.</li>
+    </ul>
+
+    <h2>📈 Metric Dictionary (What the Indices Mean)</h2>
+    <div id="helpMetricList"></div>
+  </div>
+</aside>
+
 <script>
 "use strict";
+
+const METRIC_DESC = {
+  opinionVar: "Variance of actual opinions across the population, representing the overall degree of opinion polarization.",
+  postOpinionVar: "Variance of opinions expressed in posts. Represents the diversity of content posted in the network.",
+  exposureOpinionVar: "Variance of opinions that agents are exposed to (what they see in their feeds).",
+  exposureOpinionMean: "Average opinion of posts that agents are exposed to.",
+  apparentPolarization: "Calculated as <code>exposureOpinionVar - opinionVar</code>. Measures the mismatch between the polarization of feeds vs. the actual population. Positive values indicate an 'echo chamber effect' or 'vocal minority effect' where content feeds appear more polarized than the users actually are.",
+  repostShare: "The fraction of reposts among all content created at the current step: <code>reposts / (reposts + original posts)</code>.",
+  EI_index: "Krackhardt & Stern's E-I Index: <code>2 * crossCuttingFraction - 1</code>. Measures camp-level homophily from -1 (purely within-camp follow ties) to +1 (purely cross-camp follow ties).",
+  opinionAssortativity: "Newman's assortativity coefficient of the follow network with respect to agent opinions. Positive values indicate homophily (connecting to similar-opinion others).",
+  crossCuttingFraction: "The fraction of follow network edges that cross camp boundaries (connecting agents with positive vs. negative opinions).",
+  opinionKurtosis: "Excess kurtosis of the opinion distribution. Positive values mean peaked opinions; negative values mean flat or multi-modal (polarized) distributions.",
+  bimodalityCoeff: "Sarle's bimodality coefficient, computed from opinion skewness and excess kurtosis. Values &gt; 5/9 (&asymp; 0.555) suggest a bimodal or multimodal opinion distribution (extreme polarization). Excludes target hubs.",
+  disagreement: "Average squared opinion difference between connected neighbors: <code>&Sigma;<sub>(i,j)</sub> (x<sub>i</sub> - x<sub>j</sub>)<sup>2</sup> / M</code>. High values mean local conflict; low values mean local consensus.",
+  meanTolerance: "Average confidence threshold (&epsilon;) of agents. In bounded confidence models, agents only listen/interact if opinion distance is &le; &epsilon;.",
+  toleranceVar: "Variance of the confidence threshold (&epsilon;) among agents.",
+  shannonIndex: "Shannon-Wiener entropy index of the opinion distribution. Measures opinion diversity.",
+  opinionAvg: "Mean opinion of the population.",
+  interactionAssortativity: "Opinion assortativity coefficient of the cumulative repost network.",
+  interactionCrossCuttingFraction: "Fraction of cross-cutting reposts in the cumulative repost network.",
+  interactionAssortativityW: "Opinion assortativity coefficient of the sliding-window repost network.",
+  interactionCrossCuttingFractionW: "Fraction of cross-cutting reposts in the sliding-window repost network.",
+  cRateMean: "Mean content consumption (comfort) rate per opinion bin. Measures receptiveness to seen content.",
+  postShare: "Percentage share of total posts created by agents in each opinion bin, showing who is producing the most content.",
+  hostility: "Average hostility expressed in posts by agents in each opinion bin.",
+  feedPostOpinionMean: "Average opinion of posts in feeds for users in each opinion bin.",
+  feedPostOpinionVar: "Variance of opinions of posts in feeds for users in each opinion bin.",
+  cRateVar: "Variance of content comfort rate per opinion bin.",
+  highComfortRateNum: "Count of high-comfort (highly satisfied) consumption actions per opinion bin.",
+  outGroupBlockPropensity: "Probability that exposure to out-group content triggers a block action.",
+  outGroupSanctionRate: "Rate of out-group blocks/sanctions per active step.",
+  crossRepostRate: "Fraction of reposts that cross camp boundaries (sharing opposite-camp posts).",
+  blockCount: "Total number of block actions in this step.",
+  unfollowCount: "Total number of unfollow actions in this step.",
+  evictionCount: "Total number of feed/queue eviction events.",
+  originalPostCount: "Total number of original posts created in this step.",
+  repostCount: "Total number of reposts created in this step.",
+  feedForYouCountMean: "Average number of algorithmic ('For You') posts in user feeds.",
+  feedChronoCountMean: "Average number of chronological posts in user feeds.",
+  feedRepostCountMean: "Average number of reposts in user feeds.",
+  feedOriginalCountMean: "Average number of original posts in user feeds.",
+  giantComponentFrac: "Fraction of nodes belonging to the undirected giant component of the follow network.",
+  lambda2: "Algebraic connectivity (&lambda;<sub>2</sub>, Fiedler value) of the undirected giant component. Indicates network cohesiveness and resistance to fragmentation.",
+  betweennessMean: "Average betweenness centrality of nodes on the undirected giant component. Measures how much nodes lie on shortest paths.",
+  betweennessTop: "Betweenness centrality of the highest-degree hubs.",
+  Q_sign: "Modularity of the follow network based on camp boundaries (sign of opinion). High values indicate strong community separation.",
+  Q_sign_repost: "Modularity of the repost network based on camp boundaries (sign of opinion)."
+};
+
+const SECTION_HELP = {
+  timeseries: "<b>Trends over Time</b>: Plots chronological data from <code>results.csv</code> for the active run. Drag horizontally on any chart to zoom into a step range. Enlarge cards with <code>⤢</code>, or hover over the <code>ⓘ</code> icon on a card to see what that specific metric measures.",
+  opinion: "<b>Opinion Distribution</b>: Visualizes the opinions of agents over time. In 'trajectories' view, it plots the opinion path of each agent (colored by final opinion) at sparse GEXF snapshot intervals. In '3D distribution' view, it plots a waterfall/ridgeline perspective of the 2D density surface over 100 sampled timesteps.",
+  plane: "<b>Outcome Plane</b>: Plots the phase-space trajectory of one metric against another (e.g. assortativity vs bimodality) over time. Use the scrubber slider to rewind time, or click Play to animate the trajectory. The fading trail goes from faint (early step) to solid (latest step).",
+  network: "<b>Network Snapshot</b>: A live 2D force-directed visualization of the social network (follow or repost graph). Node sizes are proportional to followers, colors map to opinions (blue &minus;1 &harr; red +1), and double-ringed nodes are intervened hubs.",
+  structure: "<b>Network Structure</b>: Plots structural statistics of the network. The degree charts show the empirical complementary cumulative distribution function (CCDF) P(X&ge;x) on log-log scales, with a power-law fit line. Also displays clustering, average betweenness centrality, algebraic connectivity (&lambda;<sub>2</sub>), E-I index, and modularity (Q<sub>sign</sub>).",
+  behavior: "<b>Agent Behavior & Attributes</b>: Displays distributions of individual agent attributes at the snapshot step (such as bounded-confidence tolerance &epsilon; and posting probability), alongside repost cascade depth, virality, and share time series."
+};
+
+function getMetricDesc(metric) {
+  const base = metric.replace(/_[0-4]$/, "");
+  return METRIC_DESC[base] || METRIC_DESC[metric] || "No description available for this metric.";
+}
+
+function populateHelpMetricList() {
+  const container = $("#helpMetricList");
+  if (!container) return;
+  container.innerHTML = "";
+  const sortedKeys = Object.keys(METRIC_DESC).sort();
+  for (const key of sortedKeys) {
+    const entry = document.createElement("div");
+    entry.className = "metric-entry";
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "metric-name";
+    nameSpan.textContent = key;
+    entry.appendChild(nameSpan);
+    const descDiv = document.createElement("div");
+    descDiv.style.marginTop = "4px";
+    descDiv.innerHTML = METRIC_DESC[key];
+    entry.appendChild(descDiv);
+    container.appendChild(entry);
+  }
+}
+
 /* ---------- palettes (dataviz skill reference palette, light+dark steps) ---------- */
 const SERIES_LIGHT = ["#2563eb","#0891b2","#16a34a","#d97706","#dc2626","#4a3aa7","#e87ba4","#eb6834"];
 const SERIES_DARK  = ["#3b82f6","#22d3ee","#22c55e","#f59e0b","#ef4444","#9085e9","#d55181","#d95926"];
@@ -411,15 +702,132 @@ const state = {
   // charts, repost behavior. Independent of netState.seed (network snapshot /
   // structure), which needs its own heavier GEXF-backed fetch.
   opseed: store("opseed", null),
+  opview: store("opview", "traj"),   // "traj" (per-agent lines, default — matches yabe's opinion-tab default) | "heat" (bin-share density)
   charts: {},   // metric -> chart meta for hover
   plane: null,
 };
+
+/* per-agent opinion trajectories (GEXF-snapshot cadence): kept outside `state`
+   like netState, since it's fetched lazily (only while opview==="traj") and
+   cached per seed rather than refreshed on every summary poll. */
+const trajState = { seed:null, data:null, loading:false, hover:-1 };
 
 function theme(){ const t=document.documentElement.dataset.theme;
   if(t) return t; return matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"; }
 function pal(){ return theme()==="dark" ? SERIES_DARK : SERIES_LIGHT; }
 function bins(){ return theme()==="dark" ? BINS_DARK : BINS_LIGHT; }
 function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+
+/* ---------- PNG Export & CSS variables resolver ---------- */
+function resolveCSSVariables(node) {
+  if (node.attributes) {
+    for (let i = 0; i < node.attributes.length; i++) {
+      const attr = node.attributes[i];
+      let val = attr.value;
+      if (val && val.includes("var(")) {
+        const matches = val.match(/var\((--[^)]+)\)/g);
+        if (matches) {
+          for (const match of matches) {
+            const varName = match.slice(4, -1);
+            const resolved = cssVar(varName);
+            if (resolved) {
+              val = val.replace(match, resolved);
+            }
+          }
+          attr.value = val;
+        }
+      }
+    }
+  }
+  if (node.style) {
+    for (let i = 0; i < node.style.length; i++) {
+      const key = node.style[i];
+      let val = node.style.getPropertyValue(key);
+      if (val && val.includes("var(")) {
+        const matches = val.match(/var\((--[^)]+)\)/g);
+        if (matches) {
+          for (const match of matches) {
+            const varName = match.slice(4, -1);
+            const resolved = cssVar(varName);
+            if (resolved) {
+              val = val.replace(match, resolved);
+            }
+          }
+          node.style.setProperty(key, val);
+        }
+      }
+    }
+  }
+  for (let child = node.firstChild; child; child = child.nextSibling) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      resolveCSSVariables(child);
+    }
+  }
+}
+
+function exportToPNG(element, filename) {
+  if (element instanceof HTMLCanvasElement) {
+    const dataURL = element.toDataURL("image/png");
+    const link = document.createElement("a");
+    link.download = filename;
+    link.href = dataURL;
+    link.click();
+  } else if (element instanceof SVGSVGElement || element.tagName === "svg" || element.querySelector("svg")) {
+    const svg = element instanceof SVGSVGElement ? element : element.querySelector("svg");
+    if (!svg) return;
+    const width = svg.viewBox?.baseVal?.width || svg.clientWidth || 300;
+    const height = svg.viewBox?.baseVal?.height || svg.clientHeight || 200;
+    const svgCopy = svg.cloneNode(true);
+    svgCopy.setAttribute("width", width);
+    svgCopy.setAttribute("height", height);
+    if (!svgCopy.getAttribute("viewBox")) {
+      svgCopy.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    }
+    
+    // Inject style rules resolving theme variables for default text/lines
+    const styleEl = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    styleEl.textContent = `
+      text { font-family: system-ui, -apple-system, sans-serif; font-size: 10.5px; fill: ${cssVar("--muted") || '#888'}; }
+      .title { font-size: 12px; font-weight: 600; fill: ${cssVar("--ink") || '#000'}; }
+      line, path { stroke: ${cssVar("--grid") || '#ddd'}; }
+      .axis line, .axis path { stroke: ${cssVar("--axis") || '#999'}; }
+      .domain { stroke: ${cssVar("--axis") || '#999'}; }
+      .tick line { stroke: ${cssVar("--grid") || '#ddd'}; }
+      .grid line { stroke: ${cssVar("--grid") || '#ddd'}; }
+    `;
+    svgCopy.insertBefore(styleEl, svgCopy.firstChild);
+    
+    // Resolve any remaining var(--...) calls to raw colors for standalone SVG rendering
+    resolveCSSVariables(svgCopy);
+    
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(svgCopy);
+    if (!svgString.match(/^<svg[^>]+xmlns="http:\/\/www\.w3\.org\/2000\/svg"/)) {
+      svgString = svgString.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+    }
+    const img = new Image();
+    const svgBlob = new Blob([svgString], {type: "image/svg+xml;charset=utf-8"});
+    const url = URL.createObjectURL(svgBlob);
+    img.onload = function() {
+      const canvas = document.createElement("canvas");
+      const pad = 12; // Outlined safety padding on all sides to prevent text clipping
+      canvas.width = (width + pad * 2) * 2;
+      canvas.height = (height + pad * 2) * 2;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = cssVar("--surface") || (theme() === "dark" ? "#12161f" : "#ffffff");
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(2, 2);
+      ctx.drawImage(img, pad, pad, width, height);
+      const dataURL = canvas.toDataURL("image/png");
+      const link = document.createElement("a");
+      link.download = filename;
+      link.href = dataURL;
+      link.click();
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  }
+}
 
 /* ---------- formatting ---------- */
 function fmt(v){ if(v==null||Number.isNaN(v)) return "–";
@@ -481,6 +889,7 @@ async function refresh(){
     const seedIds = summary.seeds.map(x=>x.seed);
     if(state.opseed===null || !seedIds.includes(state.opseed)) state.opseed = seedIds[0] ?? null;
     if(state.opseed!==null) state.opinion = await jget("/api/opinion?seed="+state.opseed+"&max=800");
+    maybeRefetchTrajectories();
     // repost cascade stats follow the network snapshot's seed (network snapshot / structure /
     // agent behavior all describe the same seed+step, so there's one seed picker for all three)
     const netSeed=(netState.seed!==null && seedIds.includes(netState.seed)) ? netState.seed : (seedIds[0] ?? null);
@@ -590,6 +999,15 @@ function renderPicker(){
       save("metrics",state.metrics); refresh();
     });
     lab.append(cb, document.createTextNode(it.label));
+    lab.addEventListener("mouseenter", (evt)=>{
+      const desc = getMetricDesc(it.id);
+      showTip(evt, `<div class="thead" style="font-weight:600;color:var(--ink)">${it.label}</div><div style="margin-top:4px;line-height:1.4;">${desc}</div>`);
+    });
+    lab.addEventListener("mousemove", (evt)=>{
+      const desc = getMetricDesc(it.id);
+      showTip(evt, `<div class="thead" style="font-weight:600;color:var(--ink)">${it.label}</div><div style="margin-top:4px;line-height:1.4;">${desc}</div>`);
+    });
+    lab.addEventListener("mouseleave", hideTip);
     list.appendChild(lab);
   }
   const reset=document.createElement("button");
@@ -608,7 +1026,9 @@ function renderPicker(){
   const os=$("#opseed"); os.innerHTML="";
   for(const s of seedList()){ const o=document.createElement("option"); o.value=s.seed; o.textContent="seed "+s.seed; os.appendChild(o); }
   os.value=state.opseed;
-  os.onchange=()=>{ state.opseed=+os.value; save("opseed",state.opseed); refresh(); };
+  os.onchange=()=>{ state.opseed=+os.value; save("opseed",state.opseed); trajState.data=null; maybeRefetchTrajectories(); refresh(); };
+  const ov=$("#opview"); ov.value=state.opview;
+  ov.onchange=()=>{ state.opview=ov.value; save("opview",state.opview); maybeRefetchTrajectories(); renderOpinion(); };
 }
 
 /* ---------- series extraction ---------- */
@@ -777,6 +1197,20 @@ function makeCard(container, id, groupKey, onReorder){
   handle.className="draghandle"; handle.textContent="✦"; handle.draggable=true;
   handle.title="drag to reorder · drag corner to resize";
   card.appendChild(handle);
+  
+  // Save PNG button
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "card-save-btn"; saveBtn.innerHTML = "⤓";
+  saveBtn.title = "Save as PNG";
+  saveBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const stepVal = netState.data?.step != null ? `_step_${netState.data.step}` : "";
+    const filename = `${id}${stepVal}.png`;
+    const el = card.querySelector("svg, canvas");
+    if (el) exportToPNG(el, filename);
+  });
+  card.appendChild(saveBtn);
+
   const body=document.createElement("div"); body.className="cardbody cardbody-pad";
   card.appendChild(body);
   applyCardSize(card, id);
@@ -797,8 +1231,26 @@ function initStaticCard(el, id, groupKey, container, onReorder){
     handle.title="drag to reorder · drag corner to resize";
     el.insertBefore(handle, el.firstChild);
   }
+
+  // Save PNG button
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "card-save-btn"; saveBtn.innerHTML = "⤓";
+  saveBtn.title = "Save as PNG";
+  if (!groupKey) {
+    saveBtn.style.right = "5px";
+  }
+  saveBtn.addEventListener("click", (ev) => {
+    ev.stopPropagation();
+    const stepVal = netState.data?.step != null ? `_step_${netState.data.step}` : "";
+    const filename = `${id}${stepVal}.png`;
+    const chartEl = el.querySelector("svg, canvas");
+    if (chartEl) exportToPNG(chartEl, filename);
+  });
+  el.appendChild(saveBtn);
+
   applyCardSize(el, id);
-  watchCardSize(el, id, id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); }) : null);
+  watchCardSize(el, id, id==="netsnapshot" ? (()=>{ if(netState.sim) startSim(); })
+    : id==="opinion" ? (()=>renderOpinion()) : null);
   if(groupKey) attachDrag(container, el, handle, groupKey, onReorder);
 }
 function restoreStaticOrder(container, groupKey){
@@ -838,11 +1290,41 @@ function toggleFeature(metric){
 function makeMetricCard(container, metric, isFeatured){
   const card=document.createElement("div");
   card.className="panel metriccard"; card.dataset.card=metric;
+  
+  // Info tooltip button
+  const infoBtn=document.createElement("button");
+  infoBtn.className="infobtn"; infoBtn.innerHTML="ⓘ";
+  infoBtn.title="About " + metric;
+  infoBtn.addEventListener("mouseenter", (evt)=>{
+    const titleText = metric === "apparentPolarization" ? "apparentPolarization" : metric;
+    const desc = getMetricDesc(metric);
+    showTip(evt, `<div class="thead" style="font-weight:600;color:var(--ink)">${titleText}</div><div style="margin-top:4px;line-height:1.4;">${desc}</div>`);
+  });
+  infoBtn.addEventListener("mousemove", (evt)=>{
+    const titleText = metric === "apparentPolarization" ? "apparentPolarization" : metric;
+    const desc = getMetricDesc(metric);
+    showTip(evt, `<div class="thead" style="font-weight:600;color:var(--ink)">${titleText}</div><div style="margin-top:4px;line-height:1.4;">${desc}</div>`);
+  });
+  infoBtn.addEventListener("mouseleave", hideTip);
+  card.appendChild(infoBtn);
+
   const btn=document.createElement("button");
   btn.className="enlargebtn"; btn.textContent=isFeatured?"⤡":"⤢";
   btn.title=isFeatured?"shrink back to the carousel":"enlarge into the featured row";
   btn.addEventListener("click",()=>toggleFeature(metric));
   card.appendChild(btn);
+
+  // Save PNG button
+  const saveBtn=document.createElement("button");
+  saveBtn.className="savebtn"; saveBtn.innerHTML="⤓";
+  saveBtn.title="Save as PNG";
+  saveBtn.addEventListener("click",()=>{
+    const filename = `${metric}.png`;
+    const svg = card.querySelector("svg");
+    if(svg) exportToPNG(svg, filename);
+  });
+  card.appendChild(saveBtn);
+  
   const body=document.createElement("div"); body.className="cardbody";
   card.appendChild(body);
   container.appendChild(card);
@@ -1152,12 +1634,24 @@ function seriesMap(metric){
   return m;
 }
 
+/* ---------- opinion distribution: heatmap | trajectories toggle ----------
+   #opview selects between two views of the same underlying opinion data:
+   renderOpinionHeat (per-step bin-share density, always available from
+   opinion_result.csv) and renderOpinionTraj (per-agent lines, only as dense
+   as the GEXF snapshot cadence — see analysis.trajectory_data). */
+function renderOpinion(){
+  $("#opinionSubnote").textContent = state.opview==="traj"
+    ? "per-agent trajectories: one faint line per agent, colored by final opinion (GEXF snapshot cadence, sparser than the 3D distribution)."
+    : "3D waterfall distribution: 100 sampled timesteps showing 2D density surface (X=opinion [-1, 1], Y=probability density, Z=time).";
+  if(state.opview==="traj") renderOpinionTraj(); else renderOpinionHeat();
+}
+
 /* ---------- opinion distribution (density heatmap) ----------
    x = step, y = opinion bin (-1 bottom .. +1 top), cell color = per-step share
    of agents in that bin (viridis). Preserves bimodality (two bright bands) that a
    quantile/mean view would hide. Bin count is read from the CSV header
    (Const.NUM_OF_BINS_OF_OPINION_FOR_WRITER), not fixed here. */
-function renderOpinion(){
+function renderOpinionHeat(){
   const host=$("#opinion"), leg=$("#opleg");
   const o=state.opinion;
   if(!o||!o.step||!o.step.length||!o.bins.length||o.bins.some(b=>!b.length)){
@@ -1178,52 +1672,310 @@ function renderOpinion(){
     for(let b=0;b<disp;b++){ const s=tot?rows[b][i]/tot:0; shares[b][i]=s; if(s>maxShare) maxShare=s; } }
   maxShare=maxShare||1;
   const x0=steps[0], x1=steps[n-1]||1;
-  const xs=v=>PL.L+(v-x0)/(x1-x0||1)*(PL.W-PL.L-PL.R);
-  const H=(PL.H-PL.B)-PL.T, rowH=H/disp;
-  const yOp=op=>(PL.H-PL.B)-((op+1)/2)*H;        // opinion in [-1,1] -> y
-  // decimate columns so cell width stays around 1px
-  const k=Math.max(1,Math.ceil(n/(PL.W-PL.L-PL.R)));
-  const D=[]; for(let i=0;i<n;i+=k) D.push(i); if(D[D.length-1]!==n-1) D.push(n-1);
-  let cells="";
-  for(let p=0;p<D.length;p++){ const i=D[p], xc=xs(steps[i]);
-    const xl=p===0?PL.L:(xs(steps[D[p-1]])+xc)/2;
-    const xr=p===D.length-1?PL.W-PL.R:(xc+xs(steps[D[p+1]]))/2;
-    const w=Math.max(0.6,xr-xl)+0.5;
-    for(let b=0;b<disp;b++){ const yt=(PL.H-PL.B)-(b+1)*rowH;
-      cells+=`<rect x="${xl.toFixed(1)}" y="${yt.toFixed(1)}" width="${w.toFixed(1)}" height="${(rowH+0.5).toFixed(1)}" fill="${seqColor(shares[b][i]/maxShare)}"/>`; }
+
+  // 3D Isometric projection parameters
+  const maxDx = 80;
+  const maxDy = 140;
+  const maxHeight = 70;
+  const W_curve = PL.W - PL.L - PL.R - maxDx;
+
+  // Sample exactly 100 steps (or less if steps.length < 100)
+  const nSlices = Math.min(100, n);
+  const sampledIndices = [];
+  if (n <= nSlices) {
+    for (let i = 0; i < n; i++) sampledIndices.push(i);
+  } else {
+    for (let i = 0; i < nSlices; i++) {
+      const idx = Math.round((i / (nSlices - 1)) * (n - 1));
+      sampledIndices.push(idx);
+    }
   }
-  let g="";
-  for(const op of [-1,-0.5,0,0.5,1]) g+=`<text x="${PL.L-5}" y="${(yOp(op)+3.5).toFixed(1)}" text-anchor="end">${op>0?"+"+op:op}</text>`;
-  for(const t of ticks(x0,x1,6)) g+=`<text x="${xs(t).toFixed(1)}" y="${PL.H-14}" text-anchor="middle">${fstep(t)}</text>`;
-  host.innerHTML=
-    `<svg viewBox="0 0 ${PL.W} ${PL.H}" style="cursor:crosshair">${cells}${g}
-      <text transform="translate(12,${(PL.T+H/2).toFixed(1)}) rotate(-90)" text-anchor="middle">opinion</text>
-      <line x1="${PL.L}" x2="${PL.W-PL.R}" y1="${PL.H-PL.B}" y2="${PL.H-PL.B}" stroke="var(--axis)"/>
-      <text x="${(PL.L+PL.W-PL.R)/2}" y="${PL.H-2}" text-anchor="middle">step</text>
-      <line class="xh" y1="${PL.T}" y2="${PL.H-PL.B}" stroke="var(--ink)" stroke-dasharray="3 3" visibility="hidden"/>
+
+  // Draw 3D floor gridlines (drawn behind the mountain peaks)
+  let gridLines = "";
+  for (const op of [-1, -0.5, 0, 0.5, 1]) {
+    const opOffset = ((op + 1) / 2) * W_curve;
+    gridLines += `<line x1="${PL.L + maxDx + opOffset}" y1="${PL.H - PL.B - maxDy}" x2="${PL.L + opOffset}" y2="${PL.H - PL.B}" stroke="var(--grid)" stroke-width="0.8" stroke-dasharray="2 2"/>`;
+  }
+  for (let t = 0; t <= 4; t++) {
+    const frac = t / 4;
+    const bx = PL.L + (1 - frac) * maxDx;
+    const by = PL.H - PL.B - (1 - frac) * maxDy;
+    gridLines += `<line x1="${bx}" y1="${by}" x2="${bx + W_curve}" y2="${by}" stroke="var(--grid)" stroke-width="0.8" stroke-dasharray="2 2"/>`;
+  }
+
+  // Generate 3D waterfall paths (from back i=0 to front i=nSlices-1)
+  let paths = "";
+  const surfaceColor = cssVar("--surface") || (theme() === "dark" ? "#1e293b" : "#ffffff");
+  for (let j = 0; j < nSlices; j++) {
+    const i = sampledIndices[j];
+    const frac = j / (nSlices - 1 || 1);
+    const bx = PL.L + (1 - frac) * maxDx;
+    const by = PL.H - PL.B - (1 - frac) * maxDy;
+    
+    let pathData = `M ${bx.toFixed(1)} ${by.toFixed(1)}`;
+    for (let b = 0; b < disp; b++) {
+      const px = bx + (b / (disp - 1 || 1)) * W_curve;
+      const h = (shares[b][i] / maxShare) * maxHeight;
+      const py = by - h;
+      pathData += ` L ${px.toFixed(1)} ${py.toFixed(1)}`;
+    }
+    pathData += ` L ${(bx + W_curve).toFixed(1)} ${by.toFixed(1)} Z`;
+    const color = seqColor(frac);
+    paths += `<path class="ridgeline-slice" data-idx="${j}" d="${pathData}" fill="${surfaceColor}" fill-opacity="0.9" stroke="${color}" stroke-width="1.2" />`;
+  }
+
+  // Draw 3D Time Axis (Diagonal on the left)
+  let timeTicks = "";
+  timeTicks += `<line x1="${PL.L + maxDx}" y1="${PL.H - PL.B - maxDy}" x2="${PL.L}" y2="${PL.H - PL.B}" stroke="var(--axis)" stroke-width="1.5" stroke-dasharray="3 3"/>`;
+  const nTimeTicks = 4;
+  for (let t = 0; t <= nTimeTicks; t++) {
+    const frac = t / nTimeTicks;
+    const tx = PL.L + (1 - frac) * maxDx;
+    const ty = PL.H - PL.B - (1 - frac) * maxDy;
+    const stepVal = x0 + frac * (x1 - x0);
+    timeTicks += `<line x1="${tx}" y1="${ty}" x2="${tx - 4}" y2="${ty + 2}" stroke="var(--axis)"/>`;
+    timeTicks += `<text x="${tx - 8}" y="${ty + 4}" text-anchor="end" font-size="9" fill="var(--muted)">${fstep(Math.round(stepVal))}</text>`;
+  }
+  const tAngle = Math.round(Math.atan2(maxDy, maxDx) * 180 / Math.PI);
+  const titleX = PL.L + maxDx/2 - 25;
+  const titleY = PL.H - PL.B - maxDy/2 + 20;
+  timeTicks += `<text x="${titleX}" y="${titleY}" transform="rotate(-${tAngle}, ${titleX}, ${titleY})" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink2)">time (step)</text>`;
+
+  // Draw 3D Height Axis (Vertical at the back-left)
+  let heightTicks = "";
+  const hx = PL.L + maxDx;
+  const hy = PL.H - PL.B - maxDy;
+  heightTicks += `<line x1="${hx}" y1="${hy}" x2="${hx}" y2="${hy - maxHeight}" stroke="var(--axis)" stroke-width="1.5"/>`;
+  for (const t of [0, 0.5, 1.0]) {
+    const yVal = hy - t * maxHeight;
+    heightTicks += `<line x1="${hx}" y1="${yVal}" x2="${hx + 4}" y2="${yVal}" stroke="var(--axis)"/>`;
+    heightTicks += `<text x="${hx + 8}" y="${yVal + 3}" text-anchor="start" font-size="9" fill="var(--muted)">${(t * maxShare * 100).toFixed(0)}%</text>`;
+  }
+  heightTicks += `<text x="${hx + 28}" y="${hy - maxHeight/2}" transform="rotate(-90, ${hx + 28}, ${hy - maxHeight/2})" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink2)">share</text>`;
+
+  // Draw 3D Opinion Axis (Horizontal at the front-bottom)
+  let opinionTicks = "";
+  opinionTicks += `<line x1="${PL.L}" x2="${PL.L + W_curve}" y1="${PL.H - PL.B}" y2="${PL.H - PL.B}" stroke="var(--axis)" stroke-width="1.5"/>`;
+  for (const op of [-1, -0.5, 0, 0.5, 1]) {
+    const opOffset = ((op + 1) / 2) * W_curve;
+    const tx = PL.L + opOffset;
+    opinionTicks += `<line x1="${tx}" y1="${PL.H - PL.B}" x2="${tx}" y2="${PL.H - PL.B + 4}" stroke="var(--axis)"/>`;
+    opinionTicks += `<text x="${tx}" y="${PL.H - PL.B + 16}" text-anchor="middle" font-size="10" fill="var(--muted)">${op > 0 ? "+" + op : op}</text>`;
+  }
+  opinionTicks += `<text x="${PL.L + W_curve/2}" y="${PL.H - PL.B + 30}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink2)">opinion</text>`;
+
+  host.innerHTML =
+    `<svg viewBox="0 0 ${PL.W} ${PL.H}" style="cursor:crosshair">
+      ${gridLines}
+      ${paths}
+      ${timeTicks}
+      ${heightTicks}
+      ${opinionTicks}
+      <line class="xh" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="2 2" visibility="hidden"/>
     </svg>`;
-  // legend: viridis colorbar for share, 0 .. maxShare
+
+  // Time gradient colorbar legend
   const grad=[0,.25,.5,.75,1].map(t=>seqColor(t)).join(",");
-  leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">share 0%`+
+  leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">time: step ${fstep(x0)} `+
     `<i style="display:inline-block;width:110px;height:10px;border-radius:2px;background:linear-gradient(90deg,${grad})"></i>`+
-    `${(100*maxShare).toFixed(0)}%</span>`;
+    ` step ${fstep(x1)}</span>`;
+
+  // Interactivity handlers
   const svg=host.querySelector("svg");
-  svg.addEventListener("mousemove",evt=>{
-    const r=svg.getBoundingClientRect();
-    const px=(evt.clientX-r.left)/r.width*PL.W;
-    if(px<PL.L||px>PL.W-PL.R){ hideTip(); return; }
-    const step=x0+(px-PL.L)/(PL.W-PL.L-PL.R)*(x1-x0);
-    const i=nearestIdx(steps,step);
-    const xh=svg.querySelector(".xh");
-    xh.setAttribute("x1",xs(steps[i])); xh.setAttribute("x2",xs(steps[i])); xh.setAttribute("visibility","visible");
-    let rowsHtml="";
-    for(let b=disp-1;b>=0;b--){ const lo=(-1+b*2/disp), hi=(-1+(b+1)*2/disp);
-      const lbl=`[${lo.toFixed(1)},${hi.toFixed(1)}${b===disp-1?"]":")"}`;
-      rowsHtml+=`<div class="trow"><span><span class="dot" style="background:${seqColor(shares[b][i]/maxShare)}"></span>${lbl}</span><span>${(100*shares[b][i]).toFixed(1)}%</span></div>`; }
-    showTip(evt,`<div class="thead">seed ${state.opseed} @ step ${fstep(steps[i])}</div>`+rowsHtml);
+  svg.addEventListener("mousemove", evt => {
+    const r = svg.getBoundingClientRect();
+    const mx = (evt.clientX - r.left) / r.width * PL.W;
+    const my = (evt.clientY - r.top) / r.height * PL.H;
+    
+    // Horizontal tracking bounds
+    const targetFrac = 1 - (PL.H - PL.B - my) / maxDy;
+    const bestSliceIdx = Math.max(0, Math.min(nSlices - 1, Math.round(targetFrac * (nSlices - 1))));
+    const frac = bestSliceIdx / (nSlices - 1 || 1);
+    const bx = PL.L + (1 - frac) * maxDx;
+    const by = PL.H - PL.B - (1 - frac) * maxDy;
+    
+    if (mx < bx || mx > bx + W_curve) {
+      hideTip();
+      svg.querySelectorAll(".ridgeline-slice").forEach(p => {
+        const idx = +p.dataset.idx;
+        const f = idx / (nSlices - 1 || 1);
+        p.setAttribute("stroke", seqColor(f));
+        p.setAttribute("stroke-width", "1.2");
+        p.setAttribute("fill-opacity", "0.9");
+      });
+      const xh = svg.querySelector(".xh"); if (xh) xh.setAttribute("visibility", "hidden");
+      return;
+    }
+    
+    // Highlight slice path
+    svg.querySelectorAll(".ridgeline-slice").forEach(p => {
+      const idx = +p.dataset.idx;
+      if (idx === bestSliceIdx) {
+        p.setAttribute("stroke", "var(--ink)");
+        p.setAttribute("stroke-width", "2.5");
+        p.setAttribute("fill-opacity", "0.98");
+      } else {
+        const f = idx / (nSlices - 1 || 1);
+        p.setAttribute("stroke", seqColor(f));
+        p.setAttribute("stroke-width", "1.2");
+        p.setAttribute("fill-opacity", "0.9");
+      }
+    });
+    
+    const i = sampledIndices[bestSliceIdx];
+    const binFrac = (mx - bx) / W_curve;
+    const hoverBin = Math.max(0, Math.min(disp - 1, Math.floor(binFrac * disp)));
+    
+    // Set vertical height cursor
+    const xh = svg.querySelector(".xh");
+    if (xh) {
+      const px = bx + (hoverBin + 0.5) / disp * W_curve;
+      const h = (shares[hoverBin][i] / maxShare) * maxHeight;
+      xh.setAttribute("x1", px); xh.setAttribute("x2", px);
+      xh.setAttribute("y1", by); xh.setAttribute("y2", by - h);
+      xh.setAttribute("visibility", "visible");
+    }
+    
+    let rowsHtml = "";
+    for (let b = disp - 1; b >= 0; b--) {
+      const lo = -1 + b * 2 / disp;
+      const hi = -1 + (b + 1) * 2 / disp;
+      const lbl = `[${lo.toFixed(1)},${hi.toFixed(1)}${b === disp - 1 ? "]" : ")"}`;
+      const isCurrentBin = (b === hoverBin);
+      const rowStyle = isCurrentBin ? 'font-weight:bold;background:var(--panel-soft);' : '';
+      rowsHtml += `<div class="trow" style="${rowStyle}"><span><span class="dot" style="background:${seqColor(shares[b][i]/maxShare)}"></span>${lbl}</span><span>${(100*shares[b][i]).toFixed(1)}%</span></div>`;
+    }
+    showTip(evt, `<div class="thead">seed ${state.opseed} @ step ${fstep(steps[i])}</div>` + rowsHtml);
   });
-  svg.addEventListener("mouseleave",()=>{ hideTip();
-    const xh=svg.querySelector(".xh"); if(xh) xh.setAttribute("visibility","hidden"); });
+  svg.addEventListener("mouseleave", () => {
+    hideTip();
+    svg.querySelectorAll(".ridgeline-slice").forEach(p => {
+      const idx = +p.dataset.idx;
+      const f = idx / (nSlices - 1 || 1);
+      p.setAttribute("stroke", seqColor(f));
+      p.setAttribute("stroke-width", "1.2");
+      p.setAttribute("fill-opacity", "0.9");
+    });
+    const xh = svg.querySelector(".xh"); if (xh) xh.setAttribute("visibility", "hidden");
+  });
+}
+
+/* ---------- opinion distribution (per-agent trajectories) ----------
+   Ported from dashboard-remote/yabe's renderOpinionTraj (R5): one faint canvas
+   polyline per agent (x=step, y=opinion in [-1,1]) — a thousand overlapping
+   low-alpha lines read as a density field without an SVG DOM per point. Line
+   color is fixed to that agent's *final* observed opinion so a single line
+   stays visually trackable end to end; reuses the network view's editable
+   opinion gradient (getGradStops()/gradColor()) so the two views stay
+   consistent. Data is fetched separately from the heatmap's /api/opinion —
+   see fetchTrajectories/maybeRefetchTrajectories and analysis.trajectory_data
+   — and is only as dense as the GEXF snapshot cadence (this pipeline writes
+   no per-step per-agent series), unlike the heatmap which is per-step. */
+async function fetchTrajectories(){
+  if(trajState.loading) return;
+  const seed=state.opseed; if(seed==null) return;
+  trajState.loading=true;
+  try{
+    const d=await jget(`/api/trajectories?seed=${encodeURIComponent(seed)}&max_steps=300`);
+    trajState.data=d; trajState.seed=seed; trajState.hover=-1;
+  }catch(e){ /* leave any stale data showing; refresh()'s banner already reports server errors */ }
+  finally{ trajState.loading=false; }
+  if(state.opview==="traj") renderOpinion();
+}
+/* fetch once per seed selection, then keep refetching a running seed (new
+   GEXF snapshots may have appeared) but leave a done seed's data alone. */
+function maybeRefetchTrajectories(){
+  if(state.opview!=="traj") return;
+  if(trajState.loading) return;
+  const seed=state.opseed; if(seed==null) return;
+  if(!trajState.data || trajState.seed!==seed){ fetchTrajectories(); return; }
+  const s=seedList().find(v=>v.seed===seed);
+  if(s && s.status!=="done") fetchTrajectories();
+}
+
+function renderOpinionTraj(){
+  const host=$("#opinion"), leg=$("#opleg");
+  const d=trajState.data;
+  if(!d || !d.step || !d.step.length || !d.agents || !d.agents.length){
+    host.innerHTML=`<div class="subnote" style="padding:24px;text-align:center">`
+      +(trajState.loading?"loading…":"no data (needs GEXF snapshots — see Network Snapshot panel)")+`</div>`;
+    leg.innerHTML=""; return;
+  }
+  let cv=host.querySelector("canvas");
+  if(!cv){ host.innerHTML=""; cv=document.createElement("canvas");
+    cv.style.cssText="width:100%;height:100%;display:block;cursor:crosshair"; host.appendChild(cv); }
+  const W=host.clientWidth||480, H=host.clientHeight||320, dpr=devicePixelRatio||1;
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  const steps=d.step, n=d.agents.length;
+  const L=42,R=10,T=10,B=24;
+  const x0=steps[0], x1=steps[steps.length-1]||1;
+  const xs=v=>L+(v-x0)/((x1-x0)||1)*(W-L-R);
+  const ys=op=>(H-B)-((op+1)/2)*(H-T-B);
+  const stops=getGradStops();
+  const finalColor=vals=>{ for(let i=vals.length-1;i>=0;i--) if(vals[i]!=null) return gradColor((vals[i]+1)/2,stops);
+    return gradColor(0.5,stops); };
+  // low opacity, auto-scaled down as agent count grows (~5-15%)
+  const alpha=Math.max(0.05,Math.min(0.15, 60/n));
+  ctx.lineWidth=1;
+  for(let a=0;a<n;a++){
+    const vals=d.agents[a];
+    ctx.strokeStyle=finalColor(vals); ctx.globalAlpha=alpha;
+    ctx.beginPath(); let started=false;
+    for(let i=0;i<vals.length;i++){ const v=vals[i];
+      if(v==null){ started=false; continue; }
+      const px=xs(steps[i]), py=ys(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha=1;
+
+  ctx.strokeStyle=cssVar("--axis");
+  ctx.beginPath(); ctx.moveTo(L,H-B); ctx.lineTo(W-R,H-B); ctx.stroke();
+  ctx.fillStyle=cssVar("--ink2"); ctx.font="11px system-ui,sans-serif";
+  ctx.textAlign="center";
+  for(const t of ticks(x0,x1,6)) ctx.fillText(fstep(t), xs(t), H-7);
+  ctx.textAlign="right";
+  for(const op of [-1,-0.5,0,0.5,1]) ctx.fillText(op>0?"+"+op:""+op, L-6, ys(op)+4);
+
+  // hover-highlighted agent redrawn on top at full opacity/weight
+  if(trajState.hover>=0 && trajState.hover<n){
+    const vals=d.agents[trajState.hover];
+    ctx.strokeStyle=finalColor(vals); ctx.lineWidth=2; ctx.globalAlpha=1;
+    ctx.beginPath(); let started=false;
+    for(let i=0;i<vals.length;i++){ const v=vals[i];
+      if(v==null){ started=false; continue; }
+      const px=xs(steps[i]), py=ys(v);
+      if(!started){ ctx.moveTo(px,py); started=true; } else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+  }
+
+  const grad=[0,.25,.5,.75,1].map(t=>gradColor(t,stops)).join(",");
+  leg.innerHTML=`<span style="display:inline-flex;align-items:center;gap:6px">final opinion &minus;1`
+    +`<i style="display:inline-block;width:110px;height:10px;border-radius:2px;background:linear-gradient(90deg,${grad})"></i>+1</span>`
+    +(d.total>d.shown?` <span class="subnote">showing ${d.shown} of ${d.total} agents (subsampled)</span>`:``);
+
+  cv.onmousemove=evt=>{
+    const r=cv.getBoundingClientRect();
+    const mx=evt.clientX-r.left, my=evt.clientY-r.top;
+    if(mx<L||mx>W-R||my<T||my>H-B){ if(trajState.hover!==-1){ trajState.hover=-1; renderOpinionTraj(); } hideTip(); return; }
+    const step=x0+(mx-L)/(W-L-R)*(x1-x0);
+    const i=nearestIdx(steps,step);
+    let best=-1, bestD=12;
+    for(let a=0;a<n;a++){ const v=d.agents[a][i]; if(v==null) continue;
+      const dd=Math.abs(ys(v)-my); if(dd<bestD){ bestD=dd; best=a; } }
+    if(best!==trajState.hover){ trajState.hover=best; renderOpinionTraj(); return; } // redraw supersedes this tooltip pass
+    if(best>=0){
+      showTip(evt,`<div class="thead">agent ${d.ids[best]} @ step ${fstep(steps[i])}</div>`
+        +`<div class="trow"><span>opinion</span><span>${fmt(d.agents[best][i])}</span></div>`);
+    } else hideTip();
+  };
+  cv.onmouseleave=()=>{ hideTip(); if(trajState.hover!==-1){ trajState.hover=-1; renderOpinionTraj(); } };
 }
 
 /* ---------- network snapshot: live force layout on canvas ----------
@@ -1232,11 +1984,26 @@ function renderOpinion(){
    color over opinion in [-1,1], r ~ sqrt(degree), animated tick loop.
    Reimplemented dependency-free on canvas (n=1000, m~10k needs it); repulsion
    uses a coarse-grid approximation instead of Barnes-Hut for compactness. */
+/* ForceAtlas2 layout config (ported from dashboard-remote/yabe): repulsion scales
+   with (1+in-degree) of both endpoints and falls off linearly with distance (not
+   squared); attraction is a simple distance-proportional pull with no spring rest
+   length; a light central gravity keeps disconnected components on screen. */
+const FA2_DEFAULTS={repulsion:1,attraction:1,gravity:1,damping:0.6,preventOverlap:false};
+const storedFA2=store("netfa2",{});
 const netState={ seed:store("netseed",null), type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
   edgeColor:store("netedgecolor",null),
   wMin:store("netwmin",null), wMax:store("netwmax",null), filteredEdges:null,
+  layout:store("netlayout","force"),
+  fa2:{
+    repulsion:storedFA2.repulsion??FA2_DEFAULTS.repulsion,
+    attraction:storedFA2.attraction??FA2_DEFAULTS.attraction,
+    gravity:storedFA2.gravity??FA2_DEFAULTS.gravity,
+    damping:storedFA2.damping??FA2_DEFAULTS.damping,
+    preventOverlap:Boolean(storedFA2.preventOverlap),
+  },
   data:null, loading:false, sim:null, hover:-1, lastTag:undefined };
+function persistFA2(){ save("netfa2",netState.fa2); }
 
 /* edges within [wMin,wMax] (either bound optional); recomputed whenever a fresh
    snapshot lands or the weight filter changes, not per animation frame. */
@@ -1609,7 +2376,7 @@ function maybeRefetchNetwork(){
   if(s && netState.data.step!=null && s.step>=netState.data.step+5000) fetchNetwork();
 }
 
-async function fetchNetwork(){
+async function fetchNetwork(forceQuick = false){
   if(netState.loading || !seedList().length) return;
   const ids=seedList().map(s=>s.seed);
   if(netState.seed===null || !ids.includes(netState.seed)) netState.seed=ids[0];
@@ -1619,7 +2386,8 @@ async function fetchNetwork(){
     // structural=1: also compute degree/clustering/betweenness/lambda2 for this
     // snapshot (cached server-side by file size — first fetch of a new snapshot
     // costs a few seconds for betweenness_centrality, repeats are instant).
-    const d=await jget(`/api/network?seed=${netState.seed}&net=${netState.type}&step=${netState.step}&structural=1`);
+    const structParam = (forceQuick || netPlayTimer) ? "0" : "1";
+    const d=await jget(`/api/network?seed=${netState.seed}&net=${netState.type}&step=${netState.step}&structural=${structParam}`);
     if(d.error){
       /* newest snapshot is mid-write while the run is live; server already fell back
          to an older complete one if it could. Keep showing that and retry on the
@@ -1660,6 +2428,8 @@ function renderNetControls(){
   const wmin=$("#netwmin"), wmax=$("#netwmax");
   wmin.value = netState.wMin==null ? "" : netState.wMin;
   wmax.value = netState.wMax==null ? "" : netState.wMax;
+  $("#netlayout").value=netState.layout;
+  syncFA2Controls();
   renderColorControls();
   renderColorLegend();
   updateNetLegend();
@@ -1688,6 +2458,15 @@ function fillAttrSelect(sel, keys, current){
 
 function startSim(){
   const d=netState.data, cv=$("#network");
+  /* the network canvas lives inside a tab that can be display:none (Network tab
+     not active yet). Measuring/seeding the simulation against a hidden element
+     falls back to the arbitrary 900x900 defaults below, and that fallback aspect
+     ratio then sticks to the canvas's width/height attributes and distorts its
+     real on-screen size once the tab is shown (auto-height replaced-element
+     sizing follows the attributes' ratio). Skip entirely while hidden — the
+     tab-switch handler (switchTab) calls startSim() again once it's visible,
+     which is the first time real dimensions exist to seed/fit the layout with. */
+  if(cv.clientWidth===0 && cv.clientHeight===0) return;
   const W=cv.clientWidth||900, H=cv.clientHeight||640;
   const dpr=devicePixelRatio||1;
   cv.width=W*dpr; cv.height=H*dpr;
@@ -1766,6 +2545,73 @@ function simTick(s,d){
   for(let i=0;i<n;i++){
     vx[i]*=0.6; vy[i]*=0.6;
     x[i]+=vx[i]-sx*0.08; y[i]+=vy[i]-sy*0.08;
+  }
+  s.alpha*=0.985;
+}
+
+/* Gephi ForceAtlas2-style layout (ported from dashboard-remote/yabe): see the
+   FA2_DEFAULTS comment above netState for the physics summary. Its equilibrium
+   spread routinely exceeds the canvas — drawNet()'s existing fitView() rescales
+   every frame regardless of which layout produced the positions, so nothing
+   needs to be clamped here. */
+function simTickFA2(s,d){
+  const {n,x,y,vx,vy}=s, a=s.alpha;
+  const KA=0.008*netState.fa2.attraction;
+  const KR=0.02*netState.fa2.repulsion;
+  const GRAV=0.03*netState.fa2.gravity;
+  const DAMP=netState.fa2.damping;
+  const preventOverlap=netState.fa2.preventOverlap;
+  const radiusToWorld=1/Math.max(1e-6,(s.view&&s.view.k)||1);
+  let maxWorldRadius=0;
+  if(preventOverlap) for(let i=0;i<n;i++) maxWorldRadius=Math.max(maxWorldRadius,s.r[i]*radiusToWorld);
+  const wdeg=i=>1+d.nodes[i].indeg;
+  for(const [u,v] of netState.filteredEdges){
+    const dx=x[v]-x[u], dy=y[v]-y[u], f=KA*a;
+    vx[u]+=dx*f; vy[u]+=dy*f;
+    vx[v]-=dx*f; vy[v]-=dy*f;
+  }
+  /* degree-weighted coarse grid (exact in own+adjacent cells) */
+  const G=12;
+  let mnx=Infinity,mxx=-Infinity,mny=Infinity,mxy=-Infinity;
+  for(let i=0;i<n;i++){ if(x[i]<mnx)mnx=x[i]; if(x[i]>mxx)mxx=x[i]; if(y[i]<mny)mny=y[i]; if(y[i]>mxy)mxy=y[i]; }
+  const cw=(mxx-mnx)/G||1, ch=(mxy-mny)/G||1;
+  const cell=new Array(G*G).fill(null).map(()=>[]), cmx=new Float32Array(G*G), cmy=new Float32Array(G*G), cm=new Float32Array(G*G);
+  const ci=i=>{ const gx=Math.min(G-1,Math.max(0,Math.floor((x[i]-mnx)/cw))),
+                      gy=Math.min(G-1,Math.max(0,Math.floor((y[i]-mny)/ch))); return gy*G+gx; };
+  for(let i=0;i<n;i++){ const c=ci(i), w=wdeg(i); cell[c].push(i); cmx[c]+=x[i]*w; cmy[c]+=y[i]*w; cm[c]+=w; }
+  for(let c=0;c<G*G;c++) if(cm[c]){ cmx[c]/=cm[c]; cmy[c]/=cm[c]; }
+  for(let i=0;i<n;i++){
+    const c=ci(i), gx=c%G, gy=(c-gx)/G, wi=wdeg(i);
+    const nearX=preventOverlap?Math.max(1,Math.ceil((s.r[i]*radiusToWorld+maxWorldRadius)/cw)):1;
+    const nearY=preventOverlap?Math.max(1,Math.ceil((s.r[i]*radiusToWorld+maxWorldRadius)/ch)):1;
+    let fx=0, fy=0;
+    for(let c2=0;c2<G*G;c2++){
+      if(!cm[c2]) continue;
+      const gx2=c2%G, gy2=(c2-gx2)/G;
+      if(Math.abs(gx2-gx)<=nearX && Math.abs(gy2-gy)<=nearY){
+        for(const j of cell[c2]){ if(j===i) continue;
+          let dx=x[i]-x[j], dy=y[i]-y[j];
+          let dist=Math.sqrt(dx*dx+dy*dy);
+          if(dist<1){ dx=Math.random()-0.5; dy=Math.random()-0.5; dist=1; }
+          let f=KR*wi*wdeg(j)*a/dist;
+          if(preventOverlap){
+            const overlap=(s.r[i]+s.r[j])*radiusToWorld-dist;
+            if(overlap>0) f+=overlap*0.25*a;
+          }
+          fx+=dx/dist*f; fy+=dy/dist*f; }
+      } else {
+        let dx=x[i]-cmx[c2], dy=y[i]-cmy[c2];
+        let dist=Math.max(Math.sqrt(dx*dx+dy*dy),1);
+        const f=KR*wi*cm[c2]*a/dist;
+        fx+=dx/dist*f; fy+=dy/dist*f;
+      }
+    }
+    vx[i]+=fx+(s.W/2-x[i])*GRAV*a;
+    vy[i]+=fy+(s.H/2-y[i])*GRAV*a;
+  }
+  for(let i=0;i<n;i++){
+    vx[i]*=DAMP; vy[i]*=DAMP;
+    x[i]+=vx[i]; y[i]+=vy[i];
   }
   s.alpha*=0.985;
 }
@@ -1863,7 +2709,8 @@ function fitView(s){
 function loop(){
   const s=netState.sim;
   if(!s){ return; }
-  if(s.alpha>0.005){ simTick(s,netState.data); drawNet();
+  const tick = netState.layout==="forceAtlas2" ? simTickFA2 : simTick;
+  if(s.alpha>0.005){ tick(s,netState.data); drawNet();
     s.raf=requestAnimationFrame(loop);
   } else { drawNet(); s.raf=0; }
 }
@@ -1874,7 +2721,7 @@ function statTile(label,value){ return `<div class="stattile"><div class="lbl">$
 /* value-only structural stats (no chart) bundled into one card, so the row
    below only spends independent cards on things that actually have a graph */
 function renderStructSummary(s){
-  const r=s && s.rwc, dp=s && s.dip;
+  const r=s && s.rwc, dp=s && s.dip, bp=s && s.boundaryP, brho=s && s.boundaryRho;
   const rwcNote = r && r.rwc!=null
     ? `1=segregated echo chambers, 0=well-mixed, &lt;0=walks cross more than they stay. p<sub>XX</sub>=${fmt(r.pXX)} p<sub>YY</sub>=${fmt(r.pYY)} · sides ${r.sideX}/${r.sideY}, k=${r.k} hubs (Garimella et&nbsp;al. 2018, giant comp.)`
     : (r && r.unavailable==="one-sided" ? "all nodes on one opinion side"
@@ -1884,11 +2731,23 @@ function renderStructSummary(s){
   const dipNote = dp && dp.dip!=null
     ? `p=${fmt(dp.p)} vs uniform null (B=${dp.B}, n=${dp.n}) — ${dipSig?"multimodal (reject unimodality)":"unimodal (n.s.)"}. Complements bimodalityCoeff; unlike it, not fooled by skew.`
     : (dp && dp.detail ? dp.detail : (dp && dp.unavailable==="degenerate" ? `too few opinions (n=${dp.n})` : "not available"));
+  const bpNote = bp && bp.P!=null
+    ? `boundary=${bp.boundarySize} nodes (${bp.b12}/${bp.b21} per side). &gt;0=boundary nodes favor own camp (antagonism), &lt;0=cross more than expected (no polarization), unlike modularity this isolates antagonism from mere homophily (Guerra et&nbsp;al. 2013).`
+    : (bp && bp.unavailable==="one-sided" ? "all nodes on one opinion side"
+       : bp && bp.unavailable==="empty-boundary" ? "camps are fully isolated (no edges between them) — polarization not assessable, same as asking if there's polarization between humans and extraterrestrials (Guerra et al. 2013)"
+       : bp && bp.detail ? bp.detail : "not available");
+  const rhoNote = brho && brho.rho!=null
+    ? `n=${brho.n}, p=${fmt(brho.p)}. High = popular nodes concentrate at the camp boundary (no polarization); low = popular nodes avoid it (extreme voices lack cross-camp endorsement) (Guerra et&nbsp;al. 2013 §6).`
+    : (brho && brho.detail ? brho.detail : "not available");
   return `<div class="statlist">
     <div><div class="stat-row"><span class="lbl">Random Walk Controversy (opinion sides)</span><span class="val">${r && r.rwc!=null?fmt(r.rwc):"–"}</span></div>
       <div class="stat-note">${rwcNote}</div></div>
     <div><div class="stat-row"><span class="lbl">Hartigan dip (opinion multimodality)</span><span class="val">${dp && dp.dip!=null?fmt(dp.dip):"–"}</span></div>
       <div class="stat-note">${dipNote}</div></div>
+    <div><div class="stat-row"><span class="lbl">Boundary Polarization P (Guerra et al. 2013)</span><span class="val">${bp && bp.P!=null?fmt(bp.P):"–"}</span></div>
+      <div class="stat-note">${bpNote}</div></div>
+    <div><div class="stat-row"><span class="lbl">Boundary &rho; (popular-node concentration)</span><span class="val">${brho && brho.rho!=null?fmt(brho.rho):"–"}</span></div>
+      <div class="stat-note">${rhoNote}</div></div>
     <div class="stat-row"><span class="lbl">&lambda;<sub>2</sub> algebraic connectivity (giant comp.)</span><span class="val">${s && s.lambda2!=null?fmt(s.lambda2):"–"}</span></div>
     <div class="stat-row"><span class="lbl">giant component fraction</span><span class="val">${s && s.giantComponentFrac!=null?(100*s.giantComponentFrac).toFixed(1)+"%":"–"}</span></div>
     <div class="stat-row"><span class="lbl">nodes / edges</span><span class="val">${s && s.nNodes!=null?`${s.nNodes} / ${s.nEdges}`:"–"}</span></div>
@@ -2203,6 +3062,34 @@ $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").ch
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });
+function syncFA2Controls(){
+  $("#netfa2controls").hidden = netState.layout!=="forceAtlas2";
+  $("#netrepulsion").value=netState.fa2.repulsion;
+  $("#netattraction").value=netState.fa2.attraction;
+  $("#netgravity").value=netState.fa2.gravity;
+  $("#netdamping").value=netState.fa2.damping;
+  $("#netpreventoverlap").checked=netState.fa2.preventOverlap;
+}
+$("#netlayout").addEventListener("change",e=>{
+  netState.layout=e.target.value; save("netlayout",netState.layout);
+  syncFA2Controls();
+  const s=netState.sim; if(s){ s.alpha=1; if(!s.raf) loop(); }
+});
+for(const [id,key] of [["netrepulsion","repulsion"],["netattraction","attraction"],
+                        ["netgravity","gravity"],["netdamping","damping"]]){
+  $("#"+id).addEventListener("change",e=>{
+    netState.fa2[key]=+e.target.value||0; persistFA2();
+    const s=netState.sim; if(s){ s.alpha=Math.max(s.alpha,0.5); if(!s.raf) loop(); }
+  });
+}
+$("#netpreventoverlap").addEventListener("change",e=>{
+  netState.fa2.preventOverlap=e.target.checked; persistFA2();
+  const s=netState.sim; if(s){ s.alpha=Math.max(s.alpha,0.5); if(!s.raf) loop(); }
+});
+$("#netlayoutreset").addEventListener("click",()=>{
+  netState.fa2={...FA2_DEFAULTS}; persistFA2(); syncFA2Controls();
+  const s=netState.sim; if(s){ s.alpha=1; if(!s.raf) loop(); }
+});
 function onWeightFilterChange(){
   netState.wMin = $("#netwmin").value===""? null : +$("#netwmin").value;
   netState.wMax = $("#netwmax").value===""? null : +$("#netwmax").value;
@@ -2274,23 +3161,29 @@ window.addEventListener("keydown",e=>{ if(e.key==="Escape"&&cpState) closeColorP
 
 /* ---- network snapshot time-sequence playback ---- */
 let netPlayTimer=null;
-$("#netScrub").addEventListener("input",e=>{ stopNetPlay();
+$("#netScrub").addEventListener("input",e=>{ stopNetPlay(true);
   const steps=netSteps(), i=+e.target.value;
-  if(steps[i]!=null){ netState.step=String(steps[i]); save("netstep",netState.step); fetchNetwork(); } });
+  if(steps[i]!=null){ netState.step=String(steps[i]); save("netstep",netState.step); fetchNetwork(true); } });
+$("#netScrub").addEventListener("change",e=>{
+  const steps=netSteps(), i=+e.target.value;
+  if(steps[i]!=null){ netState.step=String(steps[i]); save("netstep",netState.step); fetchNetwork(false); } });
 $("#netPlay").addEventListener("click",()=>{ netPlayTimer?stopNetPlay():startNetPlay(); });
 function startNetPlay(){
   const steps=netSteps(); if(steps.length<2) return;
   const b=$("#netPlay"); b.innerHTML="&#9208; pause"; b.classList.add("live");
   let i=0;                                   /* begin at the earliest snapshot */
-  netState.step=String(steps[0]); save("netstep",netState.step); fetchNetwork();
+  netState.step=String(steps[0]); save("netstep",netState.step); fetchNetwork(true);
   netPlayTimer=setInterval(()=>{
     const st=netSteps(); i++;
     if(i>=st.length){ stopNetPlay(); return; }
-    netState.step=String(st[i]); save("netstep",netState.step); fetchNetwork();
+    netState.step=String(st[i]); save("netstep",netState.step); fetchNetwork(true);
   }, 1800);   /* first pass is gated by fetch/relayout; snapshots cache server-side after */
 }
-function stopNetPlay(){ if(netPlayTimer){ clearInterval(netPlayTimer); netPlayTimer=null; }
-  const b=$("#netPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); } }
+function stopNetPlay(preventFetch = false){
+  if(netPlayTimer){ clearInterval(netPlayTimer); netPlayTimer=null; }
+  const b=$("#netPlay"); if(b){ b.innerHTML="&#9654; play"; b.classList.remove("live"); }
+  if(!preventFetch) fetchNetwork(false);
+}
 
 function autoRange(values, padFrac=0.06){
   const vals=(values||[]).filter(v=>v!=null && !Number.isNaN(v));
@@ -2357,6 +3250,7 @@ function hideTip(){ $("#tooltip").hidden=true; }
 /* ---------- log drawer ---------- */
 let logSeed=null;
 async function openLog(seed){
+  $("#helpdrawer").hidden=true;
   logSeed=seed;
   $("#logdrawer").hidden=false;
   $("#logtitle").textContent=`logs/run_${seed}.log`;
@@ -2438,6 +3332,36 @@ const savedTheme=store("theme",null);
 if(savedTheme) document.documentElement.dataset.theme=savedTheme;
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>renderAll());
 
+/* ---------- app sidebar: tab switching + compact toggle ----------
+   Three tabs group the existing cards (Time Series / Opinion & Outcome /
+   Network) without changing what any of them render. Canvas-based views
+   (network snapshot, opinion trajectories) size themselves from their host's
+   clientWidth/Height, which is 0 while a tabpanel is display:none — the
+   explicit re-render calls below fix that the moment a tab becomes visible;
+   the ResizeObserver in watchCardSize (see initStaticCard) also catches it
+   after its debounce, so this is a belt-and-suspenders instant fix. */
+state.tab = store("tab","timeseries");
+function switchTab(tab){
+  state.tab=tab; save("tab",tab);
+  document.querySelectorAll(".tabbtn").forEach(b=>b.classList.toggle("active", b.dataset.tab===tab));
+  document.querySelectorAll(".tabpanel").forEach(p=>{ p.hidden = p.dataset.tabpanel!==tab; });
+  if(!state.summary) return;   // before the first refresh() lands, there's nothing to (re)render yet
+  if(tab==="timeseries") renderGrid();
+  else if(tab==="opinion"){ renderPlane(); renderOpinion(); }
+  else if(tab==="network"){ startSim(); }   /* first-ever call for this tab if it was never visible before (see startSim's hidden-canvas guard) */
+}
+document.querySelectorAll(".tabbtn").forEach(b=>b.addEventListener("click",()=>switchTab(b.dataset.tab)));
+switchTab(state.tab);
+
+const sidebarCompact = { current: store("sidebarCompact", false) };
+function setSidebarCompact(v){
+  sidebarCompact.current=v; save("sidebarCompact",v);
+  document.body.classList.toggle("sidebar-compact", v);
+  $("#railToggle").setAttribute("aria-expanded", String(!v));
+}
+setSidebarCompact(sidebarCompact.current);
+$("#railToggle").addEventListener("click",()=>setSidebarCompact(!sidebarCompact.current));
+
 /* ---------- main loop ---------- */
 let timer=null;
 function schedule(){
@@ -2446,6 +3370,34 @@ function schedule(){
 }
 initStaticCards();
 loadStopPresets();
+
+// Hook up help drawer controls
+const helpBtn = $("#helpbtn");
+const helpClose = $("#helpclose");
+const helpDrawer = $("#helpdrawer");
+if (helpBtn && helpClose && helpDrawer) {
+  helpBtn.addEventListener("click", () => {
+    $("#logdrawer").hidden = true;
+    helpDrawer.hidden = false;
+    populateHelpMetricList();
+  });
+  helpClose.addEventListener("click", () => {
+    helpDrawer.hidden = true;
+  });
+}
+
+// Hook up section help hover events
+document.querySelectorAll(".section-info-btn").forEach(btn => {
+  const key = btn.dataset.help;
+  btn.addEventListener("mouseenter", (evt) => {
+    showTip(evt, `<div style="line-height:1.4; max-width:260px;">${SECTION_HELP[key]}</div>`);
+  });
+  btn.addEventListener("mousemove", (evt) => {
+    showTip(evt, `<div style="line-height:1.4; max-width:260px;">${SECTION_HELP[key]}</div>`);
+  });
+  btn.addEventListener("mouseleave", hideTip);
+});
+
 refresh(); schedule();
 </script>
 </body>

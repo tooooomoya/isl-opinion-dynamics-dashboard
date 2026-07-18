@@ -98,6 +98,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(core.api_repost(qs))
             elif u.path == "/api/network":
                 self._json(analysis.api_network(qs))
+            elif u.path == "/api/trajectories":
+                self._json(analysis.api_trajectories(qs))
             elif u.path == "/api/color-presets":
                 self._json(api_color_presets())
             elif u.path == "/api/log":
