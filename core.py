@@ -32,6 +32,17 @@ RESULTS_COLS = ["step", "opinionAssortativity", "crossCuttingFraction",
 SEED_RE = re.compile(r"run_(\d+)\.log$")
 DEFAULT_TARGET_STEPS = 40000
 
+# Generic "run set" discovery: run.sh writes logs/run_<seed>.log, but every AI-agent-driven
+# script (BO calibrations, sweeps, ...) picks its own name, e.g.
+# logs/app_pol_baseline_v5_seed<seed>.log or logs/stage1b_bo_seed<seed>.log. Both conventions
+# share the shape "<prefix><seed>.log" where <prefix> is whatever text precedes the trailing
+# digit run - so grouping logs/*.log by that prefix, with no per-script registration needed,
+# is enough to let the dashboard discover and switch between them. results/run_<seed>_<tag>/
+# itself is already shared across all scripts (same ExperimentConfig.tag() convention), so only
+# log discovery needs to become group-aware.
+GROUP_LOG_RE = re.compile(r"^(.+?)(\d+)\.log$")
+DEFAULT_GROUP = "run_"
+
 DERIVED = {
     "apparentPolarization": (("exposureOpinionVar", "opinionVar"), lambda a, b: a - b),
     "repostShare": (("repostCount", "originalPostCount"),
@@ -45,16 +56,30 @@ STORES = {}          # seed -> SeedStore
 LOCK = threading.Lock()
 SERVE_LOGDIR = None  # set at startup
 SERVE_ONLY = None
+SERVE_GROUP = DEFAULT_GROUP  # currently-selected log-prefix "run set", switchable via /api/group
 
 
-def active_seeds(logdir: Path, only=None):
-    """seed -> status ('running' | 'done' | 'failed'), from logs/run_<seed>.log."""
-    out = {}
-    for f in sorted(logdir.glob("run_*.log")):
-        m = SEED_RE.search(f.name)
+def log_groups(logdir: Path):
+    """logs/*.log grouped by filename prefix (text before the trailing seed number).
+
+    Returns {prefix: [(seed, path), ...]}. "run_0.log" -> prefix "run_"; a BO script's
+    "app_pol_baseline_v5_seed3.log" -> prefix "app_pol_baseline_v5_seed". No registration
+    required - any script that writes logs/<anything><seed>.log is auto-discovered.
+    """
+    groups = {}
+    for f in logdir.glob("*.log"):
+        m = GROUP_LOG_RE.match(f.name)
         if not m:
             continue
-        seed = int(m.group(1))
+        groups.setdefault(m.group(1), []).append((int(m.group(2)), f))
+    return groups
+
+
+def active_seeds(logdir: Path, only=None, prefix=None):
+    """seed -> status ('running' | 'done' | 'failed'), from logs/<prefix><seed>.log."""
+    out = {}
+    prefix = DEFAULT_GROUP if prefix is None else prefix
+    for seed, f in sorted(log_groups(logdir).get(prefix, [])):
         if only is not None and seed not in only:
             continue
         text = f.read_text(errors="ignore")
@@ -66,6 +91,52 @@ def active_seeds(logdir: Path, only=None):
             status = "running"
         out[seed] = status
     return out
+
+
+def api_groups():
+    """Available run sets for the picker: one entry per discovered logs/*.log prefix."""
+    groups = log_groups(SERVE_LOGDIR)
+    out = []
+    for prefix, entries in groups.items():
+        statuses = active_seeds(SERVE_LOGDIR, prefix=prefix)
+        counts = {"running": 0, "done": 0, "failed": 0}
+        for st in statuses.values():
+            counts[st] += 1
+        out.append({
+            "prefix": prefix,
+            "seedCount": len(entries),
+            "counts": counts,
+            "latestMtime": max((f.stat().st_mtime for _, f in entries), default=0),
+        })
+    out.sort(key=lambda g: -g["latestMtime"])
+    return {"groups": out, "active": SERVE_GROUP}
+
+
+def pick_default_group(logdir: Path):
+    """Startup default for SERVE_GROUP: whichever run set actually has activity, not always
+    run.sh's "run_". Prefers a group with running seeds (most running wins ties), else the
+    most recently touched group; DEFAULT_GROUP only if logs/ has no matches at all - this is
+    what a fresh `--serve` should show without the user needing to touch the picker first."""
+    groups = log_groups(logdir)
+    if not groups:
+        return DEFAULT_GROUP
+    def key(prefix):
+        running = sum(1 for s in active_seeds(logdir, prefix=prefix).values() if s == "running")
+        latest = max((f.stat().st_mtime for _, f in groups[prefix]), default=0)
+        return (running > 0, running, latest)
+    return max(groups, key=key)
+
+
+def set_group(prefix):
+    """Switch the active run set. Rejects unknown prefixes (also closes off using this as
+    an arbitrary-path primitive into api_log's f"{SERVE_GROUP}{seed}.log")."""
+    global SERVE_GROUP
+    if prefix not in log_groups(SERVE_LOGDIR):
+        raise ValueError(f"unknown run set: {prefix!r}")
+    with LOCK:
+        SERVE_GROUP = prefix
+        STORES.clear()
+    return api_groups()
 
 
 def result_dir(seed: int):
@@ -156,7 +227,7 @@ class SeedStore:
 
 def poll_all():
     """Refresh statuses and tail every store. Call under LOCK."""
-    statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY)
+    statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY, SERVE_GROUP)
     for seed in statuses:
         d = result_dir(seed)
         if d is None:
@@ -389,7 +460,7 @@ def api_repost(qs):
 def api_log(qs):
     seed = int(qs.get("seed", ["-1"])[0])
     lines = int(qs.get("lines", ["200"])[0])
-    f = SERVE_LOGDIR / f"run_{seed}.log"
+    f = SERVE_LOGDIR / f"{SERVE_GROUP}{seed}.log"
     if not f.exists():
         return f"(no log file for seed {seed})"
     return "\n".join(f.read_text(errors="replace").splitlines()[-lines:])

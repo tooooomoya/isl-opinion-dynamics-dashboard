@@ -55,7 +55,10 @@ def load_network(path: Path):
         })
     # weight: repost count on that edge (repostNW); Gephi's GEXF exporter omits the
     # attribute entirely when it equals the default (1.0), so a missing key means 1.
-    edges = [[idx[u], idx[v], round(float(dat.get("weight") or 1.0), 4)]
+    # type: dominantEdgeType ("homophily"/"hostile"/"mixed"), only present on repost-graph
+    # snapshots written since the 2026-07-21 homophily/hostile edge split (RepostVisualize.java);
+    # absent (None) on follow-graph edges and on older repost snapshots.
+    edges = [[idx[u], idx[v], round(float(dat.get("weight") or 1.0), 4), dat.get("dominantEdgeType")]
              for u, v, dat in G.edges(data=True)]
     return {"n": len(nodes), "m": len(edges), "nodes": nodes, "edges": edges}
 

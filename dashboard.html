@@ -405,6 +405,8 @@
 <header class="top">
   <div class="grow"><div class="bar"><div id="obar" style="width:0%"></div></div></div>
   <div class="controls">
+    <label class="ctl" title="which experiment's logs+results to show, auto-discovered from logs/*.log filename prefixes (e.g. run.sh's run_ vs a BO script's app_pol_baseline_v5_seed)">run set
+      <select id="rungroup"></select></label>
     <button id="pause" title="pause/resume auto-refresh">&#9208; pause</button>
     <select id="interval" title="refresh interval">
       <option value="2">2s</option><option value="5" selected>5s</option>
@@ -485,6 +487,7 @@
         <input type="number" id="netwmax" min="0" step="1" placeholder="max" style="width:5.5em">
       </label>
       <label class="ctl"><input type="checkbox" id="netcross"> highlight cross-cutting edges</label>
+      <label class="ctl" title="repost graph only: color edges by which repost-probability gate fired (repostProb-gated in-bc relay = homophily, outOfBCRepostProb-gated out-of-bc relay = hostile, mixed = pair carried both in this window). No effect on the follow graph or on snapshots written before 2026-07-21."><input type="checkbox" id="netedgetype"> color edges by relay type (repost)</label>
       <label class="ctl" title="force = d3-style spring/repulsion; ForceAtlas2 = Gephi-style, degree-weighted repulsion with linear falloff and central gravity">layout
         <select id="netlayout">
           <option value="force">force</option>
@@ -646,7 +649,7 @@ const SECTION_HELP = {
   timeseries: "<b>Trends over Time</b>: Plots chronological data from <code>results.csv</code> for the active run. Drag horizontally on any chart to zoom into a step range. Enlarge cards with <code>⤢</code>, or hover over the <code>ⓘ</code> icon on a card to see what that specific metric measures.",
   opinion: "<b>Opinion Distribution</b>: Visualizes the opinions of agents over time. In 'trajectories' view, it plots the opinion path of each agent (colored by final opinion) at sparse GEXF snapshot intervals. In '3D distribution' view, it plots a waterfall/ridgeline perspective of the 2D density surface over 100 sampled timesteps.",
   plane: "<b>Outcome Plane</b>: Plots the phase-space trajectory of one metric against another (e.g. assortativity vs bimodality) over time. Use the scrubber slider to rewind time, or click Play to animate the trajectory. The fading trail goes from faint (early step) to solid (latest step).",
-  network: "<b>Network Snapshot</b>: A live 2D force-directed visualization of the social network (follow or repost graph). Node sizes are proportional to followers, colors map to opinions (blue &minus;1 &harr; red +1), and double-ringed nodes are intervened hubs.",
+  network: "<b>Network Snapshot</b>: A live 2D force-directed visualization of the social network (follow or repost graph). Node sizes are proportional to followers, colors map to opinions (blue &minus;1 &harr; red +1), and double-ringed nodes are intervened hubs. On the repost graph, 'color edges by relay type' distinguishes homophily relays (in-bc, repostProb-gated) from hostile relays (out-of-bc, outOfBCRepostProb-gated), with 'mixed' for pairs carrying both in the current window.",
   structure: "<b>Network Structure</b>: Plots structural statistics of the network. The degree charts show the empirical complementary cumulative distribution function (CCDF) P(X&ge;x) on log-log scales, with a power-law fit line. Also displays clustering, average betweenness centrality, algebraic connectivity (&lambda;<sub>2</sub>), E-I index, and modularity (Q<sub>sign</sub>).",
   behavior: "<b>Agent Behavior & Attributes</b>: Displays distributions of individual agent attributes at the snapshot step (such as bounded-confidence tolerance &epsilon; and posting probability), alongside repost cascade depth, virality, and share time series."
 };
@@ -685,8 +688,10 @@ const BINS_DARK  = ["#3b82f6","#7fa8e8","#7b828f","#e39a8d","#ef4444"];
 const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"];
 /* "cRateMean" here is a FAMILY id (see state.summary.families), not a literal
    results.csv column — rendered as one class-colored chart, not five. */
-const DEFAULT_METRICS = ["cRateMean","postShare","disagreement","apparentPolarization",
-                         "unfollow","originalPostCount"];
+const DEFAULT_METRICS = ["cRateMean","postShare","apparentPolarization","feedChronoCountMean",
+                         "feedForYouCountMean","feedOriginalCountMean","highComfortRateNum",
+                         "originalPostCount","repostShare","follow","unfollowCount"];
+const DEFAULT_FEATURED = ["cRateMean","postShare"];   // promoted to the larger row-2 cards by default
 const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed"};
 
 const $ = s => document.querySelector(s);
@@ -696,7 +701,7 @@ const save  = (k,v) => localStorage.setItem("dash."+k, JSON.stringify(v));
 const state = {
   summary:null, series:{}, opinion:null, repost:null,
   metrics: store("metrics", DEFAULT_METRICS),
-  featured: store("featured", []),   // metric ids promoted to row 2 (max 2, oldest first)
+  featured: store("featured", DEFAULT_FEATURED),   // metric ids promoted to row 2 (max 2, oldest first)
   hidden: new Set(store("hidden", [])),
   zoom: null, scrub: null, paused:false, busy:false,
   px: store("px","opinionAssortativity"), py: store("py","bimodalityCoeff"),
@@ -876,10 +881,37 @@ function expandMetric(m){
   return fam ? fam : [m];
 }
 
+/* ---------- run-set picker ---------- */
+// Lets you switch which experiment's logs+results the dashboard tails without restarting the
+// server: run.sh's logs/run_<seed>.log vs an AI-agent script's logs/<name>_seed<seed>.log are
+// both just "prefix + seed" (see core.py's log_groups). Selection lives server-side
+// (core.SERVE_GROUP) since it gates which seeds every other endpoint sees.
+function renderGroupPicker(g){
+  const sel = $("#rungroup");
+  if(!sel || !g) return;
+  const cur = sel.value;
+  sel.innerHTML = g.groups.map(x=>{
+    const label = `${x.prefix} · ${x.seedCount} seed${x.seedCount===1?"":"s"}`
+      + (x.counts.running ? ` · ${x.counts.running} running` : "");
+    return `<option value="${x.prefix}"${x.prefix===g.active?" selected":""}>${label}</option>`;
+  }).join("");
+  // keep an in-flight user selection visible even if this poll's snapshot hasn't caught up yet
+  if(cur && [...sel.options].some(o=>o.value===cur)) sel.value = cur;
+}
+$("#rungroup").addEventListener("change", async ()=>{
+  try{
+    renderGroupPicker(await postJson("/api/group", {prefix: $("#rungroup").value}));
+  }catch(e){ showBanner("err","failed to switch run set: "+e.message); return; }
+  // new run set -> old detail-seed choices are almost certainly gone; let refresh() re-pick
+  state.opseed = null; netState.seed = null;
+  refresh();
+});
+
 async function refresh(){
   // don't tear a card's DOM out from under an in-progress resize/reorder drag
   if(state.busy || interacting) return; state.busy=true;
   try{
+    renderGroupPicker(await jget("/api/groups"));
     const summary = await jget("/api/summary");
     state.summary = summary;
     // Q_sign/Q_sign_repost/EI_index (network-structure panel) and repostShare (behavior panel)
@@ -1014,7 +1046,10 @@ function renderPicker(){
   }
   const reset=document.createElement("button");
   reset.textContent="reset to defaults"; reset.style.gridColumn="1/-1"; reset.style.width="fit-content";
-  reset.addEventListener("click",()=>{ state.metrics=[...DEFAULT_METRICS]; save("metrics",state.metrics); refresh(); });
+  reset.addEventListener("click",()=>{
+    state.metrics=[...DEFAULT_METRICS]; state.featured=[...DEFAULT_FEATURED];
+    save("metrics",state.metrics); save("featured",state.featured); refresh();
+  });
   list.appendChild(reset);
   /* plane axis selects (plain columns only — a 2-D plane axis must be a single scalar) */
   for(const [sel,key] of [["#px","px"],["#py","py"]]){
@@ -2084,6 +2119,15 @@ function saveCatColor(key,idx,hex){
   byName[cats[idx]]=hex;
   save("netcat."+key,byName);
 }
+/* repost edge-type coloring (2026-07-21): fixed (non-user-editable) palette, unlike node
+   categorical colors -- picked to stay visually distinct from the diverging opinion scale
+   (no blue) and from opsign's blue/cyan/green triple (reuses only green). */
+const EDGE_TYPE_CATS=["homophily","hostile","mixed"];
+const EDGE_TYPE_PALETTE_IDX=[2,4,5];
+function getEdgeTypePalette(){
+  const base=theme()==="dark"?SERIES_DARK:SERIES_LIGHT;
+  return EDGE_TYPE_PALETTE_IDX.map(i=>base[i]);
+}
 /* piecewise-linear gradient over pos-sorted stops; t in [0,1] */
 function gradColor(t,stops){ t=Math.max(0,Math.min(1,t));
   const s=[...stops].sort((a,b)=>a.pos-b.pos);
@@ -2136,9 +2180,11 @@ function applyNetColors(){
 }
 function updateNetLegend(){
   const leg=$("#netleg"); if(!leg) return;
+  const pal=getEdgeTypePalette();
   leg.innerHTML=
     `<span><i style="background:none;border:2px solid var(--ink2);border-radius:50%"></i>hub (ringed)</span>`+
-    ($("#netcross").checked?`<span><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"");
+    ($("#netcross").checked?`<span><i style="background:var(--warn)"></i>cross-cutting edge</span>`:"")+
+    ($("#netedgetype").checked?EDGE_TYPE_CATS.map((c,i)=>`<span><i style="background:${pal[i]}"></i>${c} relay</span>`).join(""):"");
 }
 
 /* ---- named gradient presets: standard (shipped, dashboard/color_presets.json)
@@ -2630,13 +2676,38 @@ function drawNet(){
      Node radii stay in screen px; only positions are scaled. */
   const view=fitView(s); s.view=view;
   const {k,ox,oy}=view, PX=i=>ox+x[i]*k, PY=i=>oy+y[i]*k;
-  ctx.lineWidth=0.5; ctx.strokeStyle=netState.edgeColor||cssVar("--axis"); ctx.globalAlpha=0.4;
-  ctx.beginPath();
-  for(const [u,v] of netState.filteredEdges){
-    if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
-    ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
+  const byType=$("#netedgetype").checked;
+  if(byType){
+    const pal=getEdgeTypePalette();
+    for(let ti=0;ti<EDGE_TYPE_CATS.length;ti++){
+      ctx.strokeStyle=pal[ti]; ctx.lineWidth=0.7; ctx.globalAlpha=0.55;
+      ctx.beginPath();
+      for(const [u,v,,t] of netState.filteredEdges){
+        if(t!==EDGE_TYPE_CATS[ti]) continue;
+        if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
+        ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
+      }
+      ctx.stroke();
+    }
+    // edges without a type tag (follow graph, or repost snapshots older than 2026-07-21)
+    // fall back to the plain edge color so they don't just vanish.
+    ctx.strokeStyle=netState.edgeColor||cssVar("--axis"); ctx.lineWidth=0.5; ctx.globalAlpha=0.4;
+    ctx.beginPath();
+    for(const [u,v,,t] of netState.filteredEdges){
+      if(t) continue;
+      if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
+      ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
+    }
+    ctx.stroke();
+  } else {
+    ctx.lineWidth=0.5; ctx.strokeStyle=netState.edgeColor||cssVar("--axis"); ctx.globalAlpha=0.4;
+    ctx.beginPath();
+    for(const [u,v] of netState.filteredEdges){
+      if(cross && d.nodes[u].op*d.nodes[v].op<0) continue;
+      ctx.moveTo(PX(u),PY(u)); ctx.lineTo(PX(v),PY(v));
+    }
+    ctx.stroke();
   }
-  ctx.stroke();
   if(cross){
     ctx.lineWidth=0.9; ctx.strokeStyle=cssVar("--warn"); ctx.globalAlpha=0.75;
     ctx.beginPath();
@@ -3056,11 +3127,14 @@ $("#netcolor").addEventListener("change",e=>{ netState.colorBy=e.target.value; s
   stopSel=0; stopPresetName="";
   renderColorControls(); applyNetColors(); });
 $("#netcross").checked=store("netcross",false);
+$("#netedgetype").checked=store("netedgetype",false);
 $("#netedgecolor").addEventListener("input",e=>{
   netState.edgeColor=e.target.value; save("netedgecolor",netState.edgeColor);
   const s=netState.sim; if(s&&!s.raf) drawNet();
 });
 $("#netcross").addEventListener("change",()=>{ save("netcross",$("#netcross").checked); renderNetControls();
+  if(netState.sim&&!netState.sim.raf) drawNet(); });
+$("#netedgetype").addEventListener("change",()=>{ save("netedgetype",$("#netedgetype").checked); renderNetControls();
   if(netState.sim&&!netState.sim.raf) drawNet(); });
 $("#netreheat").addEventListener("click",()=>{ const s=netState.sim;
   if(s){ s.alpha=1; if(!s.raf) loop(); } });

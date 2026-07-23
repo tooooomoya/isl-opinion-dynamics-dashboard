@@ -102,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(analysis.api_trajectories(qs))
             elif u.path == "/api/color-presets":
                 self._json(api_color_presets())
+            elif u.path == "/api/groups":
+                self._json(core.api_groups())
             elif u.path == "/api/log":
                 self._send(200, core.api_log(qs).encode(), "text/plain; charset=utf-8")
             elif u.path == "/favicon.ico":
@@ -118,6 +120,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/color-presets":
                 self._json(save_color_preset(self._read_json_body()))
+            elif u.path == "/api/group":
+                self._json(core.set_group(self._read_json_body().get("prefix")))
             else:
                 self._send(404, b"not found", "text/plain")
         except BrokenPipeError:
@@ -129,6 +133,7 @@ class Handler(BaseHTTPRequestHandler):
 def run_server(logdir: Path, only, host: str, port: int):
     core.SERVE_LOGDIR = logdir
     core.SERVE_ONLY = only
+    core.SERVE_GROUP = core.pick_default_group(logdir)
     httpd = ThreadingHTTPServer((host, port), Handler)
     url = f"http://{host}:{port}"
     print(f"Serving interactive dashboard at {url}")
