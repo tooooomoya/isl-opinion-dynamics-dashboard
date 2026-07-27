@@ -2425,7 +2425,18 @@ function maybeRefetchNetwork(){
 }
 
 async function fetchNetwork(forceQuick = false){
-  if(netState.loading || !seedList().length) return;
+  /* 2026-07-28: a call arriving while a fetch is already in flight (e.g. the user
+     flips #nettype follow->repost while the initial structural=1 fetch, which can
+     take several seconds, is still running) used to be silently dropped here —
+     netState.type still flipped to "repost", but netState.data kept the stale
+     follow-graph payload with no automatic retry (maybeRefetchNetwork only refetches
+     on tag change / step advance, never on a type/seed mismatch). That made the
+     network panel keep rendering the follow graph — visually near-identical to the
+     repost graph, and universally weight=1 since the follow graph is an unweighted
+     adjacency — silently mislabeled as "repost graph", so any weight>=2 filter
+     zeroed every edge. Queue one retry instead of dropping it. */
+  if(netState.loading){ netState.pendingRefetch=true; return; }
+  if(!seedList().length) return;
   const ids=seedList().map(s=>s.seed);
   if(netState.seed===null || !ids.includes(netState.seed)) netState.seed=ids[0];
   netState.loading=true;
@@ -2454,7 +2465,10 @@ async function fetchNetwork(forceQuick = false){
     renderStructural();
     renderBehavior();
   }catch(e){ $("#netinfo").textContent="dashboard server unreachable: "+e.message; }
-  finally{ netState.loading=false; }
+  finally{
+    netState.loading=false;
+    if(netState.pendingRefetch){ netState.pendingRefetch=false; fetchNetwork(); }
+  }
 }
 function renderNetControls(){
   const ns=$("#netseed");
