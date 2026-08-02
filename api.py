@@ -96,6 +96,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(core.api_opinion(qs))
             elif u.path == "/api/repost":
                 self._json(core.api_repost(qs))
+            elif u.path == "/api/post_lifespan":
+                self._json(core.api_post_lifespan(qs))
             elif u.path == "/api/network":
                 self._json(analysis.api_network(qs))
             elif u.path == "/api/trajectories":

@@ -140,8 +140,14 @@ def set_group(prefix):
 
 
 def result_dir(seed: int):
-    """Newest results/run_<seed>_<tag>/ folder for this seed (mtime-based)."""
-    candidates = list(ROOT.glob(f"results/run_{seed}_*"))
+    """Newest results/run_<seed>_<tag>/ folder for this seed (mtime-based).
+
+    2026-07-28: widened from a flat results/run_<seed>_* glob to results/**/run_<seed>_* so runs
+    launched with ExperimentConfig.resultsSubdir (grouping into e.g. results/<experiment>/) are
+    still found -- ** matches zero-or-more directories, so ungrouped flat runs still resolve
+    exactly as before (verified: results/**/run_0_* matches both results/run_0_* variants).
+    """
+    candidates = list(ROOT.glob(f"results/**/run_{seed}_*"))
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
@@ -217,12 +223,17 @@ class SeedStore:
         self.mod = CsvTail(d / "metrics" / "modularity.csv")
         self.op = CsvTail(d / "opinion" / "opinion_result.csv", max_rows=2000)
         self.repost = CsvTail(d / "posts" / "repost_cascades.csv", max_rows=8000)
+        # 2026-07-29: per-post eviction log (Writer.logPostLifespan / AdminOptim.recordLifespan) --
+        # one row per post that was ever reposted, at the moment it ages out of the For-You
+        # candidate window. See api_post_lifespan.
+        self.lifespan = CsvTail(d / "posts" / "post_lifespan.csv", max_rows=8000)
 
     def poll(self):
         self.main.poll()
         self.mod.poll()
         self.op.poll()
         self.repost.poll()
+        self.lifespan.poll()
 
 
 def poll_all():
@@ -454,6 +465,46 @@ def api_repost(qs):
                                if b in vir_buckets else None for b in bkeys],
             "depthHist": {str(k): v for k, v in sorted(hist.items())},
             "n": len(steps),
+        }
+
+
+def api_post_lifespan(qs):
+    """Self-reinforcement diagnostic from posts/post_lifespan.csv (Writer.logPostLifespan): the
+    top-N reposted posts by lifespan (lastRepostStep - postedStep) for one seed, plus the same
+    mean/still-active-fraction summary as the postLifespanMean/postStillActiveAtEvictionFrac
+    results.csv scalars -- computed independently here from the raw per-post rows so the ranking
+    table and the summary numbers are self-consistent even under CsvTail's decimation.
+    """
+    seed = int(qs.get("seed", ["-1"])[0])
+    top_n = max(1, min(50, int(qs.get("top", ["15"])[0])))
+    empty = {"rows": [], "n": 0, "meanLifespan": None, "stillActiveFrac": None}
+    with LOCK:
+        poll_all()
+        st = STORES.get(seed)
+        if st is None:
+            return empty
+        post_ids = st.lifespan.column("postId")
+        if not post_ids:
+            return empty
+        authors = st.lifespan.column("author")
+        posted = st.lifespan.column("postedStep")
+        last_repost = st.lifespan.column("lastRepostStep")
+        eviction = st.lifespan.column("evictionStep")
+        lifespans = st.lifespan.column("lifespan")
+        reposts = st.lifespan.column("receivedReposts")
+        active = st.lifespan.column("stillActiveAtEviction")
+        order = sorted(range(len(post_ids)), key=lambda i: lifespans[i], reverse=True)[:top_n]
+        rows = [{
+            "postId": int(post_ids[i]), "author": int(authors[i]),
+            "postedStep": int(posted[i]), "lastRepostStep": int(last_repost[i]),
+            "evictionStep": int(eviction[i]), "lifespan": int(lifespans[i]),
+            "receivedReposts": int(reposts[i]), "stillActive": bool(active[i]),
+        } for i in order]
+        return {
+            "rows": rows,
+            "n": len(post_ids),
+            "meanLifespan": rnd(sum(lifespans) / len(lifespans)),
+            "stillActiveFrac": rnd(sum(active) / len(active)),
         }
 
 

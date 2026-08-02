@@ -153,7 +153,13 @@
   #banner { border-radius:8px; padding:8px 12px; font-size:13px; margin-bottom:10px; }
   #banner.err { background:color-mix(in srgb, var(--bad) 12%, var(--surface)); border:1px solid var(--bad); }
   #banner.ok  { background:color-mix(in srgb, var(--good) 12%, var(--surface)); border:1px solid var(--good); }
-  #seedbar { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; margin-bottom:10px; }
+  /* max-height+scroll, not flex:none's natural height: a run with many seeds (e.g. 40) would
+     otherwise wrap into many rows and squeeze the tabpanel below it (#appShell is a flex column
+     with fixed viewport height) -- capping this at ~2 rows keeps the graph/chart area stable
+     regardless of seed count, matching the "generic tool" charter (not specific to any one
+     experiment's seed count). */
+  #seedbar { display:flex; gap:8px; flex-wrap:wrap; margin-top:20px; margin-bottom:10px;
+    max-height:84px; overflow-y:auto; padding-right:4px; }
   .chip { display:flex; gap:6px; align-items:center; background:var(--surface); border:1px solid var(--border);
     border-radius:999px; padding:7px 14px; font-size:11.5px; cursor:pointer; user-select:none; }
   .chip.off { opacity:.4; }
@@ -690,7 +696,8 @@ const BIN_LABELS = ["[-1,-0.6)","[-0.6,-0.2)","[-0.2,0.2)","[0.2,0.6)","[0.6,1]"
    results.csv column — rendered as one class-colored chart, not five. */
 const DEFAULT_METRICS = ["cRateMean","postShare","apparentPolarization","feedChronoCountMean",
                          "feedForYouCountMean","feedOriginalCountMean","highComfortRateNum",
-                         "originalPostCount","repostShare","follow","unfollowCount"];
+                         "originalPostCount","repostShare","follow","unfollowCount",
+                         "postLifespanMean","postStillActiveAtEvictionFrac"];
 const DEFAULT_FEATURED = ["cRateMean","postShare"];   // promoted to the larger row-2 cards by default
 const STATUS_GLYPH = {running:"&#9654; running", done:"&#10003; done", failed:"&#10007; failed"};
 
@@ -928,6 +935,7 @@ async function refresh(){
     // agent behavior all describe the same seed+step, so there's one seed picker for all three)
     const netSeed=(netState.seed!==null && seedIds.includes(netState.seed)) ? netState.seed : (seedIds[0] ?? null);
     if(netSeed!==null) state.repost = await jget("/api/repost?seed="+netSeed);
+    if(netSeed!==null) state.postLifespan = await jget("/api/post_lifespan?seed="+netSeed+"&top=15");
     hideBanner("err");
     renderAll();
     maybeRefetchNetwork();
@@ -1154,7 +1162,7 @@ const DEFAULT_ORDER = {
   degree: ["in", "out", "total"],
   structstats: ["summary", "clustering", "betweenness", "echo"],
   qsignei: ["qsign", "qsignrepost", "ei"],
-  repostpair: ["depth", "virality", "share"],
+  repostpair: ["depth", "virality", "share", "lifespan"],
   attrpair: ["bc", "pp"],
 };
 function getOrder(key){
@@ -3317,11 +3325,22 @@ function renderBehavior(){
       const r=state.repost;
       const S=(r && r.step && r.step.length && r.structVirality) ? [{steps:r.step, vals:r.structVirality, color:cssVar("--accent")}] : [];
       drawSimpleSeries(body, `mean structural virality (Goel 2015; 1=broadcast) — seed ${seed??"–"}`, S);
-    } else {
+    } else if(key==="share"){
       const e=seed!=null ? state.series[String(seed)] : null;
       const vals=e && e.cols && e.cols.repostShare;
       const S=(vals && e.step.length) ? [{steps:e.step, vals, color:cssVar("--accent")}] : [];
       drawSimpleSeries(body, `repost share of content — seed ${seed??"–"}`, S);
+    } else if(key==="lifespan"){
+      const pl=state.postLifespan;
+      const rows=(pl && pl.rows) || [];
+      body.innerHTML=`<div style="font-size:12px;font-weight:600;color:var(--ink2);margin-bottom:2px">top reposted posts by lifespan — seed ${seed??"–"}</div>`+
+        `<div class="subnote" style="margin:-2px 0 4px">self-reinforcement diagnostic (posts/post_lifespan.csv): lifespan = last repost step &minus; posted step, for posts evicted from the For-You candidate window (VELOCITY_WINDOW steps). &#9673; = still gaining reposts when forcibly evicted, i.e. cut off mid-virality rather than having gone quiet on its own.</div>`+
+        statTile("mean lifespan (all evicted, reposted)", pl && pl.meanLifespan!=null ? fmt(pl.meanLifespan) : "–") +
+        statTile("still-active-at-eviction frac.", pl && pl.stillActiveFrac!=null ? fmt(pl.stillActiveFrac) : "–") +
+        `<table class="bctable" style="margin-top:6px"><thead><tr><th>post</th><th>author</th><th>reposts</th><th>lifespan</th></tr></thead><tbody>`+
+        (rows.length ? rows.map(r=>`<tr><td>${r.postId}${r.stillActive?" &#9673;":""}</td><td>${r.author}</td><td>${r.receivedReposts}</td><td>${r.lifespan}</td></tr>`).join("")
+                     : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">–</td></tr>`)+
+        `</tbody></table>`;
     }
   }
 }
