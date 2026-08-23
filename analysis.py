@@ -5,6 +5,7 @@ import math
 import random
 import threading
 from pathlib import Path
+from . import core
 from .core import result_dir, rnd, decimate
 
 GRAPH_CACHE = {}
@@ -520,7 +521,12 @@ def api_network(qs):
     net = qs.get("net", ["follow"])[0]
     want_step = qs.get("step", ["latest"])[0]
     want_structural = qs.get("structural", ["0"])[0] == "1"
-    d = result_dir(seed)
+    # An explicit pathHint (manual-seed override, see dashboard.html) always wins; otherwise
+    # scope this seed lookup to the currently-active run set's own tag, for the same reason
+    # poll_all() does (a seed number reused by another arm of the same sweep must not resolve
+    # to that other arm's folder just because it happens to be mtime-newer).
+    path_hint = qs.get("pathHint", [None])[0] or core.group_path_hint(core.SERVE_LOGDIR, core.SERVE_GROUP)
+    d = result_dir(seed, path_hint)
     empty = {"steps": [], "step": None, "nodes": [], "edges": []}
     if d is None or not (d / "GEXF").is_dir():
         return empty

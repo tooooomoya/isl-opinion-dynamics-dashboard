@@ -106,6 +106,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(api_color_presets())
             elif u.path == "/api/groups":
                 self._json(core.api_groups())
+            elif u.path == "/api/activity":
+                self._json(core.api_activity())
             elif u.path == "/api/log":
                 self._send(200, core.api_log(qs).encode(), "text/plain; charset=utf-8")
             elif u.path == "/favicon.ico":

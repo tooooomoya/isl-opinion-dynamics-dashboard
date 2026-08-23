@@ -3,6 +3,7 @@ import csv
 import re
 import math
 import threading
+import time
 from pathlib import Path
 
 # Path discovery with CWD fallback for standalone executions
@@ -43,6 +44,20 @@ DEFAULT_TARGET_STEPS = 40000
 GROUP_LOG_RE = re.compile(r"^(.+?)(\d+)\.log$")
 DEFAULT_GROUP = "run_"
 
+# 2026-08-22: some OAT/param-sweep scripts put the sweep tag *after* the seed instead of at the
+# very end, e.g. logs/bcrecoveryoat_seed7700000_bcrec0.01.log (seed 7700000, tag "bcrec0.01") or
+# logs/feedmech_seed8900000_..._pu0.11_vcr0.1_control.log. Against GROUP_LOG_RE alone, the LAST
+# digit run before ".log" wins the "seed" capture, which for "..._bcrec0.01.log" is the trailing
+# "01" from "0.01" -- the real seed and the swept parameter value both get silently swallowed
+# into the "prefix" half, so every real seed forms its own bogus one-off group instead of the
+# sweep collapsing into one group per parameter value shared across all seeds. Any filename
+# containing the literal "_seed" marker is checked against this pattern first: text before
+# "_seed" + "_seed" itself = group(1), the seed digits = group(2), everything else up to ".log"
+# (the parameter tag) = group(3). The group key is group(1)+group(3) (seed digits removed) so
+# all seeds sharing the same parameter tag collapse into one group, and the tag stays visible in
+# the run-set picker instead of being hidden inside a per-seed prefix.
+MID_SEED_RE = re.compile(r"^(.*_seed)(\d+)(.*)\.log$")
+
 DERIVED = {
     "apparentPolarization": (("exposureOpinionVar", "opinionVar"), lambda a, b: a - b),
     "repostShare": (("repostCount", "originalPostCount"),
@@ -58,21 +73,95 @@ SERVE_LOGDIR = None  # set at startup
 SERVE_ONLY = None
 SERVE_GROUP = DEFAULT_GROUP  # currently-selected log-prefix "run set", switchable via /api/group
 
+# 2026-08-22: lightweight "what's the server doing right now" status, polled by the frontend
+# (/api/activity) on a fast interval so a slow poll_all()/results-index rescan shows up on screen
+# as text instead of the UI just silently sitting there for several seconds.
+ACTIVITY = None
+ACTIVITY_LOCK = threading.Lock()
+
+
+def set_activity(msg):
+    global ACTIVITY
+    with ACTIVITY_LOCK:
+        ACTIVITY = msg
+
+
+def clear_activity():
+    global ACTIVITY
+    with ACTIVITY_LOCK:
+        ACTIVITY = None
+
+
+def api_activity():
+    with ACTIVITY_LOCK:
+        return {"activity": ACTIVITY}
+
 
 def log_groups(logdir: Path):
-    """logs/*.log grouped by filename prefix (text before the trailing seed number).
+    """logs/*.log grouped by filename prefix (text before the trailing seed number), or by
+    prefix+suffix with the seed digits removed when the seed sits mid-filename (see MID_SEED_RE).
 
     Returns {prefix: [(seed, path), ...]}. "run_0.log" -> prefix "run_"; a BO script's
-    "app_pol_baseline_v5_seed3.log" -> prefix "app_pol_baseline_v5_seed". No registration
-    required - any script that writes logs/<anything><seed>.log is auto-discovered.
+    "app_pol_baseline_v5_seed3.log" -> prefix "app_pol_baseline_v5_seed";
+    "bcrecoveryoat_seed7700000_bcrec0.01.log" -> prefix "bcrecoveryoat_seed_bcrec0.01" (seed 7700000
+    joins the other 14 seeds swept at bcrec0.01, instead of forming its own one-seed group). No
+    registration required - any script that writes logs/<anything><seed>.log or
+    logs/<anything>_seed<seed><anything>.log is auto-discovered.
     """
     groups = {}
     for f in logdir.glob("*.log"):
-        m = GROUP_LOG_RE.match(f.name)
-        if not m:
-            continue
-        groups.setdefault(m.group(1), []).append((int(m.group(2)), f))
+        m = MID_SEED_RE.match(f.name)
+        if m:
+            key, seed = m.group(1) + m.group(3), int(m.group(2))
+        else:
+            m = GROUP_LOG_RE.match(f.name)
+            if not m:
+                continue
+            key, seed = m.group(1), int(m.group(2))
+        groups.setdefault(key, []).append((seed, f))
     return groups
+
+
+def log_path_for_seed(logdir: Path, prefix: str, seed: int):
+    """Actual log Path for one (prefix, seed) pair, looked up from log_groups() rather than
+    reconstructed by string concatenation -- concatenation breaks for MID_SEED_RE groups, whose
+    key has the seed digits removed from the *middle* of the filename, not the end."""
+    for s, f in log_groups(logdir).get(prefix, []):
+        if s == seed:
+            return f
+    return None
+
+
+def group_path_hint(logdir: Path, prefix: str):
+    """The descriptive tag text after the seed digits for a MID_SEED_RE group (e.g. prefix
+    'feedmech_seed_2026-08-14_lmp_feedmech_structural_9b_pu0.15_vcr0.1_control' -> tag text
+    '_2026-08-14_lmp_feedmech_structural_9b_pu0.15_vcr0.1_control'). None for a plain
+    trailing-seed group (GROUP_LOG_RE), which has no such tag and no ambiguity to resolve.
+
+    Why this matters: seed numbers are commonly reused across arms/conditions of the SAME sweep
+    (e.g. .../pu0.15_vcr0.1/control/run_8900000_* and .../pu0.15_vcr0.1/M_silent/run_8900000_*
+    both exist). Without disambiguation, result_dir(seed) can only pick by mtime, so switching
+    the active run set (e.g. control -> M_silent) can silently keep resolving to the SAME
+    on-disk folder if it happens to be the newer one -- every chart and the network snapshot then
+    show identical data for what looks like two different conditions, with no error. Pairing this
+    tag text with result_dir's path_hint (see its normalized substring match) scopes seed lookups
+    to the folder that actually belongs to the currently-active group.
+    """
+    for f in logdir.glob("*.log"):
+        m = MID_SEED_RE.match(f.name)
+        if m and (m.group(1) + m.group(3)) == prefix:
+            return m.group(3) or None
+    return None
+
+
+_HINT_SEP_RE = re.compile(r"[_./]+")
+
+
+def _normalize_hint(s: str) -> str:
+    """Collapse '_', '.', '/' to a single space so a hint built from an underscore-joined log
+    tag (e.g. '_pu0.15_vcr0.1_control') can substring-match a slash-separated results/ path
+    (e.g. '.../pu0.15_vcr0.1/control/...') despite the different separator characters."""
+    return _HINT_SEP_RE.sub(" ", s.strip("_./ ")).strip().lower()
 
 
 def active_seeds(logdir: Path, only=None, prefix=None):
@@ -128,28 +217,89 @@ def pick_default_group(logdir: Path):
 
 
 def set_group(prefix):
-    """Switch the active run set. Rejects unknown prefixes (also closes off using this as
-    an arbitrary-path primitive into api_log's f"{SERVE_GROUP}{seed}.log")."""
+    """Switch the active run set. Rejects unknown prefixes so SERVE_GROUP always names a
+    real, currently-discovered group."""
     global SERVE_GROUP
     if prefix not in log_groups(SERVE_LOGDIR):
         raise ValueError(f"unknown run set: {prefix!r}")
     with LOCK:
         SERVE_GROUP = prefix
         STORES.clear()
+        invalidate_result_index()
     return api_groups()
 
 
-def result_dir(seed: int):
-    """Newest results/run_<seed>_<tag>/ folder for this seed (mtime-based).
+_RESULT_INDEX = None       # seed -> [Path, ...], built by _result_index()
+_RESULT_INDEX_AT = 0.0     # time.monotonic() of the last rebuild
+RESULT_INDEX_TTL = 20.0    # seconds a cached index is trusted before a rescan
+RESULT_DIR_RE = re.compile(r"^run_(\d+)_")
+
+
+def _build_result_index():
+    """One full walk of results/ -> {seed: [Path, ...]}, instead of a separate
+    results/**/run_<seed>_* glob per seed. With one experiment's results/ tree in the tens of
+    GB across dozens of pu/vcr/arm subfolders, doing that walk once per lookup (poll_all() used
+    to do it once per seed, every poll cycle) is what made switching run sets and the Network tab
+    feel like they hung -- the whole UI was blocked behind N redundant tree walks of the same
+    unchanging directory."""
+    set_activity("scanning results/ …")
+    idx = {}
+    try:
+        for p in ROOT.glob("results/**/run_*"):
+            if not p.is_dir():
+                continue
+            m = RESULT_DIR_RE.match(p.name)
+            if m:
+                idx.setdefault(int(m.group(1)), []).append(p)
+    finally:
+        clear_activity()
+    return idx
+
+
+def _result_index():
+    global _RESULT_INDEX, _RESULT_INDEX_AT
+    now = time.monotonic()
+    if _RESULT_INDEX is None or (now - _RESULT_INDEX_AT) > RESULT_INDEX_TTL:
+        _RESULT_INDEX = _build_result_index()
+        _RESULT_INDEX_AT = now
+    return _RESULT_INDEX
+
+
+def invalidate_result_index():
+    """Force the next result_dir()/poll_all() call to rescan results/ from scratch (e.g. right
+    after switching run sets, so a stale TTL window doesn't hide a just-appeared run)."""
+    global _RESULT_INDEX
+    _RESULT_INDEX = None
+
+
+def result_dir(seed: int, path_hint: str = None):
+    """Newest results/run_<seed>_<tag>/ folder for this seed (mtime-based), from the cached
+    results/ index (see _result_index) rather than a fresh glob per call.
 
     2026-07-28: widened from a flat results/run_<seed>_* glob to results/**/run_<seed>_* so runs
     launched with ExperimentConfig.resultsSubdir (grouping into e.g. results/<experiment>/) are
     still found -- ** matches zero-or-more directories, so ungrouped flat runs still resolve
     exactly as before (verified: results/**/run_0_* matches both results/run_0_* variants).
+
+    2026-08-22: added optional `path_hint` substring filter. Some experiments reuse the same seed
+    numbers across arms/conditions (e.g. results/<exp>/<cell>/control/run_0_* and
+    .../M_silent/run_0_*) -- plain mtime-newest silently picks one arm and makes the other
+    unreachable by seed alone, and can silently make TWO different active run sets resolve to the
+    SAME on-disk folder (whichever is mtime-newest) with no visible error -- e.g. control and
+    M_silent charts/network-snapshots looking identical because both quietly loaded M_silent's
+    data. When path_hint is given, restrict candidates to those whose path normalized-matches it
+    (see _normalize_hint -- tolerant of '_'/'.';'/' separator differences between a log tag and a
+    results/ path), still mtime-newest among the filtered set; an unmatched hint falls back to
+    the unfiltered behavior rather than returning nothing.
     """
-    candidates = list(ROOT.glob(f"results/**/run_{seed}_*"))
+    candidates = _result_index().get(seed, [])
     if not candidates:
         return None
+    if path_hint:
+        norm_hint = _normalize_hint(path_hint)
+        filtered = [p for p in candidates if norm_hint in _normalize_hint(str(p))]
+        if filtered:
+            candidates = filtered
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
@@ -239,18 +389,26 @@ class SeedStore:
 def poll_all():
     """Refresh statuses and tail every store. Call under LOCK."""
     statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY, SERVE_GROUP)
-    for seed in statuses:
-        d = result_dir(seed)
-        if d is None:
-            STORES.pop(seed, None)
-            continue
-        st = STORES.get(seed)
-        if st is None or st.dir != d:
-            STORES[seed] = st = SeedStore(seed, d)
-        st.poll()
-    for seed in list(STORES):
-        if seed not in statuses:
-            del STORES[seed]
+    total = len(statuses)
+    # Scope every seed lookup to the active group's own tag (see group_path_hint) so a seed
+    # number reused by another arm of the same sweep can't get silently picked instead.
+    hint = group_path_hint(SERVE_LOGDIR, SERVE_GROUP)
+    try:
+        for i, seed in enumerate(statuses, 1):
+            set_activity(f"loading seed {seed} ({i}/{total}) …")
+            d = result_dir(seed, hint)
+            if d is None:
+                STORES.pop(seed, None)
+                continue
+            st = STORES.get(seed)
+            if st is None or st.dir != d:
+                STORES[seed] = st = SeedStore(seed, d)
+            st.poll()
+        for seed in list(STORES):
+            if seed not in statuses:
+                del STORES[seed]
+    finally:
+        clear_activity()
     return statuses
 
 
@@ -511,7 +669,7 @@ def api_post_lifespan(qs):
 def api_log(qs):
     seed = int(qs.get("seed", ["-1"])[0])
     lines = int(qs.get("lines", ["200"])[0])
-    f = SERVE_LOGDIR / f"{SERVE_GROUP}{seed}.log"
-    if not f.exists():
+    f = log_path_for_seed(SERVE_LOGDIR, SERVE_GROUP, seed)
+    if f is None or not f.exists():
         return f"(no log file for seed {seed})"
     return "\n".join(f.read_text(errors="replace").splitlines()[-lines:])

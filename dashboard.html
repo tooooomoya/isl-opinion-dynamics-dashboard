@@ -380,6 +380,7 @@
       <div class="statusline">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
         <span id="ostats">–</span>
+        <span id="activityStat" class="subnote" style="margin-left:0.6em"></span>
       </div>
     </div>
     <button id="railToggle" type="button" title="toggle app sidebar" aria-label="compact app sidebar" aria-expanded="true">&#8249;</button>
@@ -479,6 +480,7 @@
   <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
     <h3 class="big">Network Snapshot <button class="section-info-btn" data-help="network" title="About this section">ⓘ</button>
       <select id="netseed"></select>
+      <input type="text" id="netseedmanual" placeholder="or seed # [hint]" title="inspect any seed's GEXF snapshots directly by run number, even if it isn't part of the active run set (looked up via results/**/run_<seed>_*). If that seed# is reused across experiment arms (e.g. .../control/run_0_* and .../M_silent/run_0_*), add a second word as a path substring to disambiguate, e.g. '8900000 M_silent'." style="width:10em">
       <select id="nettype">
         <option value="follow">follow graph</option>
         <option value="repost">repost graph</option>
@@ -910,7 +912,7 @@ $("#rungroup").addEventListener("change", async ()=>{
     renderGroupPicker(await postJson("/api/group", {prefix: $("#rungroup").value}));
   }catch(e){ showBanner("err","failed to switch run set: "+e.message); return; }
   // new run set -> old detail-seed choices are almost certainly gone; let refresh() re-pick
-  state.opseed = null; netState.seed = null;
+  state.opseed = null; netState.seed = null; netSeedManual = false; netPathHint = null;
   refresh();
 });
 
@@ -918,31 +920,60 @@ async function refresh(){
   // don't tear a card's DOM out from under an in-progress resize/reorder drag
   if(state.busy || interacting) return; state.busy=true;
   try{
-    renderGroupPicker(await jget("/api/groups"));
-    const summary = await jget("/api/summary");
+    // groups + summary are the only things every other fetch below depends on (seed list,
+    // tags) -- fetch those two together, then fire everything else in parallel instead of one
+    // long await chain. /api/summary is the one that can be slow (it polls every seed's result
+    // folder); the others just read what it already tailed into STORES.
+    const [groups, summary] = await Promise.all([jget("/api/groups"), jget("/api/summary")]);
+    renderGroupPicker(groups);
     state.summary = summary;
+    const seedIds = summary.seeds.map(x=>x.seed);
+    if(state.opseed===null || !seedIds.includes(state.opseed)) state.opseed = seedIds[0] ?? null;
+    // repost cascade stats follow the network snapshot's seed (network snapshot / structure /
+    // agent behavior all describe the same seed+step, so there's one seed picker for all three)
+    const netSeed=(netState.seed!==null && seedIds.includes(netState.seed)) ? netState.seed : (seedIds[0] ?? null);
+
+    // Kick the network snapshot off now, in parallel with the rest -- it only needs the seed
+    // list (just set above), not the timeseries/opinion/repost fetches below, so the Network tab
+    // shouldn't have to wait for those to become selectable/interactive.
+    maybeRefetchNetwork();
+
     // Q_sign/Q_sign_repost/EI_index (network-structure panel) and repostShare (behavior panel)
     // are read directly by those panels regardless of picker state.
     const cols = new Set([state.px, state.py, "Q_sign", "Q_sign_repost", "EI_index", "repostShare"]);
     for(const m of state.metrics) for(const c of expandMetric(m)) cols.add(c);
-    const s = await jget("/api/series?cols="+encodeURIComponent([...cols].join(","))+"&max=1200");
+    const [s, opinion, repost, postLifespan] = await Promise.all([
+      jget("/api/series?cols="+encodeURIComponent([...cols].join(","))+"&max=1200"),
+      state.opseed!==null ? jget("/api/opinion?seed="+state.opseed+"&max=800") : Promise.resolve(null),
+      netSeed!==null ? jget("/api/repost?seed="+netSeed) : Promise.resolve(null),
+      netSeed!==null ? jget("/api/post_lifespan?seed="+netSeed+"&top=15") : Promise.resolve(null),
+    ]);
     state.series = s.seeds;
-    const seedIds = summary.seeds.map(x=>x.seed);
-    if(state.opseed===null || !seedIds.includes(state.opseed)) state.opseed = seedIds[0] ?? null;
-    if(state.opseed!==null) state.opinion = await jget("/api/opinion?seed="+state.opseed+"&max=800");
+    if(opinion!==null) state.opinion = opinion;
+    if(repost!==null) state.repost = repost;
+    if(postLifespan!==null) state.postLifespan = postLifespan;
     maybeRefetchTrajectories();
-    // repost cascade stats follow the network snapshot's seed (network snapshot / structure /
-    // agent behavior all describe the same seed+step, so there's one seed picker for all three)
-    const netSeed=(netState.seed!==null && seedIds.includes(netState.seed)) ? netState.seed : (seedIds[0] ?? null);
-    if(netSeed!==null) state.repost = await jget("/api/repost?seed="+netSeed);
-    if(netSeed!==null) state.postLifespan = await jget("/api/post_lifespan?seed="+netSeed+"&top=15");
     hideBanner("err");
     renderAll();
-    maybeRefetchNetwork();
     $("#ostats").textContent = statText() + " · updated " + new Date().toLocaleTimeString();
   }catch(e){
     showBanner("err","server unreachable — is dashboard/dashboard.py --serve still running? ("+e.message+")");
   }finally{ state.busy=false; }
+}
+
+/* ---------- server activity indicator (poll_all()/results-index rescans can take a few
+   seconds on a large results/ tree; without this the UI just looks frozen during that window) */
+let activityTimer=null;
+async function pollActivity(){
+  try{
+    const a=await jget("/api/activity");
+    const el=$("#activityStat");
+    if(el) el.textContent = a.activity ? ("⏳ "+a.activity) : "";
+  }catch(e){ /* transient — next tick will retry */ }
+}
+function startActivityPolling(){
+  if(activityTimer) return;
+  activityTimer=setInterval(pollActivity, 400);
 }
 
 function statText(){
@@ -2035,7 +2066,9 @@ function renderOpinionTraj(){
    length; a light central gravity keeps disconnected components on screen. */
 const FA2_DEFAULTS={repulsion:1,attraction:1,gravity:1,damping:0.6,preventOverlap:false};
 const storedFA2=store("netfa2",{});
-const netState={ seed:store("netseed",null), type:store("nettype","follow"),
+let netSeedManual=false; // true once a seed is picked via #netseedmanual, not the run-set-scoped #netseed dropdown
+let netPathHint=null; // optional path substring to disambiguate same seed# reused across experiment arms (see result_dir)
+const netState={ seed:store("netseed",null), lastSeed:undefined, type:store("nettype","follow"),
   step:store("netstep","latest"), sizeBy:store("netsize","indeg"), colorBy:store("netcolor","op"),
   edgeColor:store("netedgecolor",null),
   wMin:store("netwmin",null), wMax:store("netwmax",null), filteredEdges:null,
@@ -2423,10 +2456,21 @@ function maybeRefetchNetwork(){
   /* snapshots land every 5000 steps; refetch "latest" only when a newer one can exist.
      Also refetch immediately if this seed's run was replaced (results dir swapped to a
      fresh tag) — that resets the step counter, so the "+5000 steps" check alone would
-     never fire again and the section would keep showing the previous run's snapshot. */
+     never fire again and the section would keep showing the previous run's snapshot.
+
+     2026-08-22 bug fix: switching run sets (#rungroup) resets netState.seed to null so
+     refresh() can re-pick a default from the new group -- but until something re-assigns it,
+     seedList().find(v=>v.seed===null) is always undefined, so the two checks below (which both
+     require that lookup to succeed) silently did nothing. netState.data was still non-null (the
+     PREVIOUS group's snapshot), so this branch never even fetched a fresh one either. Net
+     effect: the Network tab kept showing the old run set's snapshot after switching groups, with
+     no visible error -- exactly what made control vs. M_silent look identical. Comparing against
+     lastSeed (the seed the currently-shown data actually came from) catches this: seed===null
+     never equals a real lastSeed, so it forces a fetch, which then resolves null to a real
+     default seed internally (see fetchNetwork). */
   if(netState.loading) return;
+  if(!netState.data || netState.seed!==netState.lastSeed){ fetchNetwork(); return; }
   const s=seedList().find(v=>v.seed===netState.seed);
-  if(!netState.data){ fetchNetwork(); return; }
   if(s && s.tag!==netState.lastTag){ fetchNetwork(); return; }
   if(netState.step!=="latest") return;
   if(s && netState.data.step!=null && s.step>=netState.data.step+5000) fetchNetwork();
@@ -2444,9 +2488,9 @@ async function fetchNetwork(forceQuick = false){
      adjacency — silently mislabeled as "repost graph", so any weight>=2 filter
      zeroed every edge. Queue one retry instead of dropping it. */
   if(netState.loading){ netState.pendingRefetch=true; return; }
-  if(!seedList().length) return;
+  if(!netSeedManual && !seedList().length) return;
   const ids=seedList().map(s=>s.seed);
-  if(netState.seed===null || !ids.includes(netState.seed)) netState.seed=ids[0];
+  if(netState.seed===null || (!netSeedManual && !ids.includes(netState.seed))) netState.seed=ids[0];
   netState.loading=true;
   $("#netinfo").textContent="loading…";
   try{
@@ -2454,7 +2498,8 @@ async function fetchNetwork(forceQuick = false){
     // snapshot (cached server-side by file size — first fetch of a new snapshot
     // costs a few seconds for betweenness_centrality, repeats are instant).
     const structParam = (forceQuick || netPlayTimer) ? "0" : "1";
-    const d=await jget(`/api/network?seed=${netState.seed}&net=${netState.type}&step=${netState.step}&structural=${structParam}`);
+    const hintParam = netSeedManual && netPathHint ? `&pathHint=${encodeURIComponent(netPathHint)}` : "";
+    const d=await jget(`/api/network?seed=${netState.seed}&net=${netState.type}&step=${netState.step}&structural=${structParam}${hintParam}`);
     if(d.error){
       /* newest snapshot is mid-write while the run is live; server already fell back
          to an older complete one if it could. Keep showing that and retry on the
@@ -2464,6 +2509,7 @@ async function fetchNetwork(forceQuick = false){
     }
     netState.data=d;
     netState.lastTag = (seedList().find(v=>v.seed===netState.seed)||{}).tag;
+    netState.lastSeed = netState.seed;
     applyWeightFilter();
     $("#netinfo").textContent = d.step==null ? "no GEXF snapshots found yet (log_gexf=false, or run hasn't reached step 5000)"
       : `step ${fstep(d.step)}${d.stale?" (older snapshot — latest still being written)":""} · ${d.n} nodes · ${d.edges.length} edges`+
@@ -2484,6 +2530,7 @@ function renderNetControls(){
     ns.innerHTML=""; for(const s of seedList()){ const o=document.createElement("option");
       o.value=s.seed; o.textContent="seed "+s.seed; ns.appendChild(o); } }
   ns.value=netState.seed;
+  $("#netseedmanual").value = netSeedManual ? (netState.seed+(netPathHint?" "+netPathHint:"")) : "";
   $("#nettype").value=netState.type;
   const st=$("#netstep"), d=netState.data;
   const wanted=["latest"].concat(d&&d.steps?d.steps.map(String):[]);
@@ -3140,7 +3187,17 @@ $("#network").addEventListener("mousemove",evt=>{
 });
 $("#network").addEventListener("mouseleave",()=>{ hideTip();
   if(netState.hover>=0){ netState.hover=-1; if(netState.sim&&!netState.sim.raf) drawNet(); } });
-$("#netseed").addEventListener("change",e=>{ stopNetPlay(); netState.seed=+e.target.value; save("netseed",netState.seed); fetchNetwork(); });
+$("#netseed").addEventListener("change",e=>{ stopNetPlay(); netSeedManual=false; netPathHint=null; netState.seed=+e.target.value; save("netseed",netState.seed); fetchNetwork(); });
+$("#netseedmanual").addEventListener("keydown",e=>{
+  if(e.key!=="Enter") return;
+  // "8900000" or "8900000 M_silent" -- the optional second token disambiguates a seed number
+  // reused across experiment arms/conditions (path substring match, see result_dir/pathHint).
+  const parts=e.target.value.trim().split(/\s+/);
+  const v=+parts[0];
+  if(!Number.isFinite(v) || !parts[0]) return;
+  stopNetPlay(); netSeedManual=true; netPathHint=parts[1]||null; netState.seed=v; netState.step="latest";
+  save("netseed",netState.seed); fetchNetwork();
+});
 $("#nettype").addEventListener("change",e=>{ stopNetPlay(); netState.type=e.target.value; save("nettype",netState.type); fetchNetwork(); });
 $("#netstep").addEventListener("change",e=>{ stopNetPlay(); netState.step=e.target.value; save("netstep",netState.step); fetchNetwork(); });
 $("#netsize").addEventListener("change",e=>{ netState.sizeBy=e.target.value; save("netsize",netState.sizeBy);
@@ -3507,7 +3564,7 @@ document.querySelectorAll(".section-info-btn").forEach(btn => {
   btn.addEventListener("mouseleave", hideTip);
 });
 
-refresh(); schedule();
+refresh(); schedule(); startActivityPolling();
 </script>
 </body>
 </html>
