@@ -4,6 +4,7 @@ import re
 import math
 import random
 import threading
+import warnings
 from pathlib import Path
 from . import core
 from .core import result_dir, rnd, decimate
@@ -12,11 +13,11 @@ GRAPH_CACHE = {}
 GRAPH_LOCK = threading.Lock()
 
 # 2026-07-18: agents with |opinion| < this are excluded from every two-camp partition below
-# (RWC, boundary polarization, boundary rho) -- mirrors Analysis.java's isModerate()/
-# ExperimentConfig.moderateBandHalfWidth (Java default 0.2, kept in sync here). Rationale there
+# (RWC, boundary polarization, boundary rho) -- mirrors Analysis.java's isNeutral()/
+# ExperimentConfig.neutralBandHalfWidth (Java default 0.2, kept in sync here). Rationale there
 # applies here too: a bare sign(opinion) split has no analog to Conover et al. 2011's "undecidable"
 # exclusion (~5-11% of actively-tweeting users, not force-assigned to a camp).
-MODERATE_BAND_HALF_WIDTH = 0.2
+NEUTRAL_BAND_HALF_WIDTH = 0.2
 
 
 def parse_gexf_cached(path: Path):
@@ -167,9 +168,15 @@ def fit_powerlaw(values):
         return {"unavailable": "too-few", "n": len(arr)}
     try:
         import powerlaw
-        fit = powerlaw.Fit(arr, discrete=True, verbose=False)
-        R, p = fit.distribution_compare("power_law", "exponential")
-        R_ln, p_ln = fit.distribution_compare("power_law", "lognormal")
+        with warnings.catch_warnings():
+            # powerlaw's internal MLE search routinely hits degenerate candidate
+            # fits (e.g. lognormal on this data) and warns via RuntimeWarning/
+            # UserWarning/OptimizeWarning; those are expected noise, not signal,
+            # and drown out the dashboard's startup log (e.g. the server URL).
+            warnings.simplefilter("ignore")
+            fit = powerlaw.Fit(arr, discrete=True, verbose=False)
+            R, p = fit.distribution_compare("power_law", "exponential")
+            R_ln, p_ln = fit.distribution_compare("power_law", "lognormal")
         return {"alpha": round(float(fit.power_law.alpha), 3), "xmin": float(fit.power_law.xmin),
                 "R": round(float(R), 3), "p": round(float(p), 4), "plausible": bool(R > 0),
                 "R_lognormal": round(float(R_ln), 3), "p_lognormal": round(float(p_ln), 4)}
@@ -306,8 +313,8 @@ def compute_rwc(Gg):
     try:
         nodes = list(Gg.nodes)
         op = {u: float(Gg.nodes[u].get("opinion", 0.0)) for u in nodes}
-        side_x = [u for u in nodes if op[u] >= MODERATE_BAND_HALF_WIDTH]
-        side_y = [u for u in nodes if op[u] <= -MODERATE_BAND_HALF_WIDTH]
+        side_x = [u for u in nodes if op[u] >= NEUTRAL_BAND_HALF_WIDTH]
+        side_y = [u for u in nodes if op[u] <= -NEUTRAL_BAND_HALF_WIDTH]
         if not side_x or not side_y:
             return {"unavailable": "one-sided"}
         k = min(max(3, int(round(0.01 * n))), len(side_x), len(side_y))
@@ -346,10 +353,10 @@ def compute_rwc(Gg):
 
 
 def _camps(Gg):
-    """Two-camp partition on Gg's 'opinion' node attribute, excluding the moderate band."""
+    """Two-camp partition on Gg's 'opinion' node attribute, excluding the neutral band."""
     op = {u: float(Gg.nodes[u].get("opinion", 0.0)) for u in Gg.nodes}
-    g1 = {u for u in Gg.nodes if op[u] >= MODERATE_BAND_HALF_WIDTH}
-    g2 = {u for u in Gg.nodes if op[u] <= -MODERATE_BAND_HALF_WIDTH}
+    g1 = {u for u in Gg.nodes if op[u] >= NEUTRAL_BAND_HALF_WIDTH}
+    g2 = {u for u in Gg.nodes if op[u] <= -NEUTRAL_BAND_HALF_WIDTH}
     return op, g1, g2
 
 

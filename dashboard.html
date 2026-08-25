@@ -480,7 +480,7 @@
   <section class="panel card" id="netsnapshotSection" data-card="netsnapshot">
     <h3 class="big">Network Snapshot <button class="section-info-btn" data-help="network" title="About this section">ⓘ</button>
       <select id="netseed"></select>
-      <input type="text" id="netseedmanual" placeholder="or seed # [hint]" title="inspect any seed's GEXF snapshots directly by run number, even if it isn't part of the active run set (looked up via results/**/run_<seed>_*). If that seed# is reused across experiment arms (e.g. .../control/run_0_* and .../M_silent/run_0_*), add a second word as a path substring to disambiguate, e.g. '8900000 M_silent'." style="width:10em">
+      <input type="text" id="netseedmanual" placeholder="or seed # [hint]" title="inspect any seed's GEXF snapshots directly by run number, even if it isn't part of the active run set (looked up via results/**/run_<seed>_*). If that seed# is reused across experiment arms (e.g. .../control/run_0_* and .../N_silent/run_0_*), add a second word as a path substring to disambiguate, e.g. '8900000 N_silent'." style="width:10em">
       <select id="nettype">
         <option value="follow">follow graph</option>
         <option value="repost">repost graph</option>
@@ -2464,7 +2464,7 @@ function maybeRefetchNetwork(){
      require that lookup to succeed) silently did nothing. netState.data was still non-null (the
      PREVIOUS group's snapshot), so this branch never even fetched a fresh one either. Net
      effect: the Network tab kept showing the old run set's snapshot after switching groups, with
-     no visible error -- exactly what made control vs. M_silent look identical. Comparing against
+     no visible error -- exactly what made control vs. N_silent look identical. Comparing against
      lastSeed (the seed the currently-shown data actually came from) catches this: seed===null
      never equals a real lastSeed, so it forces a fetch, which then resolves null to a real
      default seed internally (see fetchNetwork). */
@@ -3190,7 +3190,7 @@ $("#network").addEventListener("mouseleave",()=>{ hideTip();
 $("#netseed").addEventListener("change",e=>{ stopNetPlay(); netSeedManual=false; netPathHint=null; netState.seed=+e.target.value; save("netseed",netState.seed); fetchNetwork(); });
 $("#netseedmanual").addEventListener("keydown",e=>{
   if(e.key!=="Enter") return;
-  // "8900000" or "8900000 M_silent" -- the optional second token disambiguates a seed number
+  // "8900000" or "8900000 N_silent" -- the optional second token disambiguates a seed number
   // reused across experiment arms/conditions (path substring match, see result_dir/pathHint).
   const parts=e.target.value.trim().split(/\s+/);
   const v=+parts[0];

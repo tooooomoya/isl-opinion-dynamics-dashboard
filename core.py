@@ -139,9 +139,9 @@ def group_path_hint(logdir: Path, prefix: str):
     trailing-seed group (GROUP_LOG_RE), which has no such tag and no ambiguity to resolve.
 
     Why this matters: seed numbers are commonly reused across arms/conditions of the SAME sweep
-    (e.g. .../pu0.15_vcr0.1/control/run_8900000_* and .../pu0.15_vcr0.1/M_silent/run_8900000_*
+    (e.g. .../pu0.15_vcr0.1/control/run_8900000_* and .../pu0.15_vcr0.1/N_silent/run_8900000_*
     both exist). Without disambiguation, result_dir(seed) can only pick by mtime, so switching
-    the active run set (e.g. control -> M_silent) can silently keep resolving to the SAME
+    the active run set (e.g. control -> N_silent) can silently keep resolving to the SAME
     on-disk folder if it happens to be the newer one -- every chart and the network snapshot then
     show identical data for what looks like two different conditions, with no error. Pairing this
     tag text with result_dir's path_hint (see its normalized substring match) scopes seed lookups
@@ -283,10 +283,10 @@ def result_dir(seed: int, path_hint: str = None):
 
     2026-08-22: added optional `path_hint` substring filter. Some experiments reuse the same seed
     numbers across arms/conditions (e.g. results/<exp>/<cell>/control/run_0_* and
-    .../M_silent/run_0_*) -- plain mtime-newest silently picks one arm and makes the other
+    .../N_silent/run_0_*) -- plain mtime-newest silently picks one arm and makes the other
     unreachable by seed alone, and can silently make TWO different active run sets resolve to the
     SAME on-disk folder (whichever is mtime-newest) with no visible error -- e.g. control and
-    M_silent charts/network-snapshots looking identical because both quietly loaded M_silent's
+    N_silent charts/network-snapshots looking identical because both quietly loaded N_silent's
     data. When path_hint is given, restrict candidates to those whose path normalized-matches it
     (see _normalize_hint -- tolerant of '_'/'.';'/' separator differences between a log tag and a
     results/ path), still mtime-newest among the filtered set; an unmatched hint falls back to
