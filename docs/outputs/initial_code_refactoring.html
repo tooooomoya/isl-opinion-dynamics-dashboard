@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Refactoring Log — SNAM2026</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 2rem; background: #f4f6fb; color: #1e2332; line-height: 1.6; }
+  h1 { color: #16213e; border-bottom: 2px solid #16213e; padding-bottom: 0.5rem; }
+  .fix { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.09); margin-bottom: 2rem; padding: 1.5rem; border-left: 5px solid #3a6bc4; }
+  .fix h4 { margin-top: 0; color: #1a2a5e; border-bottom: 1px solid #eee; padding-bottom: 0.3rem; }
+  .location { font-weight: bold; color: #555; }
+  .type { font-style: italic; color: #777; }
+  pre { background: #1b2333; color: #b8c8e0; border-radius: 6px; padding: 1rem; overflow-x: auto; font-size: 0.85rem; }
+  .before { border-left: 3px solid #c0392b; }
+  .after { border-left: 3px solid #27ae60; }
+  .rationale { margin-top: 1rem; background: #eef1f7; padding: 1rem; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<h1>SNAM2026 — Initial Code Refactoring Log</h1>
+
+<div class="fix">
+  <h4>[Fix 001] Missing Metrics in RESULT_LIST</h4>
+  <p><span class="location">Const.java</span> | <span class="type">Bug / Reproducibility</span></p>
+  <div class="before">
+    <pre><code>public static final String[] RESULT_LIST = { "opinionVar", "postOpinionVar", "follow", "unfollow", "rewire", "opinionAvg",
+"feedPostOpinionMean_0", ... };</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>public static final String[] RESULT_LIST = { "opinionVar", "postOpinionVar", "follow", "unfollow", "rewire", "opinionAvg", "shannonIndex", "disagreement",
+"feedPostOpinionMean_0", ... };</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>public static final double MAX_PU = 1.0;
+public static final double MIN_PU = 0.01;</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Shannon diversity and disagreement were computed but never saved to CSV. Adding them to <code>RESULT_LIST</code> ensures research metrics are preserved. Correcting <code>MAX_PU/MIN_PU</code> enables the platform engagement dynamics that were previously frozen.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 002] Adjacency Matrix Architecture Refactor</h4>
+  <p><span class="location">AdminOptim.java</span> | <span class="type">Architecture / Performance</span></p>
+  <div class="before">
+    <pre><code>private double[][] W;
+public void setFollowerNumArray() {
+    for (int i = 0; i < n; i++)
+        for (int j = 0; j < n; j++)
+            if (this.W[i][j] > 0.0) this.followerNumArray[j]++;
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>private Set&lt;Integer&gt;[] followees;
+private Set&lt;Integer&gt;[] followers;
+public void updateAdjacencyMatrix(int userId, int[] followedIds, int unfollowedId) {
+    if (followedIds[0] >= 0) {
+        followees[userId].add(followedIds[0]);
+        followers[followedIds[0]].add(userId);
+        followerNumArray[followedIds[0]]++;
+    }
+    // ... O(1) updates
+}</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Replaced dense $N \times N$ matrix with adjacency lists. This improves memory efficiency and reduces graph update/traversal complexity from $O(N^2)$ to $O(1)$ or $O(\text{degree})$.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 003] O(N^3) Assertion Checker Bottleneck</h4>
+  <p><span class="location">OpinionDynamics.java</span> | <span class="type">Performance / Structure</span></p>
+  <div class="before">
+    <pre><code>for (Agent agent : shuffledAgents) {
+    // ... agent logic ...
+    ASChecker.assertionChecker(agentSet, admin, agentNum, step);
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>for (Agent agent : shuffledAgents) {
+    // ... agent logic ...
+}
+ASChecker.assertionChecker(agentSet, admin, agentNum, step);</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Moving the assertion checker outside the agent loop reduces complexity from $O(N^3)$ to $O(N^2)$ per step. Invariants are now checked once per step after all agents have acted, which is semantically more correct.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 004] Optimized Post Distribution</h4>
+  <p><span class="location">OpinionDynamics.java</span> | <span class="type">Performance</span></p>
+  <div class="before">
+    <pre><code>for (Agent otherAgent : agentSet) {
+    if (W[otherAgent.getId()][agentId] > 0.00) {
+        otherAgent.addToPostCash(post);
+    }
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>for (int followerId : admin.getFollowers(agentId)) {
+    agentSet[followerId].addToPostCash(post);
+}</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Using the reverse adjacency list (<code>followers</code>) allows distributing posts in $O(\text{degree})$ time instead of $O(N)$. For sparse networks, this is a massive speedup.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 005] Batch CSV Output System</h4>
+  <p><span class="location">Writer.java</span> | <span class="type">Architecture / I/O Performance</span></p>
+  <div class="before">
+    <pre><code>public void write() {
+    try (PrintWriter pw = new PrintWriter(new FileWriter(filePath, false))) {
+        // write header and 1 row every step
+    }
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>public void write() {
+    // append to StringBuilder buffers
+    if (simulationStep - batchStartStep + 1 >= BATCH_SIZE) {
+        flushBatch();
+    }
+}</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Reduced 120,000 file I/O operations to approximately 120 per run by buffering output rows and writing them in batches of 1000 steps. This dramatically reduces system overhead.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 006] Dynamic Bounded Confidence in Comfort Threshold</h4>
+  <p><span class="location">Agent.java</span> | <span class="type">Model Integrity</span></p>
+  <div class="before">
+    <pre><code>if (Math.abs(post.getPostOpinion() - this.opinion) < Const.MINIMUM_BC) {
+    comfortPostNum++;
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>if (Math.abs(post.getPostOpinion() - this.opinion) < this.bc) {
+    comfortPostNum++;
+}</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Agents now evaluate "comfort" based on their own dynamic bounded confidence (bc) rather than a fixed minimum floor. This aligns the engagement mechanism with the opinion dynamics.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 007] Restored Engagement Feedback Loop</h4>
+  <p><span class="location">Agent.java</span> | <span class="type">Bug</span></p>
+  <div class="before">
+    <pre><code>public void updatePostProb() {
+    double increment = Const.MU_PARAM * Math.log(this.recievedLikeCount + 1);
+    //this.postProb *= 1.0 + increment;
+    this.postProb = Math.min(this.postProb, 1.0);
+}</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>public void updatePostProb() {
+    double increment = Const.MU_PARAM * Math.log(this.recievedLikeCount + 1);
+    this.postProb *= 1.0 + increment;
+    this.postProb = Math.min(this.postProb, Const.MAX_PP);
+}</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Restored the previously commented-out logic that allowed likes to increase an agent's posting probability, enabling the positive feedback loop central to the research hypothesis.
+  </div>
+</div>
+
+<div class="fix">
+  <h4>[Fix 008] Notebook Batch Data Loading</h4>
+  <p><span class="location">result-summary.ipynb / polarization-analysis.ipynb</span> | <span class="type">Reproducibility</span></p>
+  <div class="before">
+    <pre><code>for f in files:
+    match = re.search(r"post_result_(\d+)\.csv", ...)
+    df_temp = pd.read_csv(f)
+    row = df_temp.iloc[0]</code></pre>
+  </div>
+  <div class="after">
+    <pre><code>dfs = [pd.read_csv(f) for f in files]
+df_all = pd.concat(dfs, ignore_index=True).sort_values('step')
+for _, row in df_all.iterrows():
+    # process multiple rows from batch files</code></pre>
+  </div>
+  <div class="rationale">
+    <strong>Rationale:</strong> Updated Python notebooks to support the new multi-row batch CSV format while maintaining backward compatibility with single-row legacy files.
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SNAM2026 — Research-Level Code Review</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3350;
+      --accent: #6c8eff;
+      --accent2: #a78bfa;
+      --danger: #f87171;
+      --warn: #fbbf24;
+      --ok: #34d399;
+      --muted: #94a3b8;
+      --text: #e2e8f0;
+      --code-bg: #161b2e;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 0 0 80px;
+    }
+    header {
+      background: linear-gradient(135deg, #1a1d27 0%, #22263a 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 48px 60px 36px;
+    }
+    header h1 { font-size: 2rem; color: var(--accent); letter-spacing: -0.5px; }
+    header .subtitle { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+    header .meta { margin-top: 20px; display: flex; gap: 24px; flex-wrap: wrap; }
+    header .meta span { font-size: 0.82rem; color: var(--muted); background: var(--surface2); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 60px;
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.82rem;
+      padding: 12px 16px;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    nav a:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+    main { max-width: 1100px; margin: 0 auto; padding: 48px 60px; }
+
+    section { margin-bottom: 64px; }
+    h2 {
+      font-size: 1.4rem;
+      color: var(--accent2);
+      border-left: 4px solid var(--accent2);
+      padding-left: 14px;
+      margin-bottom: 28px;
+    }
+    h3 { font-size: 1.05rem; color: var(--text); margin: 24px 0 10px; font-weight: 600; }
+    h4 { font-size: 0.9rem; color: var(--muted); margin: 14px 0 6px; text-transform: uppercase; letter-spacing: 0.06em; }
+
+    p { margin-bottom: 12px; color: #cbd5e1; }
+    ul, ol { padding-left: 24px; margin-bottom: 12px; color: #cbd5e1; }
+    li { margin-bottom: 6px; }
+
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.82em;
+      background: var(--code-bg);
+      color: #93c5fd;
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid #2a3050;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      overflow-x: auto;
+      margin: 14px 0 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82em;
+      line-height: 1.6;
+    }
+    pre code { background: none; border: none; padding: 0; color: #e2e8f0; }
+    .kw { color: #c084fc; }
+    .cm { color: #64748b; font-style: italic; }
+    .str { color: #86efac; }
+    .num { color: #fb923c; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 22px 26px;
+      margin-bottom: 20px;
+    }
+    .card.danger { border-left: 4px solid var(--danger); }
+    .card.warn   { border-left: 4px solid var(--warn); }
+    .card.ok     { border-left: 4px solid var(--ok); }
+    .card.info   { border-left: 4px solid var(--accent); }
+
+    .tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .tag.bug    { background: #7f1d1d; color: #fca5a5; }
+    .tag.model  { background: #1e3a5f; color: #93c5fd; }
+    .tag.perf   { background: #3b1d6e; color: #c4b5fd; }
+    .tag.design { background: #1c3a2e; color: #6ee7b7; }
+    .tag.risk   { background: #422006; color: #fcd34d; }
+
+    .file-ref {
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-family: monospace;
+      background: var(--code-bg);
+      padding: 2px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      float: right;
+      margin-left: 10px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 0.88rem;
+    }
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 0.72rem;
+      letter-spacing: 0.07em;
+      padding: 10px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+
+    .severity { font-weight: 700; font-size: 0.8rem; }
+    .severity.high   { color: var(--danger); }
+    .severity.medium { color: var(--warn); }
+    .severity.low    { color: var(--ok); }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+    .summary-stat {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .summary-stat .num-big { font-size: 2.4rem; font-weight: 700; }
+    .summary-stat .label   { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+    .num-big.red    { color: var(--danger); }
+    .num-big.yellow { color: var(--warn); }
+    .num-big.green  { color: var(--ok); }
+    .num-big.blue   { color: var(--accent); }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+    .callout {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 16px 0;
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+    .callout strong { color: var(--text); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>SNAM2026 — Research-Level Code Review</h1>
+  <p class="subtitle">Social Network Agent-Based Model · Opinion Dynamics Simulation</p>
+  <div class="meta">
+    <span>Branch: asymmetric-stubbornness</span>
+    <span>Reviewed: 2026-04-27</span>
+    <span>Java 21 + Python 3.x</span>
+    <span>21 Java classes · 8 Python scripts</span>
+  </div>
+</header>
+
+<nav>
+  <a href="#understanding">1. Model Understanding</a>
+  <a href="#bugs">2. Critical Issues</a>
+  <a href="#design">3. Design Evaluation</a>
+  <a href="#risks">4. Research Risks</a>
+  <a href="#suggestions">5. Suggestions</a>
+</nav>
+
+<main>
+
+<!-- ============================================================ -->
+<!-- SUMMARY -->
+<!-- ============================================================ -->
+<section id="summary">
+  <div class="summary-grid">
+    <div class="summary-stat">
+      <div class="num-big red">7</div>
+      <div class="label">High-severity bugs</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num-big yellow">5</div>
+      <div class="label">Medium-severity issues</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num-big blue">4</div>
+      <div class="label">Design weaknesses</div>
+    </div>
+    <div class="summary-stat">
+      <div class="num-big yellow">5</div>
+      <div class="label">Research risks</div>
+    </div>
+  </div>
+  <div class="callout">
+    <strong>Overview.</strong> The codebase implements a bounded-confidence, co-evolving-network opinion dynamics model in the Friedkin-Johnsen (FJ) family. The simulation machinery is structurally sound, but several mechanisms that are central to the stated research goals — platform churn, engagement feedback, and the asymmetric stubbornness contribution — are silently disabled or broken in the current code. Two key output metrics (Shannon diversity index and disagreement) are computed but never written to disk. Performance is dominated by O(N³·T) assertion checking. These issues must be resolved before results can be trusted.
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 1. MODEL UNDERSTANDING -->
+<!-- ============================================================ -->
+<section id="understanding">
+  <h2>1. Model Understanding</h2>
+
+  <h3>What is implemented?</h3>
+  <p>
+    The simulation models N=1000 agents on a directed social network, each holding a continuous opinion x ∈ [−1, 1] and an intrinsic (anchoring) opinion x₀ ∈ [−1, 1]. At each discrete time step (up to T=40,000), a subset of agents becomes active (probability u=0.0025 per agent per step — ≈2.5 agents active on average), posts content, reads a feed, and updates their opinion, posting probability, and bounded confidence threshold.
+  </p>
+
+  <h3>Core opinion update rule</h3>
+  <pre><code><span class="cm">// Agent.java:313</span>
+opinion = μ · x₀ + (1 − μ) · mean(feed_opinions)</code></pre>
+  <p>
+    This is the <strong>Friedkin-Johnsen (FJ) update</strong>, where μ (stubbornness) interpolates between the agent's intrinsic opinion and the mean of posts in their feed. The bounded confidence (BC) threshold <em>bc</em> determines which posts are tolerated; posts outside <em>bc</em> trigger a decay <code>bc *= BC_DEC_RATE</code> (no mechanism to increase it). Feed content is filtered through <code>PostCash</code>, a bounded FIFO queue of posts received from followees.
+  </p>
+
+  <h3>How it maps to the theoretical model</h3>
+  <table>
+    <thead><tr><th>Theory</th><th>Implementation</th><th>Gap</th></tr></thead>
+    <tbody>
+      <tr><td>FJ stubbornness μ</td><td><code>calculateStubbornness(intrinsicOpinion)</code> — 3-level step function</td><td>Asymmetric: value depends on sign agreement with TARGET_DIRECTION. Works correctly only when args are passed.</td></tr>
+      <tr><td>Bounded confidence ε</td><td>Dynamic <code>bc</code>, decays on discordant exposure, floored at 0.2</td><td>One-directional; BC can never recover. Comfort threshold is hardcoded at MINIMUM_BC=0.2, not at current bc.</td></tr>
+      <tr><td>Network co-evolution</td><td>Follow/unfollow on feed content, capped at MAX_FOLLOW_CAPACITY=10</td><td>Two redundant state representations (followList vs. W matrix).</td></tr>
+      <tr><td>Platform engagement</td><td>postProb, useProb updated by comfort rate</td><td>useProb is frozen (MAX_PU=MIN_PU=INITIAL_PU). postProb like-feedback is commented out.</td></tr>
+      <tr><td>Algorithmic feed</td><td>AdminFeedback shuffles postCash randomly</td><td>recommendPostQueue is never populated; the "algorithm" is purely random.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- 2. CRITICAL ISSUES -->
+<!-- ============================================================ -->
+<section id="bugs">
+  <h2>2. Critical Issues</h2>
+
+  <!-- BUG 1 -->
+  <div class="card danger">
+    <span class="file-ref">Agent.java:253–259</span>
+    <div class="tag bug">Bug · High</div>
+    <h3>Like-based engagement loop is dead code</h3>
+    <p>
+      <code>updatePostProb()</code> computes an increment from received likes but the line applying it is commented out. The method only clamps and resets the counter.
+    </p>
+    <pre><code><span class="kw">public void</span> updatePostProb() {
+    <span class="kw">double</span> increment = Const.MU_PARAM * Math.log(recievedLikeCount + <span class="num">1</span>);
+    <span class="cm">// this.postProb *= 1.0 + increment;  ← NEVER APPLIED</span>
+    postProb = Math.min(postProb, <span class="num">1.0</span>);  <span class="cm">// only clamps</span>
+    recievedLikeCount = <span class="num">0</span>;
+}</code></pre>
+    <p><strong>Impact:</strong> The positive engagement feedback loop (likes → increased posting) does not exist in the model despite being described in comments. Any hypothesis about viral content amplification through likes is untestable with this code.</p>
+  </div>
+
+  <!-- BUG 2 -->
+  <div class="card danger">
+    <span class="file-ref">Const.java:41–43</span>
+    <div class="tag bug">Bug · High</div>
+    <h3>Platform churn (useProb) is frozen</h3>
+    <p>
+      <code>MAX_PU</code> and <code>MIN_PU</code> are both set to <code>INITIAL_PU = 0.0025</code>. Any multiplicative update to <code>useProb</code> is immediately clipped back to 0.0025.
+    </p>
+    <pre><code><span class="kw">public static final double</span> INITIAL_PU = <span class="num">0.0025</span>;
+<span class="kw">public static final double</span> MAX_PU = INITIAL_PU;  <span class="cm">// same as INITIAL</span>
+<span class="kw">public static final double</span> MIN_PU = INITIAL_PU;  <span class="cm">// same as INITIAL</span></code></pre>
+    <p><strong>Impact:</strong> Platform engagement dynamics (users becoming more or less active based on feed comfort) are completely neutralized. The <code>useProb *= 1.1</code> and <code>useProb *= 0.9</code> updates in <code>updateMyself()</code> have zero effect. ~2.5 agents are always active per step regardless of comfort.</p>
+  </div>
+
+  <!-- BUG 3 -->
+  <div class="card danger">
+    <span class="file-ref">Const.java:61–65 + Writer.java:272–313</span>
+    <div class="tag bug">Bug · High</div>
+    <h3>Shannon index and disagreement are computed but never written</h3>
+    <p>
+      <code>writer.setShannonIndex()</code> and <code>writer.setDisagreement()</code> are called each step, but neither <code>"shannonIndex"</code> nor <code>"disagreement"</code> appears in <code>Const.RESULT_LIST</code>. <code>handleSingleMetric()</code> has cases for both, but the writer's row construction iterates <code>RESULT_LIST</code> only.
+    </p>
+    <pre><code><span class="cm">// Const.java — RESULT_LIST does not include "shannonIndex" or "disagreement"</span>
+<span class="kw">public static final</span> String[] RESULT_LIST = {
+    <span class="str">"opinionVar"</span>, <span class="str">"postOpinionVar"</span>, <span class="str">"follow"</span>, <span class="str">"unfollow"</span>, <span class="str">"rewire"</span>, <span class="str">"opinionAvg"</span>, ...
+    <span class="cm">// "shannonIndex" and "disagreement" are MISSING</span>
+};</code></pre>
+    <p><strong>Impact:</strong> Two key diversity and echo-chamber metrics are silently lost. All existing output CSVs contain no Shannon or disagreement data. Post-hoc analysis of these metrics is impossible without re-running the simulation.</p>
+  </div>
+
+  <!-- BUG 4 -->
+  <div class="card danger">
+    <span class="file-ref">OpinionDynamics.java:203</span>
+    <div class="tag perf">Performance · High</div>
+    <h3>Assertion checker called per-agent, not per-step → O(N³·T)</h3>
+    <p>
+      <code>ASChecker.assertionChecker()</code> is invoked inside the per-agent loop. The checker iterates the full N×N adjacency matrix, making it O(N²) per call, O(N³) per step, and O(N³·T) overall.
+    </p>
+    <pre><code><span class="kw">for</span> (Agent agent : shuffledAgents) {
+    <span class="cm">// ... agent update logic ...</span>
+    ASChecker.assertionChecker(agentSet, admin, agentNum, step);  <span class="cm">// ← called N times per step</span>
+}</code></pre>
+    <p><strong>Impact:</strong> For N=1000, T=40,000 → approximately 40 billion matrix element accesses just for consistency checking. This is orders of magnitude above what the opinion dynamics themselves require. In practice it likely dominates wall time. Should be moved outside the agent loop or disabled in production runs.</p>
+  </div>
+
+  <!-- BUG 5 -->
+  <div class="card danger">
+    <span class="file-ref">Agent.java:313 + OpinionDynamics.java:140–211</span>
+    <div class="tag model">Model · High</div>
+    <h3>Default TARGET_DIRECTION=0 disables asymmetric stubbornness</h3>
+    <p>
+      The branch is named <em>asymmetric-stubbornness</em>, but the feature only activates when <code>TARGET_DIRECTION ≠ 0</code>. With the default value of 0, <code>x = opinion * 0 = 0</code> for all agents, and all agents receive stubbornness = 0.6 (the else branch).
+    </p>
+    <pre><code><span class="kw">private double</span> calculateStubbornness(<span class="kw">double</span> opinion) {
+    <span class="kw">double</span> x = opinion * Const.TARGET_DIRECTION;  <span class="cm">// = 0 when TARGET_DIRECTION=0</span>
+    <span class="kw">if</span> (x &lt;= -<span class="num">0.6</span>) value = <span class="num">0.8</span>;
+    <span class="kw">else if</span> (x &gt;= <span class="num">0.6</span>) value = <span class="num">1.0</span>;
+    <span class="kw">else</span> value = <span class="num">0.6</span>;  <span class="cm">// ← always reached when TARGET_DIRECTION=0</span>
+}</code></pre>
+    <p><strong>Impact:</strong> Running <code>java dynamics.OpinionDynamics</code> without a second argument (target) gives a symmetric stubbornness model, not the asymmetric one. The run script does pass ±1.0, so production runs are correct, but this is a fragility. The code silently falls back to a different model.</p>
+  </div>
+
+  <!-- BUG 6 -->
+  <div class="card danger">
+    <span class="file-ref">Agent.java:273</span>
+    <div class="tag model">Model · High</div>
+    <h3>Comfort uses hardcoded threshold MINIMUM_BC, not dynamic bc</h3>
+    <p>
+      The comfort post count — which drives postProb and useProb — uses the fixed constant <code>MINIMUM_BC = 0.2</code> rather than the agent's current bounded confidence value.
+    </p>
+    <pre><code><span class="kw">if</span> (Math.abs(post.getPostOpinion() - opinion) &lt; Const.MINIMUM_BC) {  <span class="cm">// 0.2 — always fixed</span>
+    comfortPostNum++;
+}</code></pre>
+    <p><strong>Impact:</strong> As <em>bc</em> decays toward 0.2, agents become less tolerant, but their comfort threshold stays at 0.2. The two variables are supposed to be linked conceptually but are implemented as independent quantities. This decoupling distorts the relationship between echo-chamber formation (bc decay) and engagement (comfort-based postProb update).</p>
+  </div>
+
+  <!-- BUG 7 -->
+  <div class="card danger">
+    <span class="file-ref">AdminOptim.java:63–98</span>
+    <div class="tag model">Model · High</div>
+    <h3>Recommendation algorithm is unimplemented — feed is random</h3>
+    <p>
+      <code>AdminOptim</code> maintains a <code>recommendPostQueue</code>, but <code>addRecommendPost()</code> is never called anywhere in the codebase. <code>AdminFeedback()</code> simply shuffles the agent's postCash and exposes all posts.
+    </p>
+    <pre><code><span class="kw">public void</span> AdminFeedback(<span class="kw">int</span> userId, Agent[] agentSet) {
+    List&lt;Post&gt; tempFeed = <span class="kw">new</span> ArrayList&lt;&gt;();
+    <span class="kw">for</span> (Post post : agentSet[userId].getPostCash().getAllPosts()) {
+        <span class="cm">// filter blocked users, then...</span>
+        tempFeed.add(post);
+    }
+    Collections.shuffle(tempFeed, randomGenerator.get());  <span class="cm">// ← random order, no ranking</span>
+    <span class="kw">for</span> (Post post : tempFeed) agentSet[userId].addPostToFeed(post);
+}</code></pre>
+    <p><strong>Impact:</strong> Any claim about algorithmic feed effects is not tested. The current feed is equivalent to a random timeline. The scaffolding for a recommendation system exists but is disconnected.</p>
+  </div>
+
+  <!-- MEDIUM ISSUES -->
+  <h3 style="margin-top: 36px;">Medium-severity issues</h3>
+
+  <div class="card warn">
+    <span class="file-ref">Network.java:37–41</span>
+    <div class="tag bug">Bug · Medium</div>
+    <h3>setEdge ignores the weight parameter</h3>
+    <p>The method signature accepts <code>double weight</code> but always writes <code>1.0</code>. The double adjacency matrix is effectively binary. <code>reduceEdge</code> and <code>increaseEdge</code> exist but are unused. Weighted network mechanics are absent.</p>
+    <pre><code><span class="kw">public void</span> setEdge(<span class="kw">int</span> i, <span class="kw">int</span> j, <span class="kw">double</span> weight) {
+    adjacencyMatrix[i][j] = <span class="num">1.0</span>;  <span class="cm">// weight parameter is silently ignored</span>
+}</code></pre>
+  </div>
+
+  <div class="card warn">
+    <span class="file-ref">BarabasiAlbertNetwork.java:35–45, 66–68</span>
+    <div class="tag model">Model · Medium</div>
+    <h3>BA network has inconsistent edge directionality</h3>
+    <p>The initial seed clique is bidirectional (<code>addEdge(i,j); addEdge(j,i)</code>), but all subsequent node connections are directed only from new→existing. Early nodes have undirected ties; later nodes have outgoing edges only. This creates a mixed structure that violates standard BA network assumptions and makes degree distribution analysis ambiguous.</p>
+  </div>
+
+  <div class="card warn">
+    <span class="file-ref">OpinionDynamics.java:153</span>
+    <div class="tag perf">Performance · Medium</div>
+    <h3>setFollowerNum called per-agent per step — O(N²·T)</h3>
+    <p><code>agent.setFollowerNum(W)</code> scans all N agents to count followers. Called for every agent at every step: O(N²) per step, O(N²·T) total. For N=1000, T=40,000 → 40 billion additions. Follower counts should be maintained incrementally and updated only on follow/unfollow events.</p>
+  </div>
+
+  <div class="card warn">
+    <span class="file-ref">OpinionDynamics.java:172–176, 189–192</span>
+    <div class="tag perf">Performance · Medium</div>
+    <h3>Post and repost distribution is O(N) per post per step</h3>
+    <p>For each post/repost, all N agents are scanned to find followers (<code>if (W[otherAgent.getId()][agentId] > 0)</code>). Since multiple agents post per step, total distribution cost is O(N²) per step. An adjacency list (follower-index per agent) would reduce this to O(out-degree) ≈ O(10).</p>
+  </div>
+
+  <div class="card warn">
+    <span class="file-ref">feed_analysis.py:85</span>
+    <div class="tag bug">Bug · Medium</div>
+    <h3>Python feed analysis reads a non-existent column for SEM computation</h3>
+    <p><code>count_prefix = "feedPostCount"</code> is requested from the CSV, but no such column is written by the Java simulation. The fallback <code>max(float(row.get(count_key, 1)), 1)</code> forces n=1, so the computed standard error equals the standard deviation. All SEM confidence bands in feed analysis plots are systematically overestimated.</p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 3. DESIGN EVALUATION -->
+<!-- ============================================================ -->
+<section id="design">
+  <h2>3. Design Evaluation</h2>
+
+  <div class="card info">
+    <div class="tag design">Design</div>
+    <h3>Dense N×N adjacency matrix for a sparse social graph</h3>
+    <p>
+      With <code>MAX_FOLLOW_CAPACITY = 10</code>, each agent follows ≤10 others. The expected edge density is ≤1%. Yet the adjacency matrix is a dense <code>double[1000][1000]</code> = 8 MB per copy. More critically, <code>getAdjacencyMatrix()</code> deep-copies the full matrix and is called repeatedly per step (once for the base W, once per agent for <code>setFollowerNum</code>, once for AssertionCheck, once per GEXF export). Each copy is ~8 MB allocated.
+    </p>
+    <p>An adjacency-list representation (e.g., <code>Set&lt;Integer&gt;[] followees</code>) would reduce memory by ~100× and graph traversal from O(N) to O(degree).</p>
+  </div>
+
+  <div class="card info">
+    <div class="tag design">Design</div>
+    <h3>Dual state representation for follow relationships</h3>
+    <p>
+      Follow state is stored in two places: <code>Agent.followList[]</code> (per-agent boolean array) and <code>AdminOptim.W[][]</code> (global adjacency matrix). Updates must propagate to both. <code>AssertionCheck</code> exists specifically to detect divergence between them — a design smell indicating that maintaining consistency is already known to be error-prone. A single source of truth would eliminate this class of bug.
+    </p>
+  </div>
+
+  <div class="card info">
+    <div class="tag design">Design</div>
+    <h3>Configuration in code, not in YAML</h3>
+    <p>
+      <code>config_template.yaml</code> exists and documents parameters (N, μ, ε_s, topology, etc.), but it is never read by the Java simulation. All parameters are hardcoded in <code>Const.java</code>. Running different parameter sweeps requires recompiling. The YAML file and <code>Const.java</code> are already diverging (e.g., YAML has <code>mu: 0.5</code>, code has <code>INITIAL_STUBBORNNESS: 0.8</code>; YAML has <code>opinion_std: 0.6</code>, code has <code>INITIAL_OPINION_STD: 0.4</code>).
+    </p>
+  </div>
+
+  <div class="card info">
+    <div class="tag design">Design</div>
+    <h3>120,000 file writes per simulation run — no buffering at the CSV level</h3>
+    <p>
+      <code>Writer.write()</code> opens, writes one row, and closes three separate CSV files per step. Over 40,000 steps, that is 120,000 individual file open/write/close operations. No step-level output buffering is used. Aggregating output into larger batches (e.g., write every 100 steps, or use a single append-mode file with step as a column) would dramatically reduce I/O overhead and simplify the Python analysis (which currently reads 40,000+ individual files).
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 4. RESEARCH RISKS -->
+<!-- ============================================================ -->
+<section id="risks">
+  <h2>4. Research Risks</h2>
+
+  <div class="card warn">
+    <div class="tag risk">Risk</div>
+    <h3>Gauss-Seidel vs. Jacobi updating — undocumented methodological choice</h3>
+    <p>
+      Agents are processed in a random shuffled order each step. Because opinion updates are applied immediately (<code>agent.updateMyself()</code> modifies <code>agent.opinion</code> in place), later agents in the step's shuffle read the already-updated opinions of earlier agents. This is a <em>Gauss-Seidel</em> (asynchronous) updating scheme, not the synchronous <em>Jacobi</em> scheme typical in bounded-confidence literature (Deffuant, HK).
+    </p>
+    <p>
+      Gauss-Seidel updating can produce qualitatively different equilibria and convergence rates. This choice should be explicitly documented and motivated — or changed to a snapshot-based approach where all opinions are read from a pre-step snapshot.
+    </p>
+  </div>
+
+  <div class="card warn">
+    <div class="tag risk">Risk</div>
+    <h3>Hub seeding creates opinion-topology inconsistency</h3>
+    <p>
+      The CNNR network is built using opinion similarity (<code>chooseNodeBySimilarity</code>): new nodes preferentially connect to existing nodes with similar opinions. After the network is fully constructed, the top-k hubs by follower count are <em>then</em> assigned extreme opinions (±1.0) and their stubbornness is recomputed. The network topology was shaped by initial random opinions, not the seeded extreme opinions. Hubs may therefore be structurally embedded in communities with incompatible opinions, creating an artificial starting tension that is an artifact of the initialization procedure rather than an emergent property.
+    </p>
+  </div>
+
+  <div class="card warn">
+    <div class="tag risk">Risk</div>
+    <h3>Extremely low activity rate suppresses dynamics</h3>
+    <p>
+      With <code>INITIAL_PU = 0.0025</code> (frozen), ~2.5 agents are active per step on average. At <code>MAX_FOLLOW_CAPACITY = 10</code>, each active agent reads posts from ≤10 followees. The expected number of posts read per step (across all agents) is tiny. With <code>INITIAL_PP = 0.1</code> and ~2.5 active agents, only ~0.25 new posts are generated per step on average. Over 40,000 steps, that is ~10,000 total posts for 1,000 agents — 10 posts per agent over the entire simulation. Most agents will go many steps without any feed content at all, making the social influence mechanism irrelevant for much of the run.
+    </p>
+  </div>
+
+  <div class="card warn">
+    <div class="tag risk">Risk</div>
+    <h3>Python analysis reads only 12.5% of simulation output by default</h3>
+    <p>
+      <code>opinion_variance_analysis.py</code> sets <code>max_step = 5000</code>, discarding steps 5001–40,000. If the model needs ~10,000 steps to reach steady state (plausible given the low activity rate), the standard analysis output captures only transient behavior. Results presented from this analysis may not reflect the model's equilibrium properties.
+    </p>
+  </div>
+
+  <div class="card warn">
+    <div class="tag risk">Risk</div>
+    <h3>Bounded confidence is monotonically decreasing — no recovery mechanism</h3>
+    <p>
+      BC decays on every discordant post (<code>bc *= 0.98</code>) and is never increased. In the long run, all agents converge toward <code>bc = MINIMUM_BC = 0.2</code>, regardless of initial conditions or network structure. This means the model's behavior at long time scales is dominated by this floor rather than by the social influence dynamics. The asymptotic state of the BC distribution is fully determined by the floor, not by the research parameters. Any claims about steady-state BC distributions require careful qualification.
+    </p>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- 5. SUGGESTIONS -->
+<!-- ============================================================ -->
+<section id="suggestions">
+  <h2>5. Suggestions</h2>
+
+  <h3>Immediate fixes (correctness)</h3>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>1. Add "shannonIndex" and "disagreement" to RESULT_LIST</h3>
+    <pre><code><span class="cm">// Const.java — add to RESULT_LIST</span>
+<span class="str">"shannonIndex"</span>, <span class="str">"disagreement"</span></code></pre>
+    <p>These metrics are already computed and set in the Writer. One line change makes them visible in output CSVs.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>2. Move AssertionCheck outside the agent loop</h3>
+    <pre><code><span class="cm">// OpinionDynamics.java — move after the agent loop, not inside it</span>
+<span class="kw">for</span> (Agent agent : shuffledAgents) {
+    <span class="cm">// ... agent update ...</span>
+    <span class="cm">// ASChecker.assertionChecker(...) ← remove from here</span>
+}
+ASChecker.assertionChecker(agentSet, admin, agentNum, step);  <span class="cm">// ← add here</span></code></pre>
+    <p>Reduces assertion cost from O(N³·T) to O(N²·T). Consider further disabling in production runs and enabling only for debug builds.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>3. Fix useProb bounds or document intent</h3>
+    <p>If platform churn is intended to be dynamic, set distinct MIN/MAX values:</p>
+    <pre><code><span class="kw">public static final double</span> MIN_PU = <span class="num">0.001</span>;
+<span class="kw">public static final double</span> MAX_PU = <span class="num">0.01</span>;</code></pre>
+    <p>If the intent is a fixed activity rate, remove the update calls from <code>updateMyself()</code> to make it explicit that no churn is modeled.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>4. Restore or remove the like-feedback update</h3>
+    <p>Either uncomment and validate the engagement increment in <code>updatePostProb()</code>, or remove the method entirely. The current state (computed but unused) is misleading.</p>
+    <pre><code><span class="kw">public void</span> updatePostProb() {
+    <span class="kw">double</span> increment = Const.MU_PARAM * Math.log(recievedLikeCount + <span class="num">1</span>);
+    postProb *= (<span class="num">1.0</span> + increment);  <span class="cm">// restore this line</span>
+    postProb = Math.min(postProb, Const.MAX_PP);
+    recievedLikeCount = <span class="num">0</span>;
+}</code></pre>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>5. Use the agent's dynamic bc in the comfort threshold</h3>
+    <pre><code><span class="cm">// Agent.java — replace MINIMUM_BC with this.bc</span>
+<span class="kw">if</span> (Math.abs(post.getPostOpinion() - opinion) &lt; <span class="kw">this</span>.bc) {
+    comfortPostNum++;
+}</code></pre>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Fix</div>
+    <h3>6. Fix Python feed analysis SEM</h3>
+    <p>Replace <code>feedPostCount</code> with the actual number of agents per class, which can be derived from the opinion CSV output already written:</p>
+    <pre><code><span class="cm"># Compute n_c from opinion_result CSVs, or add highComfortRateNum as a count proxy</span>
+n = max(agentCountByClass[c], <span class="num">1</span>)</code></pre>
+    <p>Alternatively, write agent counts per class as a new metric column.</p>
+  </div>
+
+  <h3 style="margin-top: 36px;">Structural improvements (design)</h3>
+
+  <div class="card ok">
+    <div class="tag design">Design</div>
+    <h3>7. Replace dense adjacency matrix with adjacency lists</h3>
+    <p>Store follower/followee relationships as <code>Set&lt;Integer&gt;</code> per agent. This eliminates the O(N²) scans in post distribution, follower counting, and assertion checking. Update <code>AdminOptim</code> to delegate state ownership to agents rather than maintaining a separate matrix.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Design</div>
+    <h3>8. Consolidate to a single source of truth for follow state</h3>
+    <p>Remove either <code>Agent.followList</code> or <code>AdminOptim.W</code> as authoritative state. Keep one and derive the other on-demand. This eliminates the need for <code>AssertionCheck</code>'s consistency verification entirely.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Design</div>
+    <h3>9. Wire the YAML config to Java simulation</h3>
+    <p>Add a YAML parser (e.g., SnakeYAML, already likely in the lib directory for Gephi) and read parameters from <code>config_template.yaml</code> at startup. This decouples experiment configuration from compilation and prevents the YAML/Const.java drift that is already visible (<code>mu</code>, <code>opinion_std</code> disagree between files).</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag design">Design</div>
+    <h3>10. Batch CSV output — one file per simulation, not per step</h3>
+    <p>Write all metrics rows to a single append-mode CSV per metric type, with <code>step</code> as the first column. This reduces 120,000 file I/O operations to 3 and simplifies the Python analysis from glob-sorting 40,000 files to reading one.</p>
+    <pre><code><span class="cm">// Write once at end, or append-mode each step</span>
+<span class="kw">try</span> (PrintWriter pw = <span class="kw">new</span> PrintWriter(<span class="kw">new</span> FileWriter(filePath, <span class="kw">true</span>))) {
+    pw.println(row);  <span class="cm">// append, header written once at init</span>
+}</code></pre>
+  </div>
+
+  <h3 style="margin-top: 36px;">Model-level recommendations</h3>
+
+  <div class="card ok">
+    <div class="tag model">Model</div>
+    <h3>11. Add a BC recovery mechanism</h3>
+    <p>Consider a slow recovery: <code>bc = min(bc + α, 1.0)</code> on concordant post exposure. Without it, BC converges to 0.2 for all agents regardless of conditions, making the long-run equilibrium parameter-independent. A recovery term makes BC a genuine dynamic variable and allows studying its steady-state distribution as a function of network topology and stubbornness.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag model">Model</div>
+    <h3>12. Document and justify the Gauss-Seidel update order</h3>
+    <p>Either switch to snapshot-based (Jacobi) updating — take a copy of all opinions before the step begins and use those for feed influence — or explicitly state and motivate the asynchronous scheme. For comparison, run both variants with identical seeds and report whether conclusions differ.</p>
+    <pre><code><span class="cm">// Jacobi-style: copy opinions before the step</span>
+<span class="kw">double</span>[] snapshotOpinions = Arrays.stream(agentSet)
+    .mapToDouble(Agent::getOpinion).toArray();
+<span class="cm">// Use snapshotOpinions[i] for influence computation, not agent.getOpinion()</span></code></pre>
+  </div>
+
+  <div class="card ok">
+    <div class="tag model">Model</div>
+    <h3>13. Separate hub seeding from network construction</h3>
+    <p>Assign extreme opinions to hubs <em>before</em> building the CNNR network, or use an opinion-agnostic hub-selection criterion (e.g., random among top-k by degree in a pre-built topology). The current design creates a structural inconsistency where the network was built to reflect one opinion landscape but must operate in another.</p>
+  </div>
+
+  <div class="card ok">
+    <div class="tag model">Model</div>
+    <h3>14. Increase Python analysis horizon to the full simulation</h3>
+    <p>Set <code>max_step = Const.MAX_SIMULATION_STEP</code> (or pass it as an argument) in all Python scripts. Use adaptive smoothing (larger window at scale) to handle the full 40,000-step series without overwhelming the plots.</p>
+  </div>
+</section>
+
+<hr />
+<p style="color: var(--muted); font-size: 0.8rem; text-align: center;">
+  SNAM2026 Code Review · Generated 2026-04-27 · Focus: research relevance, not style
+</p>
+
+</main>
+</body>
+</html>

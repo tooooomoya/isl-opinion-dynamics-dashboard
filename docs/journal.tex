@@ -1,0 +1,1477 @@
+%Version 3.1 December 2024
+% See section 11 of the User Manual for version history
+%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%                                                                 %%
+%% Please do not use \input{...} to include other tex files.       %%
+%% Submit your LaTeX manuscript as one .tex document.              %%
+%%                                                                 %%
+%% All additional figures and files should be attached             %%
+%% separately and not embedded in the \TeX\ document itself.       %%
+%%                                                                 %%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%\documentclass[referee,sn-basic]{sn-jnl}% referee option is meant for double line spacing
+
+%%=======================================================%%
+%% to print line numbers in the margin use lineno option %%
+%%=======================================================%%
+
+%%\documentclass[lineno,pdflatex,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+%%=========================================================================================%%
+%% the documentclass is set to pdflatex as default. You can delete it if not appropriate.  %%
+%%=========================================================================================%%
+
+%%\documentclass[sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+
+%%Note: the following reference styles support Namedate and Numbered referencing. By default the style follows the most common style. To switch between the options you can add or remove �Numbered� in the optional parenthesis. 
+%%The option is available for: sn-basic.bst, sn-chicago.bst%  
+ 
+%%\documentclass[pdflatex,sn-nature]{sn-jnl}% Style for submissions to Nature Portfolio journals
+%%\documentclass[pdflatex,sn-basic]{sn-jnl}% Basic Springer Nature Reference Style/Chemistry Reference Style
+\documentclass[pdflatex,sn-mathphys-num]{sn-jnl}% Math and Physical Sciences Numbered Reference Style
+%%\documentclass[pdflatex,sn-mathphys-ay]{sn-jnl}% Math and Physical Sciences Author Year Reference Style
+%%\documentclass[pdflatex,sn-aps]{sn-jnl}% American Physical Society (APS) Reference Style
+%%\documentclass[pdflatex,sn-vancouver-num]{sn-jnl}% Vancouver Numbered Reference Style
+%%\documentclass[pdflatex,sn-vancouver-ay]{sn-jnl}% Vancouver Author Year Reference Style
+%%\documentclass[pdflatex,sn-apa]{sn-jnl}% APA Reference Style
+%%\documentclass[pdflatex,sn-chicago]{sn-jnl}% Chicago-based Humanities Reference Style
+
+%%%% Standard Packages
+%%<additional latex packages if required can be included here>
+
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{amsthm}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+%%%%
+
+%%%%%=============================================================================%%%%
+%%%%  Remarks: This template is provided to aid authors with the preparation
+%%%%  of original research articles intended for submission to journals published 
+%%%%  by Springer Nature. The guidance has been prepared in partnership with 
+%%%%  production teams to conform to Springer Nature technical requirements. 
+%%%%  Editorial and presentation requirements differ among journal portfolios and 
+%%%%  research disciplines. You may find sections in this template are irrelevant 
+%%%%  to your work and are empowered to omit any such section if allowed by the 
+%%%%  journal you intend to submit to. The submission guidelines and policies 
+%%%%  of the journal take precedence. A detailed User Manual is available in the 
+%%%%  template package for technical guidance.
+%%%%%=============================================================================%%%%
+
+%% as per the requirement new theorem styles can be included as shown below
+\theoremstyle{thmstyleone}%
+\newtheorem{theorem}{Theorem}%  meant for continuous numbers
+%%\newtheorem{theorem}{Theorem}[section]% meant for sectionwise numbers
+%% optional argument [theorem] produces theorem numbering sequence instead of independent numbers for Proposition
+\newtheorem{proposition}[theorem]{Proposition}% 
+%%\newtheorem{proposition}{Proposition}% to get separate numbers for theorem and proposition etc.
+
+\theoremstyle{thmstyletwo}%
+\newtheorem{example}{Example}%
+\newtheorem{remark}{Remark}%
+
+\theoremstyle{thmstylethree}%
+\newtheorem{definition}{Definition}%
+
+\raggedbottom
+%%\unnumbered% uncomment this for unnumbered level heads
+
+
+
+
+\def\blue#1{\textcolor[rgb]{0,0,1.0}{#1}}
+\def\green#1{\textcolor[rgb]{0,0.6,0}{#1}}
+\def\red#1{\textcolor[rgb]{1.0,0,0}{#1}}
+\def\green#1{\textcolor[rgb]{0,0.6,0}{#1}}
+\def\dgreen#1{\textcolor[rgb]{0.02,0.55,0.04}{#1}}
+\def\gray#1{\textcolor[rgb]{0.5,0.5,0.7}{#1}}
+\def\orange#1{#1}% reverted to black (was orange)
+\def\Orange{}% reverted to black (was orange)
+
+\def\Dgreen{\color[rgb]{0.02,0.55,0.04}}
+\def\Blue{\color[rgb]{0,0,1}}
+\def\Red{\color[rgb]{1,0,0}}
+\def\Black{\color[rgb]{0,0,0}}
+\def\Gray{\color[rgb]{0.5,0.5,0.7}}
+\def\colorreset{\color[rgb]{0,0,0}}
+
+
+\usepackage{xspace}
+
+\def\ignore#1{\iffalse #1 \fi\xspace}
+%\def\red#1{\RedColor\textcolor{red}{#1}}
+\def\red#1{\textcolor{red}{#1}}
+\def\blue#1{\textcolor{blue}{ #1}}
+\def\ignore#1{\xspace}
+
+\usepackage[normalem]{ulem}
+
+\newcommand{\add}[1]{\dgreen{#1}}
+%\newcommand{\erase}[1]{\textcolor{red}{\sout{\textcolor{black}{#1}}}}
+\newcommand{\erase}[1]{\textcolor{red}{\sout{#1}}}
+
+\def\subst#1#2{\add{#1}\erase{ (#2)}}
+
+\def\replace#1#2{\dgreen{#2}}  % #1 old, #2 new
+% \def\replace#1#2{\erase{#1} \dgreen{#2}}  % #1 old, #2 new
+
+\renewcommand{\topfraction}{.99}
+\renewcommand{\dbltopfraction}{.99}
+\renewcommand{\bottomfraction}{.99}
+\renewcommand{\textfraction}{.01}
+\renewcommand{\floatpagefraction}{0.9}
+\renewcommand{\dblfloatpagefraction}{0.9}
+
+
+% parameters definition
+
+\def\AgentSet{\mathcal{A}}
+\def\post{\rho} % was P_p
+\def\BoundedConfidence{\epsilon}
+\def\e{\varepsilon}
+\def\feed{F}
+
+\def\maxfollower{S_{\it fol}}
+\def\maxfeed{S_{\it fd}}
+\def\Stubbornness{\mu_{\it stub}}
+\def\ThofOpPreval{\varepsilon_s}
+
+
+\usepackage{url}
+\usepackage{subcaption}
+
+\begin{document}
+
+\title[Mechanism of the Structural Backfire Effect]{\dgreen{Mechanism of the Structural Backfire Effect: \\How Hub Opinion Shifts Fragment Heavy-Tailed Social Networks}}
+
+%%=============================================================%%
+%% GivenName	-> \fnm{Joergen W.}
+%% Particle	-> \spfx{van der} -> surname prefix
+%% FamilyName	-> \sur{Ploeg}
+%% Suffix	-> \sfx{IV}
+%% \author*[1,2]{\fnm{Joergen W.} \spfx{van der} \sur{Ploeg} 
+%%  \sfx{IV}}\email{iauthor@gmail.com}
+%%=============================================================%%
+
+\author*[1]{\fnm{Tomoya} \sur{Takeda}}\email{tomoya.leo9@fuji.waseda.jp}
+
+\author[2]{\fnm{Fujio} \sur{Toriumi}}\email{tori@sys.t.u-tokyo.ac.jp}
+
+\author[1]{\fnm{Toshiharu} \sur{Sugawara}}\email{sugawara@waseda.jp}
+
+
+\affil*[1]{\orgdiv{Department of Computer Science and Communications Engineering}, \orgname{Waseda University}, \orgaddress{\street{3-4-1 Okubo}, \city{Shinjyuku-ku}, \state{Tokyo}, \country{Japan}}}
+
+\affil[2]{\orgdiv{Department of Systems Innovation}, \orgname{The University of Tokyo}, \\ \orgaddress{\street{7-3-1 Hongo}, \city{Bunkyo-ku}, \state{Tokyo}, \country{Japan}}}
+
+%\affil[3]{\orgdiv{Department of Computer Science and Communications Engineering, Waseda University}, \orgname{Organization}, \orgaddress{\street{3-4-1 Okubo}, \city{Shinjyuku-ku}, \postcode{169-8555}, \state{Tokyo}, \country{Japan}}}
+
+%%==================================%%
+%% Sample for unstructured abstract %%
+%%==================================%%
+
+\abstract{
+\Dgreen
+Online discourse on social media has become a prerequisite for public
+opinion formation for a large part of the population, and
+influencers (or hub users) exert a strong influence on online communication.
+We study a counterintuitive {\em structural backfire effect} in agent-based
+opinion dynamics: when a moderate-opinionated hub is driven toward an
+extreme stance, it often fails to steer public opinion and instead accelerates
+collective polarization by energizing opposite-opinion followers.
+We show that this is a robust {\em structural} phenomenon---emerging
+specifically in heavy-tailed networks when users are sufficiently stubborn and
+the opinion-shifting hub is sufficiently central, and absent in networks lacking
+a heavy tail. By directly measuring the causal chain, we identify its mechanism:
+hub manipulation severs the primary cross-partisan bridge, driving
+opposite-opinion followers to defect and collapse into echo chambers. 
+The pre-manipulation model reproduces empirical
+stylized facts of real social media data, and the effect persists under a realistic gradual
+opinion shift.
+These findings advance our understanding of 
+the vulnerability of social networks highlighting 
+how nonlinear structural dynamics produce counterintuitive collective
+outcomes, 
+contributing to 
+organizing conditions for sound web communication.
+\Black
+}
+\keywords{Opinion Dynamics, Computational Social Science, Multi-Agent Simulation, Polarization, Influence Operation, Social Media}
+
+%%================================%%
+%% Sample for structured abstract %%
+%%================================%%
+
+% \abstract{\textbf{Purpose:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Methods:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Results:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.
+% 
+% \textbf{Conclusion:} The abstract serves both as a general introduction to the topic and as a brief, non-technical summary of the main results and their implications. The abstract must not include subheadings (unless expressly permitted in the journal's Instructions to Authors), equations or citations. As a guide the abstract should not exceed 200 words. Most journals do not set a hard limit however authors are advised to check the author instructions for the journal they are submitting to.}
+
+%%\pacs[JEL Classification]{D8, H51}
+
+%%\pacs[MSC Classification]{35A01, 65L10, 65L12, 65L20, 65L70}
+
+\maketitle
+
+%\Blue
+
+\section{Introduction}\label{Intro}
+The advent of social media platforms such as Facebook, X (formerly Twitter), YouTube, and TikTok has profoundly transformed the global information environment. By significantly reducing communication barriers, these platforms offer novel interaction modes in which finding like-minded communities is effortless and the cost of broadcasting to the public has drastically decreased~\cite{Cheung2011,Carr2015,Nyhan2023}. Owing to their accessibility and efficiency, online social networks are increasingly envisioned as essential infrastructure for civic deliberation and digital democracy~\cite{Smith2021,Tseng2022,Yang2025}. However, to fully harness the potential of these transformative technologies, we must understand the complex interplay between system features and user behavior, particularly because the relatively short history of human interaction with social media means that our understanding of its long-term societal impact remains nascent.
+\par
+
+
+Despite these advantages, society faces significant challenges, including opinion polarization, misinformation diffusion, and malicious influence operations~\cite{Fisher2015,Baccarella2018,Conover2011}. Although phenomena such as polarization are not exclusive to the digital age, the architectural and functional characteristics of social media arguably catalyze their emergence. Structural phenomena, such as \emph{echo chambers}~\cite{Cinelli2020,Sasahara2021}, in which users are isolated in homophilic clusters driven by their own selective tie formation, and \emph{filter bubbles}~\cite{Uthsav2020,Lien2022}, driven by algorithmic filtering, create environments that foster radicalization. 
+\Dgreen
+A less studied yet equally consequential source of polarization 
+is the opinion shift of highly connected \emph{hub users}, 
+whose stance changes can propagate rapidly through the network. 
+Such shifts arise spontaneously---in events such as the sudden political revelations of
+prominent influencers, the ideological radicalization of public figures,
+or the adoption of increasingly extreme positions by populist politicians---
+events that routinely trigger follower defection and affective polarization~\cite{Flamino2023,Bail2018}.
+Exogenous \emph{influence operations}~\cite{Fisher2015,Pascal2016,Golovchenko2020},
+which deliberately target opinion leaders to steer collective discourse,
+represent an intentional variant of the same mechanism.
+\par
+
+
+Whether endogenous or exogenous, the structural and behavioral conditions under which
+such hub-driven opinion shifts trigger irreversible polarization remain poorly understood. 
+While prior research has repeatedly shown that attempts to shift opinions 
+through social influence frequently produce counterintuitive and nonlinear 
+outcomes---including reinforcement of prior positions rather than convergence
+toward the intended target~\cite{Brehm1966,Bail2018}---the network-structural conditions under which hub users' opinion shifts trigger such effects remain poorly understood.
+In preliminary work, we proposed an {\em agent-based model} (ABM), which integrates well-established
+social interaction models with behavioral repulsion---tie severing through
+unfollowing rather than attitudinal reactance---and reported a novel
+network-level phenomenon termed the {\em structural backfire effect}, in which the opinion
+shift of moderate hub users toward extremes severs the cross-partisan bridge they
+provide, driving far-opinion followers to defect and retreat into echo chambers,
+ultimately intensifying polarization~\cite{Takeda2026}.
+We use \emph{structural} to distinguish this network-mediated effect from the
+classical, individual-level ``backfire effect,'' in which exposure to opposing
+views reinforces a person's prior \emph{opinion}~\cite{Brehm1966,Nyhan2021}:
+here the intervention instead amplifies the opposing camp's \emph{posting activity}
+through structural fragmentation of the network, with little opinion-level repulsion
+term in the model. Hereafter we refer to it as the structural backfire effect, or
+simply backfire where unambiguous.
+However, those preliminary findings were limited to a specific parameter set,
+a single network topology, and two hub nodes undergoing instantaneous opinion shifts;
+moreover, the model lacked empirical grounding to establish its behavioral credibility
+relative to real social media dynamics.
+It therefore remained unclear whether the backfire effect is a universal structural
+phenomenon or an artifact arising only under narrow conditions.
+\par
+
+
+This paper establishes the structural backfire effect as a robust structural phenomenon and explains its mechanism, through four contributions.
+First, we provide direct mechanistic evidence for the causal chain underlying the backfire
+effect by tracking unfollowing events, follower composition, and feed homogeneity at each
+manipulation step, revealing echo chamber deepening via hub loss as a structural mechanism for backfire
+distinct from the psychological reactance processes identified in prior literature~\cite{Bail2018}.
+Second, we identify the boundary conditions under which hub-driven opinion shifts trigger irreversible
+polarization, through a fine-grained parameter sweep across agent stubbornness and
+opinion prevalence thresholds evaluated across heavy-tailed, high-clustering, and random networks.
+Third, we validate the model against empirical stylized facts drawn from Twitter/X data,
+establishing its behavioral credibility relative to real social media dynamics prior to the main analysis.
+Fourth, in contrast to the instantaneous opinion shift modeled in our preliminary study,
+we adopt a gradual shift model in which the hub's opinion is incrementally displaced
+per platform access, demonstrating that the backfire effect persists under this
+more realistic behavioral assumption.
+Our results establish the backfire effect as a robust structural phenomenon consistently
+associated with heavy-tailed degree distributions and high user stubbornness,
+providing a theoretical framework that highlights the
+critical role of hub users in network resilience and echo chamber formation.
+\Black
+
+
+\section{Related Work}\label{RelatedWork}
+Computational social system modeling using ABM has long been a
+primary method for gaining insight 
+in complex social phenomena. Early research assumed individuals
+as nodes in a graph with internal state variables and analyzed system
+convergence and dynamics through local interactions~\cite{Clifford1973,Liggett1975,Axelrod1997,Sznajd2005,Galam2008}. 
+Liggett et al.~\cite{Liggett1975} proposed the \emph{voter model}, in which agents
+hold binary values and probabilistically change their internal values
+adopting the state of a neighbor. This model serves as a foundational
+framework to understand public opinion dynamics as a diffusion
+processes on social networks.
+\par
+
+
+These discrete models were extended by incorporating greater
+sociological realism~\cite{DeGroot1974,Friedkin1990,Deffuant2000,Hegselmann2002}. DeGroot~\cite{DeGroot1974} introduced a weighted
+averaging model, in which an agent's opinion is updated based on the
+weighted average of their neighbors' opinions, representing the
+social influence process. Building on this concept, Deffuant et al.~\cite{Deffuant2000} and Hegselmann and Krause~\cite{Hegselmann2002}
+introduced the concept of a \emph{bounded confidence model}, which
+implies that agents interact only with those whose opinions fall
+within a specified threshold range. This mechanism accounts for 
+the psychological reality that individuals are unlikely to be influenced
+by divergent views, thereby providing a mathematical basis for the emergence
+of a local consensus or cluster.
+\par
+
+
+
+Social media has introduced novel forms of communication
+environments that are distinct from traditional face-to-face interactions,
+characterized by features such as algorithmic recommender systems and
+dynamic tie formation (i.e., following and unfollowing
+relationships). The complex dynamics that emerge from these features pose
+critical questions that must be fully elucidated; therefore, a
+vast body of literature has emerged to investigate these
+phenomena~\cite{Watts2007,Lazer2009,Golder2011,Bond2012,Bakshy2015,DelVicario2016,Vosoughi2018,Sasahara2021,Conover2011}. Vosoughi
+et al.~\cite{Vosoughi2018} conducted a large-scale analysis on
+information diffusion on Twitter, and found that falsehoods spread more
+broadly, rapidly, and deeply than truths. They attribute this pattern 
+primarily to the greater novelty of false information, which increases
+users’ propensity to share such information. Furthermore, evidence indicates
+that humans---not automated accounts---serve as principal drivers
+of falsehood diffusion. Sasahara et al.~\cite{Sasahara2021}
+demonstrated that the interplay between social influence mechanisms
+and the unfollowing of social ties accelerates polarization, thereby facilitating
+the formation of echo chambers. The authors validated their simulations
+against empirical data from X (formerly Twitter) regarding
+political polarization during elections~\cite{Conover2011}, thus confirming
+qualitative alignment between the model and real-world data. Therefore,
+the information era has enabled researchers to leverage large-scale
+behavioral logs for comprehensive analysis and model validation. This integration of
+big-data analytics and multi-agent simulation grounded in
+social science theories crystallized into the interdisciplinary
+field of \emph{computational social science} (CSS)~\cite{Lazer2009}.
+\par
+
+
+In social network analysis, extensive research has
+focused on the role of influencers and hub nodes in social networks. A
+representative domain is \emph{influence maximization}, which
+addresses the problem of selecting seed nodes to maximize the spread
+of information (i.e., ``word-of-mouth'') under resource constraints,
+primarily in the viral marketing context~\cite{Kempe2003,Kitsak2010,Budak2011,Kumar2022}. 
+Kempe et al.~\cite{Kempe2003} provided the first efficient algorithms with
+provable approximation guarantees for the influence maximization
+problem, which is defined as the NP-hard task of identifying a set of nodes to
+trigger the largest adoption cascade. More recently, Kumar et
+al.~\cite{Kumar2022} employed graph embeddings and {\em graph neural networks} to efficiently solve this problem, demonstrating that deep-learning approaches outperformed classical heuristics.
+\par
+
+
+\Dgreen
+Although these studies treated hub nodes as static conduits for information spread,
+they do not address the consequences of hub users' \emph{own} opinion shifts---whether
+endogenous, as discussed in Section~\ref{Intro}, or exogenously orchestrated through
+\emph{influence operations}~\cite{Beskow2019,Ross2019,Bergh2020,Goldstein2023} such
+as bot-driven campaigns, strategic promotion, account hijacking, and cognitive warfare.
+Even within the influence-operations literature, the emphasis has been on the
+attacking actors rather than on the network position of the targeted hub:
+Ross et al.~\cite{Ross2019}, for instance, found that the number and sophistication
+of bots outweigh their network position as drivers of opinion influence.
+As a result, few studies have systematically examined the network-structural
+conditions under which the opinion shift of a \emph{human} hub user---endogenous or
+exogenous---triggers irreversible polarization.
+
+Our preliminary work identified a ``backfire effect,'' in which the opinion
+shift of moderate hub users toward extremes---modeled as manipulation to
+isolate the structural mechanism---triggers a repulsive backlash across
+the network~\cite{Takeda2026}. However, those preliminary findings did not systematically
+examine the mechanism, boundary conditions, and robustness of this phenomenon---
+specifically, how the effect emerges structurally and
+how its emergence depends on the
+interplay between social modeling parameters and network topology.
+The present study addressed this gap by systematically varying agent stubbornness,
+opinion prevalence thresholds, and network structure across heavy-tailed,
+high-clustering, and random topologies.
+\Black
+\par
+
+
+\section{Computational Social Simulation Model}\label{model}
+\subsection{Agent-Based Model (ABM)}
+We introduce an ABM designed to simulate the opinion
+dynamics on social media platforms. Let $G = (\AgentSet, E)$ be a
+directed graph representing the social network structure, where
+$\AgentSet = \{1, 2, \dots, N\}$ denotes the set of $N$ agents (i.e.,
+social media users), and $E \subseteq \AgentSet \times \AgentSet$ denotes the
+set of directed edges representing follow relationships. A directed
+edge $(i, j) \in E$ indicates that agent $i$ follows agent $j$. We
+define the adjacency matrix $A$ such that $A_{ij} = 1$ if $(i,j)\in
+E$, and $A_{ij} = 0$ otherwise, where $A_{ij}$ is the $(i,j)$ element
+in the $N\times N$ matrix $A$. The dynamics simulations are executed in discrete
+time steps, denoted by $t \in \{0, 1, 2, \dots\}$.
+\par
+
+\begin{table}[t]
+  \tabcolsep=5pt
+  \centering
+  \caption{Agent parameters and their value ranges}\label{agentParam}
+  \begin{tabular}{llll}
+    \toprule
+    Parameter & Symbol & Range & Initial value \\
+    \midrule
+    Opinion & $O_i(t)$ & $[-1.0, 1.0]$ & $\mathcal{N}(0.0, 0.6^2)$ \\
+    Posting probability & $\post_i(t)$ & $[0.05, 0.5]$ & $0.1$ \\
+    Bounded confidence threshold & $\BoundedConfidence_i(t)$ & $[0.2, 1.0]$ & $1.0$\\
+    \bottomrule\\
+  \end{tabular}
+\end{table}
+
+Agent $i \in \AgentSet$ is characterized by the internal parameters listed in Table~\ref{agentParam}. 
+Its opinion $O_i(t) \in [-1, 1]$ represents the normalized 
+stance of $i$ on a specific issue at time $t$. 
+\dgreen{Although opinions are inherently multidimensional, 
+many studies in computational social science focus on a 
+single salient issue and model opinions along a one-dimensional
+spectrum~\cite{Sasahara2021,Uthsav2020}. Under this interpretation, $O_i(t)$
+represents agent $i$'s stance toward a specific 
+controversial topic, such as support for or 
+opposition to a particular \emph{hashtag} on social media. 
+Similar issue-specific representations are 
+commonly employed in empirical analyses of online 
+political communication and polarization \cite{Conover2011,Toriumi2024}.
+}
+Boundaries $-1$ and $1$ correspond to the most extreme 
+opposing views, and $0$ represents a neutral or moderate 
+attitude. We denote the initial opinion $O_i(0)$ as 
+the agent's \emph{intrinsic opinion}, 
+representing their baseline belief that may 
+influence their dynamics over time~\cite{Friedkin1990}, 
+and set it to random numbers drawn from a Gaussian
+distribution with mean $\mu=0.0$ and standard deviation
+$\sigma=0.6$, clipped to the valid range $[-1, 1]$.
+To establish a bipolar initial condition, the two highest-degree agents in the initial network are assigned intrinsic opinions of $+1.0$ and $-1.0$, respectively, prior to the simulation.
+\par
+
+
+The posting probability $\post_i(t)$ defines the likelihood
+that agent $i$ posts at time $t$. This parameter corresponds to the
+concept of \emph{intensity}, which is often used in social simulations.
+In our model, posting intensity ($\post_i(t)$) is
+defined independently of opinion extremeness ($|O_i(t)|$). That is,
+activity is not proportional to radicalization. This independence
+allows us to capture heterogeneous behavioral patterns, including
+the phenomenon in which moderate users intensify their posting activity. As described in Section \ref{Intro}, \emph{bounded confidence} captures the sociopsychological hypothesis that
+individuals are unlikely to engage with opinions that
+deviate significantly from their own. Unlike classical bounded-confidence
+models, in which the threshold directly gates the opinion-averaging
+step~\cite{Deffuant2000,Hegselmann2002}, in our model the opinion update
+(Eq.~\eqref{FJmodel}) averages over all posts currently in the feed. This
+reflects the assumption that a user is inevitably influenced by any information
+they actually read: once a post enters and is read from the feed, it affects the
+reader's opinion regardless of how far it lies from their own. Bounded confidence
+therefore does not filter the opinion update itself; instead it governs the
+tie-level behaviors---reposting, following, unfollowing, and confidence
+decline---and thereby shapes the opinion dynamics indirectly, by determining
+which posts enter the feed in the first place. We further
+introduce a \emph{dynamic} bounded confidence parameter $\BoundedConfidence_i(t)$
+rather than a static threshold, modeling the adaptive evolution of user
+openness to conflicting views through interactions on the platform.
+The evolution of these parameters is
+governed by the social update mechanisms, as described next.
+\par
+
+
+
+\subsection{Modeling Social Adaption} 
+In general, humans tend to adapt their internal state to their environment. We model these mechanisms based on well-established computational theories~\cite{Friedkin1990,Deffuant2000,Hegselmann2002,Sasahara2021}. Each
+time an agent accesses the platform with probability $P_a$, it updates
+the internal parameters according to the rules described below. 
+Hereafter, we call a post $p_j$ from agent $j$ \emph{comfortable} for agent $i$
+when $|O_i(t) - O(p_j)| \leq \epsilon_{\min}$, where $\epsilon_{\min} = 0.2$ is the
+minimum bounded-confidence threshold (i.e., the lower bound of $\BoundedConfidence_i(t)$);
+this notion is used by the social-reinforcement rule below. The dynamic threshold
+$\BoundedConfidence_i(t)$ itself instead governs the tie-level behaviors
+(reposting, following, unfollowing, and confidence decline), as specified in each rule.
+\par
+
+
+
+\begin{description}
+\item[{\bf Social Influence.}] Agents read all posts in their feeds
+  and update their opinions based on posts in feeds and their intrinsic
+  opinions. Agent $i$ updates its opinion at time $t$, influenced by
+  the opinion of post $p_j$ in its feed $F_i(t)$, as follows:
+  %
+  \begin{equation}\label{FJmodel}
+   O_i(t) = \Stubbornness \cdot O_i(0) + (1 - \Stubbornness) \cdot \frac{\sum_{p_j \in F_i(t)} O(p_j)}{|F_i(t)|},
+  \end{equation}
+  %
+where $\Stubbornness$ denotes the agent’s \emph{stubbornness},
+representing the extent to which agents adhere to their intrinsic
+opinions $O_i(0)$ rather than being influenced by others~\cite{Friedkin1990}. Note that
+posts in an agent's feed originate from those posted or reposted by
+users whom the agent follows; thus, the agent may encounter posts that lie
+beyond its current bounded confidence unless it unfollows or blocks the creator.
+
+\Dgreen
+\item[{\bf Social Reinforcement.}]
+ Agents increase or decrease
+  their posting probability (or intensity) based on the
+  ratio of comfortable posts in their feeds. Formally, let $C_i(t)=
+  |K_i(t)|/|F_i(t)|$ be the ratio of comfortable posts in agent $i$'s
+  feed at time $t$, where $K_i(t)=\{p_j \in F_i(t) \mid |O_i(t) - O(p_j)|
+  \leq \epsilon_{\min}\}$ (comfortable posts, as defined above). The posting
+  probability is then updated by
+  %
+  \begin{equation}\label{eq:SocialReinforcement}
+    \post_i(t) =
+    \begin{cases}
+      \min(\post_i(t-1) \cdot (1 + \delta_{\post}),\, 0.5)
+        & \text{if } C_i(t) > \ThofOpPreval,\\[2pt]
+      \max(\post_i(t-1) \cdot (1 - \delta_{\post}),\, 0.05)
+        & \text{else if } C_i(t) \leq 1-\ThofOpPreval,\\[2pt]
+      \post_i(t-1) & \text{otherwise,}
+    \end{cases}
+  \end{equation}
+  %
+where $\delta_{\post}$ ($> 0$) denotes the parameter controlling the
+posting intensity adjustment rate and $\ThofOpPreval \in (0,1)$ denotes
+the {\em threshold for opinion prevalence}: an agent intensifies its posting
+when comfortable content locally prevails ($C_i(t) > \ThofOpPreval$) and
+reduces it when comfortable content is locally scarce ($C_i(t) \leq 1-\ThofOpPreval$).
+The two conditions are evaluated in order, so the increase rule takes precedence;
+consequently, when $\ThofOpPreval > 0.5$ an intermediate band
+$1-\ThofOpPreval < C_i(t) \leq \ThofOpPreval$ leaves the posting probability unchanged.
+
+\item[{\bf Social Reward.}] In addition to the conformity-based reinforcement above,
+  agents receive a posting incentive proportional to the social acceptance of their posts.
+  In our implementation, this reward is applied at the \emph{start} of each platform access, reflecting reposts accumulated since the agent's previous access, prior to reading the current feed.
+  When agent $i$'s posts are reposted by others, $i$ updates its posting probability
+  multiplicatively by a reward $r_i$ based on diminishing marginal utility~\cite{Hermann1983}:
+  %
+  \begin{equation}\label{eq:SocialReward}
+    r_i = \alpha \cdot \ln(1 + N^{l}_i),
+  \end{equation}
+  %
+  where $\alpha > 0$ is a tuning parameter and $N^{l}_i$ is the number of reposts received
+  since $i$'s previous platform access. The posting probability is then updated as
+  $\post_i(t) \leftarrow \min(\post_i(t) \cdot (1 + r_i),\ 0.5)$.
+  This logarithmic formulation reflects the empirically observed saturation of social
+  validation effects at high repost counts.
+\Black
+
+\item[{\bf Confidence Decline.}]
+\dgreen{The update of the bounded confidence threshold reflects the asymmetric
+  human tendency for negative experiences to carry greater psychological weight
+  than positive ones~\cite{Vallone1985,Baumeister2001}; accordingly, exposure to
+  conflicting content erodes openness while comfortable content does not
+  symmetrically restore it, so $\BoundedConfidence_i$ evolves monotonically
+  downward. Concretely, agents decrease their bounded
+  confidence for \emph{each} post they read that lies beyond their current bounded confidence in a given step.
+  Formally, $\BoundedConfidence_i$ is decremented multiplicatively by $\delta_{\BoundedConfidence}$ for each post $p_j \in F_i(t)$ that satisfies $|O_i(t) - O(p_j)| > \BoundedConfidence_i$, where $\BoundedConfidence_i$ takes the value already updated by preceding posts within the same step:
+  %
+  \begin{equation}
+    \BoundedConfidence_i \leftarrow \max(\BoundedConfidence_i \cdot \delta_{\BoundedConfidence},\ 0.2)
+    \quad \text{for each } p_j \in F_i(t) \text{ s.t. } |O_i(t) - O(p_j)| > \BoundedConfidence_i.
+  \end{equation}
+  %
+  Thus, a single step may produce multiple successive decays if the feed contains multiple such posts.
+  $0 < \delta_{\BoundedConfidence} < 1$ denotes the multiplicative decay rate of confidence in the surrounding environment.
+  }
+\end{description}
+
+
+
+\subsection{Modeling Behaviors on Social Media}
+As this study specifically focused on the dynamics within social
+media, we introduce the following characteristic behaviors: 
+post, repost (like), follow, and unfollow (block).
+
+\begin{description}
+\item[{\bf Post.}] Every time agent $j\in\AgentSet$ accesses the
+  platform, it creates a post $p_j$ reflecting its current opinion
+  with probability $\post_j(t)$. If $j$ creates a post, it is added to
+  the feeds of agents who follow $j$; each agent reads at most $\maxfeed$ posts per platform access, in reverse-chronological (newest-first) order, reflecting cognitive limits on information intake.
+
+\item[{\bf Repost (Like).}] When agent $i\in\AgentSet$ views a post in its
+  feed, $i$ reposts each post that lies within its bounded confidence
+  (i.e., $|O_i - O_{p_j}| <
+  \BoundedConfidence_i$) independently with probability $P_r$. Posts are distributed across the social
+  media network via this repost function; posts reposted by an agent
+  are added to the feeds of its followers. Note that the ``Like''
+  function on real-world social media services has a distribution effect
+  similar to that described here; therefore, we do not distinguish
+  between Like and Repost in the model for simplicity.
+
+\item[{\bf Follow.}] After reading the feed, agent $i$ collects the creators of all posts within its bounded confidence (i.e., $|O_i - O_{p_j}| < \BoundedConfidence_i$) with no existing follow connection as candidates; with probability $P_f$, $i$ randomly selects and follows one candidate.
+The maximum number of agents that any agent can follow is fixed at $\maxfollower$ throughout the experiments; in this study, $\maxfollower=10$ based on the concept of limited attention. 
+Although users may follow hundreds of other users, the number 
+of information sources that can effectively influence them 
+at any given time is constrained by human cognitive limits 
+and information overload \cite{Goncalves2011,Weng2012}.
+Accordingly, when an agent attempts to follow a new agent while already at $\maxfollower$, it unfollows the single currently-followed agent whose opinion is farthest from its own.
+
+\item[{\bf Unfollow (Block).}] Conversely, if a post lies beyond an agent's bounded confidence (i.e., $|O_i - O_{p_j}| > \BoundedConfidence_i$), the agent unfollows the creator with probability $P_u$, and rejects all future posts. If no connection exists, the agent blocks the creator with probability $P_u$, and rejects all future posts from the creator.
+\end{description}
+\par
+
+\dgreen{While all agents share the same behavioral rules, heterogeneity 
+arises endogenously through individually evolving state variables, 
+distinct initial opinions, and agents' structural positions---hub
+nodes and peripheral nodes experience qualitatively
+different interaction dynamics even under identical rules.}
+
+
+\subsection{Modeling Manipulation}
+\Dgreen
+The primary objective of this study is to 
+understand the nonlinear dynamics in which an influential \emph{hub} 
+user starts to shift its opinion to an extreme end. Accordingly, we manipulated a single hub user to adopt the targeted opinion direction in our simulations. The manipulation target was selected based on ideological position and structural importance in the network. After the social media network had evolved sufficiently in the middle of the simulation, 
+agents with neutral opinions (i.e., $|O_i| < 0.2$) and 
+follower counts of at least 10\% of the total population (i.e., $\geq 100$ agents for $N = 1000$) 
+were identified as candidates. One agent was then randomly selected from this pool as the manipulation target. If no qualifying candidate could be identified, the simulation run was excluded from the results.
+\par
+
+We modeled this manipulation as a gradual opinion shift: each time the target agent accesses the platform, its opinion is incremented by a fixed displacement $\Delta = 0.01$ in the target direction, bypassing the social influence update in Eq.~\eqref{FJmodel}, until the opinion reaches the extreme value ($+1.0$ or $-1.0$). The target's posting probability is simultaneously fixed at the maximum value $\rho_{\max} = 0.5$ to reflect the heightened activity of a manipulated influencer. Under platform access probability $P_a = 0.1$, the expected number of time steps for the target to 
+reach the extreme is approximately 1,000 steps given that the target's opinion is in [-0.2, 0.2]. 
+In contrast to the instantaneous shift modeled in our preliminary study~\cite{Takeda2026}, 
+this gradual formulation captures 
+the realistic human nature of opinion radicalization. 
+Although highly simplified, this single-agent setting sufficiently isolates the structural mechanism driving the backfire effect.
+This formulation abstracts away the operational mechanism 
+by which a hub's opinion shifts---whether spontaneous radicalization or
+coordinated external manipulation---and
+isolates the structural consequences of any such process.
+\Black
+\par
+
+
+\section{Experiments and Results}
+\subsection{Experimental Settings} 
+\Dgreen
+To evaluate the robustness and identify the boundary conditions of the backfire effect, we conducted a sensitivity analysis across five network configurations generated by four distinct models: the \emph{connecting nearest neighbor with random linkage} (CNNR)~\cite{Yuta2007}, the \emph{Holme--Kim} (HK)~\cite{Holme2002}, the \emph{Watts--Strogatz} (WS)~\cite{Watts1998}, and the \emph{Erd\H{o}s--R\'{e}nyi} (ER)~\cite{Erdos1959} models.
+
+The CNNR model extends the original CNN topology~\cite{Vazquez2003} by incorporating randomness to simulate human relationship formation on social media platforms, reproducing preferential attachment, hierarchical clustering, and heavy-tailed degree distributions.
+For the HK network, two different conditions were produced in the analysis, $p_t = 0$ and $0.3$.
+The HK model combines preferential attachment with a triangle-closing mechanism controlled by the parameter $p_t$: setting $p_t = 0$ recovers pure preferential attachment (yielding a network equivalent to the Barab\'{a}si--Albert model~\cite{Barabasi1999} with low clustering), while $p_t = 0.3$ additionally closes each newly added edge into a triangle with probability $p_t$, generating a heavy-tailed network with substantially higher clustering. These two HK variants thus allow us to disentangle the contributions of heavy-tailed (hub-dominated) degree structure and local clustering within the same generative framework. The WS model constructs a small-world network by rewiring a regular ring lattice with rewiring probability $\beta$: the resulting topology exhibits high clustering and short average path lengths but lacks a heavy-tailed degree distribution. The ER model serves as a random baseline lacking both hub structure and clustering. The generation parameters and their resulting average network metrics are summarized in Table~\ref{NWMetrics}.
+\par
+
+
+The parameters and their values are listed in Table~\ref{ExpParam}.
+The intensity adjustment rate $\delta_{\post}$ and confidence decay rate $\delta_{\BoundedConfidence}$ were set based on qualitative reasoning about known social dynamics: bounded confidence erodes gradually under sustained exposure to opposing views, and posting intensity adjusts incrementally in response to social feedback. The empirical adequacy of the resulting model is assessed independently in Section~\ref{sf_validation}.
+Each simulation involved $1{,}000$ agents over $40{,}000$ steps, with the manipulation phase introduced at step $20{,}000$. The code is available on GitHub.\footnote{\url{https://github.com/tooooomoya/manipulation-backfire-model}}
+\par
+
+
+\begin{table}[t]
+  \tabcolsep=5pt
+  \centering
+  \caption{Experimental parameters}\label{ExpParam}
+  \begin{tabular}{lll}
+    \toprule
+    Parameter & Symbol & Value \\
+    \midrule
+    Intensity Adjustment Rate & $\delta_\post$ & $0.1$ \\
+    Social Reward Tuning Parameter & $\alpha$ & $0.01$ \\
+    Confidence Decay Rate & $\delta_\epsilon$ & $0.99$ \\
+    Maximum Number of Followers & $\maxfollower$ & $10$\\
+    Maximum Feed Size & $\maxfeed$ & $10$\\
+    Threshold of Opinion Prevalence & $\ThofOpPreval$ & Variable\\
+    Agent's Stubbornness & $\Stubbornness$ & Variable\\
+    Probability of Accessing the Platform & $P_a$ & $0.1$\\
+    Probability of Reposting & $P_r$ & $0.25$\\
+    Probability of Following & $P_f$ & $0.1$\\
+    Probability of Unfollowing & $P_u$ & $0.1$\\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[t]
+  \tabcolsep=5pt
+  \centering
+  \caption{Network metrics (mean over seeds)}\label{NWMetrics}
+  \begin{tabular}{llllll}
+    \toprule
+    Network topology & CNNR & HK ($p_t{=}0.0$) & HK ($p_t{=}0.3$) & WS & ER \\
+    \midrule
+    Number of agents               & $1000$  & $1000$  & $1000$  & $1000$  & $1000$ \\
+    Average degree                 & $2.9$   & $6.0$   & $6.0$   & $4.0$   & $6.0$  \\
+    Average path length            & $6.76$  & $2.91$  & $2.63$  & $8.81$  & $4.06$ \\
+    Diameter                       & $17$    & $5$     & $5$     & $18$    & $8$    \\
+    Power-law exponent             & $2.80$  & $2.06$  & $1.95$  & ---     & ---    \\
+    Average clustering coefficient & $0.12$  & $0.10$  & $0.25$  & $0.19$  & $0.003$ \\
+    \bottomrule\\
+  \end{tabular}
+\end{table}
+
+\subsection{Empirical Validation via Stylized Facts}\label{sf_validation}
+
+Agent-based models of social phenomena cannot typically be validated through 
+direct predictive testing against held-out data; 
+the established alternative is to verify that the model 
+reproduces \emph{stylized facts}---qualitative regularities robustly 
+documented in the empirical literature---rather than fitting specific 
+numerical targets~\cite{Fagiolo2007}. 
+We adopt this approach and assess the pre-manipulation equilibrium of 
+our model against three stylized facts drawn from empirical studies 
+of Twitter/X, using $n = 30$ complete simulation runs under the baseline
+parameter settings ($\ThofOpPreval = 0.5$, $\Stubbornness = 0.8$, Holme--Kim network with $p_t = 0.3$).
+
+\noindent\textbf{SF1: Apparent polarization.}
+The variance in observable post content across users consistently
+exceeds the variance in the underlying opinion distribution,
+because users with more extreme views post disproportionately
+more frequently~\cite{Buntain2025}.
+We operationalize this as the ratio $\sigma_{\mathrm{post}}^{2} / \sigma_{\mathrm{opinion}}^{2}$,
+where $\sigma_{\mathrm{opinion}}^{2}$ is the opinion variance weighted by the
+number of users at each opinion position (the distribution of opinion holders)
+and $\sigma_{\mathrm{post}}^{2}$ is the same variance weighted by the number of
+posts contributed at each position (the distribution of observable content).
+To anchor this ratio empirically, we recompute it directly from the
+publicly released account-level data of~\cite{Buntain2025}
+($n = 762$ surveyed Twitter/X users with self-reported ideological lean on a
+$[-3, +3]$ scale, contributing $\sim\!1.96$M posts over 2020--2021).
+
+% \footnote{%
+% The ratio is invariant to any affine rescaling of the opinion axis, so the
+% specific $[-3,+3]$ coding does not affect its value; it relies only on the
+% assumption that the seven self-reported categories are approximately
+% equally spaced. As a single-study anchor based on a non-representative,
+% liberal-leaning sample, this range should be read as an order-of-magnitude
+% reference rather than a population parameter.}
+
+In these data, hyper-partisan accounts post roughly two to three times as
+often as moderates, inflating the post-weighted opinion variance relative to
+the user-weighted variance by a factor of $1.19$ over the full period and
+rising to $1.26$ during the high-salience 2020 election window---precisely the
+kind of high-attention regime our manipulation scenario represents.
+This yields an empirical target of $[1.19, 1.26]$.
+Our model achieves a median ratio of $1.232$ (IQR $[1.185, 1.286]$),
+with 100\% of runs exceeding the threshold of 1.0.
+The median falls within the empirically derived range, confirming that
+the model reproduces the stylized fact that publicly observable
+opinion is more dispersed---and thus appears more polarized---than
+the underlying opinion distribution.
+
+\noindent\textbf{SF2: Cross-partisan repost fraction.}
+Repost (retweet) networks are strongly segregated along partisan lines:
+cross-partisan reposting is near-zero, far below the rate expected under
+random mixing. Conover et al.~\cite{Conover2011} report a retweet-network
+modularity of $0.48$ (vs.\ $0.17$ for the mention network) and find that
+cross-ideological retweet links occur at only $3$--$5\%$ of their
+randomly-expected frequency, concluding that ideologically opposed users
+``very rarely share information from across the divide.''
+As an upper reference, Wojcieszak et al.~\cite{Wojcieszak2022} find that
+users share content from out-group political elites only about
+one-fourteenth as often as from in-group elites ($\approx 7\%$ of partisan
+shares crossing the divide).
+We operationalize this as the fraction of repost edges crossing the opinion
+midpoint among partisan agents. Our model yields a median cross-partisan
+repost fraction of $2.1\%$ (IQR $[0.6\%, 4.3\%]$), which sits in the
+near-zero regime---below the $\approx 7\%$ upper reference and consistent
+with the strong segregation documented above. This supports the validity of
+the dynamic bounded-confidence and unfollowing mechanisms in generating
+realistic levels of within-group information sharing.
+
+\noindent\textbf{SF3: Echo chamber depth.}
+Politically engaged users inhabit \emph{partial} echo chambers: a
+majority---but not the entirety---of their information diet is
+ideologically aligned. Cinelli et al.~\cite{Cinelli2021} show that on
+Twitter a user's leaning is strongly correlated with the average leaning of
+their network neighborhood, while Bakshy et al.~\cite{Bakshy2015} find that
+only about $28.5\%$ of the hard-news content in a user's feed is
+cross-cutting---i.e.\ roughly $70\%$ is ideologically aligned---and the
+partisan retweet communities of Conover et al.~\cite{Conover2011} are
+$80$--$93\%$ homogeneous. 
+We operationalize echo chamber depth as the within-group comfort rate
+(the aligned fraction of the feed) for extreme-opinion agents.
+Our model yields a median of $64.3\%$ (IQR $[57.7\%, 70.1\%]$), which sits
+just below the empirical aligned-share range for engaged users
+($\approx\!65$--$76\%$; \cite{Bakshy2015}). We therefore read SF3 as a
+\emph{directional}, not a point, match: the model reproduces the qualitative
+signature of a partial echo chamber---a majority-aligned but far-from-total
+information diet---while producing a slightly \emph{shallower} chamber than
+observed. If anything, this milder homophily makes the model a conservative
+substrate for the backfire effect rather than one that inflates it.
+
+The model quantitatively reproduces SF1 and SF2 and matches the qualitative
+direction of SF3 (a partial, slightly shallower echo chamber), providing
+empirical credibility for its structural assumptions in the pre-manipulation
+equilibrium.
+
+\subsection{Appearance of the Structural Backfire Effect}\label{backfire_appearance}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.8\linewidth]{figures/backfire_3group_logresp_A2.png}
+  \caption{Appearance of the backfire effect in
+  a Holme--Kim network
+  ($p_t = 0.3$, $\Stubbornness = 0.8$, $\ThofOpPreval = 0.5$). }
+  \label{fig:backfire_example_new}
+\end{figure}
+
+Consistent with our previous study~\cite{Takeda2026}, we first confirmed the appearance of the backfire effect, here in a Holme--Kim network with $p_t = 0.3$, by setting $\ThofOpPreval=0.5$ and $\Stubbornness=0.8$.
+Figure~\ref{fig:backfire_example_new} shows the time-series evolution 
+of a per-group \emph{log-response}. For each opinion camp $g$ 
+we plot $\log\!\left[\,v_g(t)\,/\,\bar v_g^{\text{pre}}\,\right]$, 
+the logarithm of its instantaneous posting volume $v_g(t)$ 
+normalized by its own mean volume over the pre-manipulation 
+window $t \in [19{,}000, 20{,}000]$. This normalization removes 
+the large baseline differences in posting volume between camps, 
+so that the manipulation-induced change itself becomes the signal. 
+The three camps are defined relative to the manipulation direction: 
+the \emph{target} camp (the extreme side toward which the hub is 
+driven, $|O_i| > 0.2$ on the target sign), the \emph{opposite} camp 
+(the opposing extreme), and the \emph{neutral} 
+camp ($-0.2 \le O_i \le 0.2$). To ensure the robustness of the observed 
+trends, the curves are averaged across $30$ independent 
+seeds and pooled over both manipulation directions ($\pm1.0$), 
+i.e.\ $60$ trials, with shaded bands denoting $\pm1$ standard error. 
+The manipulation was initiated at the $20{,}000$th step, 
+thereafter gradually shifting the targeted hub's opinion 
+toward its assigned extreme in the aim of influencing public opinion 
+on that side. We summarize each trial by a scalar backfire metric: writing
+$\bar{v}^{\text{post}}_{g}$ for the mean posting volume of camp $g$ over the
+post-manipulation window $t \in [39{,}000, 40{,}000]$ (and $\bar{v}^{\text{pre}}_{g}$
+for the pre-manipulation window defined above), the per-trial backfire effect is
+\begin{equation}\label{eq:backfire}
+  b = \log\!\left(\frac{\bar{v}^{\text{post}}_{\text{opp}}}{\bar{v}^{\text{pre}}_{\text{opp}}}\right)
+    - \log\!\left(\frac{\bar{v}^{\text{post}}_{\text{tgt}}}{\bar{v}^{\text{pre}}_{\text{tgt}}}\right),
+\end{equation}
+a difference-in-differences estimator on the log scale, where a positive value of
+$b$ indicates that the opposing camp grew more active than the targeted camp
+relative to baseline---i.e., the backfire effect occurred. By construction, the
+gap between the opposite and target curves in
+Figure~\ref{fig:backfire_example_new} is the time-resolved metric $b(t)$, the
+running analogue of this scalar $b$.
+
+\par
+
+As can be seen, during the first half of the simulation---prior 
+to any manipulation---the two conflicting opinionated camps (target and opposite, 
+which are statistically symmetric at this stage) grow in posting 
+activity by a substantially larger factor than the neutral camp, 
+as evidenced by their steeper rise toward the baseline. 
+This reflects the steady emergence of polarization: as echo chambers 
+form on both extremes, agents on the extremes come to post increasingly 
+often relative to the moderate majority. We note that, because each 
+curve is normalized to its own pre-manipulation window, 
+all three necessarily converge at the onset by construction; 
+the informative content is therefore the relative steepness 
+of the curves before this point, and---most importantly---their 
+divergence after it.
+\par
+
+In the latter half, although intervening on a neutral hub to drive 
+it toward the target extreme would intuitively be expected to 
+amplify only the target camp, the opposite was observed. 
+Immediately after the onset the neutral camp's posting volume 
+collapsed sharply---to roughly $30\%$ below its baseline on the 
+log scale---before partially recovering; and after a brief 
+initial transient in which the target camp ticked up, 
+the opposite camp's log-response rose above that of the 
+target camp and remained elevated long after the manipulation
+finished at around the $21{,}000$th step. Equivalently,
+the difference $b(t) = \log[v_{\text{opp}}(t)/\bar v_{\text{opp}}^{\text{pre}}] - \log[v_{\text{tgt}}(t)/\bar v_{\text{tgt}}^{\text{pre}}]$ 
+became and stayed positive: the opposing camp grew 
+more active, relative to its own pre-manipulation baseline, 
+than the very camp the manipulation sought to promote. 
+Because this pattern is averaged over both manipulation 
+directions and $30$ seeds, it is a symmetric 
+effect rather than a one-sided artifact of a particular target sign. 
+This sustained, counterintuitive outcome---contrary to the 
+intended purpose of the intervention---is what we
+term the \emph{structural backfire effect}.
+\par
+
+\subsection{Mechanism of the Structural Backfire Effect}\label{backfire_mechanism}
+
+Regarding the backfire effect confirmed in Section~\ref{backfire_appearance}, 
+we hypothesised a four-link
+causal chain: opinion shift by the targeted moderate hub (1)~drives its opposing
+followers to unfollow it, which (2)~strips the network of the bridge that
+connected the opposing camp to diverse information, so that (3)~the opposing camp
+collapses into a more pure echo chamber, and (4)~this reinforcement raises the
+opposing camp's posting activity until it outgrows the targeted camp---the
+backfire. Because this plausible narrative is not evident, this section measures
+each link directly on the canonical backfire baseline (Holme--Kim with
+$p_t{=}0.3$, $\Stubbornness{=}0.8$, $\ThofOpPreval{=}0.5$; $n{=}100$ trials, i.e.\
+$50$ seeds $\times$ two manipulation directions). The per-trial outcome is the
+log-response ratio $b$ of Eq.~\ref{eq:backfire}; over this baseline backfire is
+present and of moderate size ($\bar b = +0.056$, Cohen's $d = +0.45$, one-sided $t$-test
+vs.\ $0$: $p < 10^{-5}$, $n{=}100$). As shown later
+(Table~\ref{tab:doseresponse}), this pooled baseline is a conservative
+operating point: the effect is markedly larger when the manipulated target is a
+genuine high-centrality hub. All quantities below are derived from the
+simulation snapshots of these runs; opinion classes
+are expressed \emph{relative to the manipulation direction}, so that the
+``opposing'' and ``targeted'' camps can be pooled across both directions.
+\par
+
+\begin{table}[t]
+  \tabcolsep=4pt
+  \centering
+  \caption{Quantitative evidence for the backfire causal chain (HK
+  $p_t{=}0.3$, $\Stubbornness{=}0.8$, $\ThofOpPreval{=}0.5$). Values are mean
+  $\pm$ standard error across trials, pooled over both manipulation directions.}
+  \label{tab:mech_chain}
+  \begin{tabular}{llrr}
+    \toprule
+    \orange{Causal Chain} & \orange{Quantity} & \orange{pre/onset} & \orange{post/end} \\
+    \midrule
+    \orange{(1)} & \orange{Opposing-camp unfollows of hub}      & \orange{$21.4 \pm 1.9$}   & \orange{$104.8 \pm 8.4$}  \\
+    \orange{(1)} & \orange{Targeted-camp unfollows of hub}      & \orange{$21.4 \pm 1.9$}   & \orange{$26.3 \pm 2.1$}   \\
+    \orange{(1)} & \orange{Opposing frac.\ of hub followers}    & \orange{$0.31 \pm 0.01$}  & \orange{$0.00 \pm 0.00$}  \\
+    \orange{(1)} & \orange{Targeted frac.\ of hub followers}    & \orange{$0.31 \pm 0.01$}  & \orange{$0.95 \pm 0.01$}  \\
+    \midrule
+    \orange{(2)} & \orange{Hub betweenness (giant comp.)}     & \orange{$0.246 \pm 0.020$} & \orange{$0.022 \pm 0.004$} \\
+    \orange{(2)} & \orange{$\lambda_2$ (giant component)}     & \orange{$0.175 \pm 0.007$} & \orange{$0.110 \pm 0.006$} \\
+    \midrule
+    \orange{(3)} & \orange{Opposing camp cRate (aggregate)}     & \orange{$0.530 \pm 0.009$} & \orange{$0.568 \pm 0.010$} \\
+    \orange{(3)} & \orange{cRate, hub's former followers (opp.)}& \orange{$0.30 \pm 0.02$}   & \orange{$0.74 \pm 0.02$}   \\
+    \orange{(3)} & \orange{cRate, non-followers (opp.)}         & \orange{$0.82 \pm 0.01$}   & \orange{$0.82 \pm 0.01$}   \\
+    \orange{(3)} & \orange{Network modularity}                 & \orange{$0.45 \pm 0.01$}   & \orange{$0.56 \pm 0.01$}   \\
+    \midrule
+    \orange{(4)} & \orange{Opposing-camp post share}           & \orange{$0.399 \pm 0.006$} & \orange{$0.408 \pm 0.006$} \\
+    \orange{(4)} & \orange{Targeted-camp post share}           & \orange{$0.399 \pm 0.006$} & \orange{$0.386 \pm 0.005$} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsubsection{Selective unfollowing}
+Unfollowing of the manipulation-targeted hub is sharply asymmetric and concentrated after the
+intervention (Table~\ref{tab:mech_chain}). In the pre-manipulation window the two
+camps shed the hub equally ($21.4$ unfollows each), whereas after manipulation
+the opposing camp unfollows it nearly four times as often as the targeted camp
+($104.8$ vs.\ $26.3$ per trial; paired $t = 10.7$, $p < 10^{-17}$ for the
+opposing camp's pre$\rightarrow$post increase). As a result the hub's follower
+set, balanced at the onset ($31\%$ opposing, $31\%$ targeted, $38\%$ neutral),
+is purged of opposing followers by the end of the run ($0\%$ opposing, $95\%$
+targeted): the manipulated hub is converted from a cross-cutting broadcaster into
+a same-side echo node.
+\par
+
+\subsubsection{Loss of the bridging role}
+The hub is a genuine structural bridge at the very onset of manipulation and loses
+that role thereafter. Measured on the undirected giant component, the hub's
+betweenness centrality falls by an order of magnitude ($0.246 \rightarrow 0.022$
+from onset to end). Globally, the algebraic connectivity $\lambda_2$ of the giant
+component falls from $0.175$ to $0.110$ as the network fragments. 
+Note that
+these are undirected, giant-component quantities; the directed full-graph
+betweenness is uninformative here because the hub is a near-pure in-degree sink.
+\par
+
+\subsubsection{Echo-chamber formation}\label{Chain3}
+The decisive evidence for the mechanism is its \emph{specificity}. At the camp
+level the effect is muted---the opposing camp's mean rate of comfortable posts in feed
+(the comfort rate cRate, i.e.\ the aligned fraction of the feed defined via $\epsilon_{\min}$ in the Social Reinforcement rule)
+rises only modestly ($0.530 \rightarrow 0.568$). But disaggregating by prior
+attachment to the hub reveals the mechanism: among opposing agents, those who
+\emph{were following the hub} at the onset see their comfortable post rate surge from
+$0.30$ to $0.74$ once they lose it, whereas opposing agents who were
+\emph{not} following the hub---already in echo chambers---remain flat at $0.82$.
+Structurally, the network's modularity rises from
+$0.45$ to $0.56$ over the same interval. In other words, the hub was precisely
+what kept its opposing followers exposed to cross-cutting content; severing it
+collapses them into homogeneous feeds, while agents who never relied on it are
+unaffected. This ties the echo chamber to the hub disconnection rather than to
+generic repulsion dynamics.
+\par
+
+\subsubsection{From echo chamber to posting activity}
+Because backfire is defined on posting volume here, the chain must close on activity.
+The fraction of agents that increase their posting probability after the
+intervention is higher in the opposing and neutral camps ($0.28$ and $0.29$) than
+in the targeted camp ($0.21$), and the realised post share of the opposing camp
+rises ($0.399 \rightarrow 0.408$) while the targeted camp's share falls
+($0.399 \rightarrow 0.386$)---the asymmetry captured by $b > 0$.
+\par
+
+
+\subsubsection{Within-model dose-response}
+Because the model is fully specified, the pre/post contrasts above decompose a
+known generative process rather than identify a cause from observational data;
+but as trial averages they remain correlational, leaving open whether the chain
+operates trial by trial. We therefore ask whether the mechanism is \emph{graded}:
+across trials, does a stronger upstream perturbation produce a stronger backfire?
+The intensity of opposing-camp unfollowing is significantly and positively
+associated with the per-trial backfire magnitude (Spearman $\rho = +0.28$,
+$p = 0.004$, $n = 100$).
+In the interest of full disclosure, the \emph{aggregate} opposing-camp comfortable rate
+change is \emph{not} graded with $b$ ($\rho = +0.05$, $p = 0.69$, $n = 64$\,---
+$36$ trials whose feed-exposure logging stops at the onset are necessarily
+excluded). This pattern is coherent with the camp-level/follower-level split in the
+causal chain 3~(\ref{Chain3}): at this relatively high-stubbornness baseline the camp-averaged exposure is a
+saturated, noisy mediator, whereas the dominant within-model driver---loss of the bridging
+hub---and its follower-specific echo effect carry the signal.
+We caution that this is a within-model decomposition, not an interventional
+ablation; taken together, however, the temporal ordering, follower-level
+specificity, and graded dose-response provide convergent evidence that the
+proposed chain is the operative pathway in the present model.
+\par
+
+\subsection{Sensitivity Analysis}
+To assess the robustness of the backfire effect and delineate its 
+boundary conditions across five network configurations across four 
+structural models (CNNR, HK with $p_t{=}0.0$, HK with $p_t{=}0.3$, WS, and ER), 
+we conducted a sensitivity analysis by varying two key parameters: 
+the threshold of opinion prevalence ($\ThofOpPreval$) and 
+social influence stubbornness ($\Stubbornness$). 
+The magnitude of the backfire effect was quantified using 
+the same per-trial log response ratio $b$ defined in 
+Eq.~\ref{eq:backfire} (see Section~\ref{backfire_mechanism}), 
+where a positive value of $b$ indicates that the opposing group 
+grew more active in posting(relative to its pre-manipulation baseline) 
+than the targeted group, i.e., the backfire effect occurred.
+Each parameter condition was evaluated over up to 100 simulation runs 
+(50 independent seeds $\times$ two bidirectional manipulation directions). 
+The effect size for each condition is reported as Cohen’s $d$, 
+computed as the sample mean of $b$ divided by its sample standard deviation across these runs.
+\par
+
+
+Statistical significance was assessed via a one-sample $t$-test 
+of the per-trial $b$ values against zero (one-sided, alternative: mean $> 0$). 
+Rejection of the null hypothesis indicates that the 
+opposing group systematically outgrew the targeted group 
+following manipulation --- that is, the backfire effect is present. 
+We report significance at the $5\%$ ($p < 0.05$, $*$), 
+$1\%$ ($p < 0.01$, $**$), and $0.1\%$ ($p < 0.001$, $*{*}*$) levels.
+\par
+
+Figure~\ref{fig:sensitivity_analysis} presents the results as a series of heatmaps, 
+one per network configuration, with agent stubbornness $\Stubbornness$ on 
+the horizontal axis and the opinion prevalence threshold $\ThofOpPreval$ on the vertical axis. 
+Each cell displays the Cohen's $d$ of the backfire effect for that parameter combination; 
+cells where the backfire effect is statistically significant are annotated with asterisks. 
+This layout allows direct visual comparison of the parameter regions where 
+each network is susceptible to the backfire effect.
+\par
+
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/sensitivity_heatmap.png}
+  \caption{Sensitivity analysis of the backfire effect across five network configurations.}
+  \label{fig:sensitivity_analysis}
+\end{figure}
+
+
+\Black
+Figure~\ref{fig:sensitivity_analysis} shows that the backfire effect 
+is a robust phenomenon with respect to $\ThofOpPreval$ across the 
+entire tested range ($0.10$ to $0.90$). In the heavy-tailed networks 
+(CNNR and HK), once stubbornness was at least
+moderately high ($\Stubbornness \geq 0.7$),
+Cohen's $d$ remained positive and predominantly significant across the 
+full $\ThofOpPreval$ range, indicating that the effect persisted 
+regardless of $\ThofOpPreval$. Conversely, the dependency on $\Stubbornness$ is 
+the dominant pattern: in heavy-tailed topologies, the backfire effect 
+was statistically significant only at higher stubbornness 
+values ($\Stubbornness \geq 0.7$, with effect sizes increasing 
+monotonically up to $\Stubbornness = 0.9$), whereas at low 
+stubbornness ($\Stubbornness \leq 0.6$) Cohen's $d$ was near zero or 
+negative and never significant. 
+Furthermore, in ER and WS networks --- which lack heavy-tailed 
+degree distributions --- the backfire effect was 
+essentially absent: Cohen's $d$ stayed near zero and was not 
+statistically significant in any of the $25$ parameter cells. 
+These results suggest that a heavy-tailed (hub-dominated) 
+degree distribution is a critical boundary condition for this backfire phenomenon.
+\par
+
+\Dgreen
+To isolate the role of the manipulated user's hub status
+--- rather than that of the heavy-tailed topology
+in the aggregate --- we repeated the sensitivity analysis on
+the subset of trials in which the manipulated target was itself 
+a genuine large hub. For each network configuration we retained 
+only the trials whose target in-degree at the manipulation onset 
+(step $20{,}000$) was at or above the $75$th percentile of the 
+corresponding degree distribution, and recomputed Cohen's $d$ over 
+this subset. Figure~\ref{fig:sensitivity_large_hub} presents the result. 
+In the heavy-tailed networks (CNNR and HK) the backfire effect intensified 
+substantially under this restriction: the peak Cohen's $d$ rose from 
+roughly $0.5$ in the full sample to $0.8$--$0.9$, and the monotonic strengthening 
+with stubbornness became steeper (the heavy-tailed-network mean Cohen's $d$ 
+reaching $\approx 0.72$ at $\Stubbornness = 0.9$). By contrast, in the WS and ER 
+networks the effect remained absent even among their most-connected targets, 
+with no parameter cell attaining positive significance. It should be noted, 
+however, that because the WS and ER degree distributions lack a heavy tail, 
+their top-quartile targets are only marginally more connected than the median 
+(for instance, in-degree at most roughly twice the median, against up to fivefold in CNNR) and 
+therefore do not constitute genuine hubs; 
+these two networks consequently serve as 
+a negative control, confirming that the most-connected nodes a non-heavy-tailed 
+topology can offer are still insufficient to trigger backfire. 
+This contrast confirms that the backfire effect is governed by the structural 
+prominence of the manipulated hub: it emerges only when a 
+highly central user --- whose disproportionate connectivity 
+lets a single severed tie cascade into widespread disconnection --- 
+is the one to abruptly shift stance, consistent with the 
+literature identifying network centrality as the primary determinant 
+of a node's systemic influence over diffusion processes~\cite{Kitsak2010,Kempe2003}.
+\par
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{figures/sensitivity_heatmap_large_hub.png}
+  \caption{Sensitivity analysis restricted to large-hub targets 
+  (target in-degree $\geq$ $75$th percentile within each network 
+  configuration, measured at the manipulation onset, step $20{,}000$).}
+  \label{fig:sensitivity_large_hub}
+\end{figure}
+
+The large-hub contrast above is corroborated by a graded dose--response on the
+\emph{continuous} target in-degree, measured on the canonical heavy-tailed cell
+(HK $p_t{=}0.3$, $\Stubbornness{=}0.8$, $\ThofOpPreval{=}0.5$). Binning trials by
+target in-degree at the onset (Table~\ref{tab:doseresponse}), the per-trial
+backfire $b$ rises monotonically across quartiles and is near zero---in raw
+magnitude, not merely in significance---for the bottom two quartiles
+($\bar b \approx 0$, not significant), emerging only for the top two
+($\bar b = +0.078$ and $+0.148$; Cohen's $d = 0.73$ and $0.93$). The top-quartile
+effect ($\bar b = +0.148$, i.e.\ $\exp(b) \approx 1.16$, a $\approx 16\%$ relative
+difference-in-differences) is a $2.6\times$ amplification over the pooled baseline
+($\bar b = +0.056$); because the trial-to-trial standard deviation grows only
+$1.27\times$ against this $2.6\times$ rise in the mean, the amplification reflects
+a genuinely larger effect rather than a compression of variance.
+\par
+
+Treated continuously, $b$ correlates with target in-degree at Spearman
+$\rho = +0.40$ ($p = 3.1\times10^{-5}$, $n = 100$); the association survives
+within-condition demeaning across the full design ($\rho = +0.15$, $n = 2473$,
+$p < 10^{-13}$), ruling out a between-condition confound. Notably, hub centrality
+predicts $b$ \emph{more} strongly than the opposing-camp unfollow count does
+($\rho = +0.28$; Section~\ref{backfire_mechanism}). In a single mediated chain the
+upstream--outcome correlation would be \emph{attenuated} relative to the mediator;
+the reverse ordering here indicates that opposing-camp unfollowing is only a
+partial mediator, and that hub centrality additionally acts through the other
+structural channels documented above (loss of betweenness and algebraic
+connectivity; Table~\ref{tab:mech_chain}). The effect is therefore not merely
+amplified but \emph{gated} by structural prominence: absent for low-centrality
+targets, and growing with centrality where it appears.
+\par
+
+\begin{table}[t]
+  \tabcolsep=6pt
+  \centering
+  \caption{Dependence of the structural backfire effect on the structural
+  prominence (in-degree) of the manipulated hub (HK $p_t{=}0.3$,
+  $\Stubbornness{=}0.8$, $\ThofOpPreval{=}0.5$; $n{=}100$ trials). }
+  \label{tab:doseresponse}
+  \begin{tabular}{lrrrr}
+    \toprule
+    \orange{Target in-degree} & \orange{$n$} & \orange{mean $b$} & \orange{Cohen's $d$} & \orange{$p$} \\
+    \midrule
+    \orange{All targets (baseline)} & \orange{$100$} & \orange{$+0.056$} & \orange{$0.45$}  & \orange{$9.2\times10^{-6}$} \\
+    \midrule
+    \orange{Q1 ($103$--$130$)}      & \orange{$26$}  & \orange{$-0.004$} & \orange{$-0.06$} & \orange{$0.61$} \\
+    \orange{Q2 ($133$--$248$)}      & \orange{$24$}  & \orange{$+0.006$} & \orange{$0.10$}  & \orange{$0.32$} \\
+    \orange{Q3 ($267$--$573$)}      & \orange{$26$}  & \orange{$+0.078$} & \orange{$0.73$}  & \orange{$0.0006$} \\
+    \orange{Q4 ($583$--$693$)}      & \orange{$24$}  & \orange{$+0.148$} & \orange{$0.93$}  & \orange{$0.0001$} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+In summary, the backfire effect is robust against variations
+in the threshold of opinion prevalence, but is sensitive to 
+agent stubbornness, being most pronounced in heavy-tailed 
+networks (CNNR and HK), in which agents maintain a 
+high resistance to opinion change. Restricting the analysis 
+to large-hub targets further sharpens this picture, 
+confirming that the structural prominence of the 
+manipulated user is the proximate driver of the effect.
+\Black
+\par
+
+
+\subsection{Discussion}
+Within the scope of our model, these results identify two
+boundary conditions for the backfire effect:
+(1) the heavy-tailed (hub-dominated) nature of
+the network structure and (2) a high degree of agent stubbornness
+(i.e., resistance to opinion change).
+Both conditions are characteristic of many modern social media
+platforms, which suggests---though does not by itself establish---that
+such networks may be susceptible to the effect; we return to the
+caveats on external validity in the Conclusion.
+\par
+
+We posit that the first condition, 
+a heavy-tailed (hub-dominated) degree distribution, 
+is essential because the backfire mechanism relies 
+on the disproportionate influence of hub users. 
+In social media ecosystems, ``influencers’’ with 
+enormous followings coexist with the vast majority 
+of users who have few connections, forming a 
+heavy-tailed degree distribution. This structural 
+disparity creates a fragile connectivity; 
+when a hub acts as a bridge between opposing views, 
+its change in state can trigger a cascade of 
+disconnections, isolating followers into echo chambers as
+we clarified by a causal chain analysis in \ref{backfire_mechanism}. 
+The consistent susceptibility of both CNNR and HK networks 
+--- despite their differing clustering properties --- 
+further confirms that a heavy-tailed (hub-dominated) 
+degree structure, rather than local clustering, is the decisive structural condition.
+\par
+
+Regarding the second condition, we infer that
+high stubbornness is a prerequisite for the
+formation and maintenance of echo chambers. 
+As discussed in Section~\ref{backfire_mechanism}, 
+the backfire effect is intrinsically linked 
+to the echo chamber formation mechanism. 
+When agents hold their opinions firmly, 
+they are more likely to reject conflicting information 
+from opinion leaders and disconnect from them 
+rather than conform to them. Furthermore, our results
+indicate that the backfire effect strengthens monotonically
+with stubbornness over the tested range: 
+in the heavy-tailed networks the mean Cohen's $d$ 
+rose steadily from near zero at $\Stubbornness = 0.6$ to 
+its maximum at $\Stubbornness = 0.9$, 
+with no sign of a turning point within $\Stubbornness \leq 0.9$. 
+This implies that a network becomes increasingly vulnerable 
+as users hold their intrinsic beliefs more firmly, 
+so long as they retain residual susceptibility to 
+social influence. Our findings suggest that this 
+specific psychological trait, when coupled with 
+the network structure, significantly amplifies the 
+systemic vulnerability to the backfire effect triggered 
+by sudden extreme stance expressions from moderate influencers.
+\par
+
+In particular, our results indicate that the threshold 
+for opinion prevalence $\ThofOpPreval$, which indirectly 
+represents agent conformity to local opinions via 
+Eq.~\eqref{eq:SocialReinforcement}, is not the primary 
+driver of the backfire effect. Intuitively, one might 
+assume that a higher sensitivity to social pressure 
+(i.e., high $\ThofOpPreval$) would lead to more intense 
+activation alone, and thus a stronger backlash. 
+However, as discussed in Section~\ref{backfire_mechanism}, 
+the backfire effect that we have discussed
+in this paper is driven not so much by the magnitude
+of user activity but rather by the structural 
+disconnection of ties (unfollowing). 
+Consequently, the phenomenon remains robust, even when 
+agents are not highly sensitive to social pressure.
+\par
+
+\Dgreen
+The temporal dynamics of the backfire effect 
+also merit discussion. As shown in Section~\ref{backfire_appearance}, 
+the post-manipulation trajectory exhibits two distinct phases. 
+Immediately after the onset, the target camp shows a brief 
+transient uptick in posting activity---the expected short-lived 
+response to the hub's initial opinion shift. However, 
+this transient is quickly overtaken: within a short window 
+the opposing camp's log-response surpasses that of 
+the target camp and \emph{remains} elevated for 
+the remainder of the run. Crucially, therefore, 
+the backfire effect itself is not transient; it is 
+the target-camp spike that is short-lived, and 
+what persists is the sustained dominance of the opposing camp. 
+This sustained behavioral signal is further compounded 
+by the underlying structural damage: the network
+fragmentation induced by the backfire effect---most
+notably the loss of cross-partisan
+ties between the hub and its former opposing
+followers---persists for the remainder of the simulated horizon,
+well after posting volumes stabilize, and these ties do not reform
+within our observation window. This indicates that the structural consequences
+are at least as durable as the already-persistent surface-level behavioral signal.
+\par
+
+
+\section{Conclusion}
+\Dgreen
+This paper establishes the structural backfire effect---the
+counterintuitive finding that gradually shifting a moderate, influential hub
+toward an extreme stance energizes the opposing camp rather than the targeted one
+in online social networks---as a robust structural phenomenon, and
+identifies the structural mechanism that produces it. Building on a
+preliminary observation, and using an ABM grounded in well-established
+social-interaction protocols with the manipulation modeled as an incremental opinion shift,
+we provide
+direct mechanistic evidence for the causal chain underlying the effect, delineate
+its boundary conditions through a sensitivity analysis spanning four
+network-generating models and a two-parameter grid of agent stubbornness and
+opinion-prevalence threshold, and establish the model's behavioral credibility
+against empirical stylized facts drawn from Twitter/X.
+\par
+
+
+The backfire effect proved robust to the threshold of opinion prevalence (the
+local conforming rate) across its entire tested range, indicating that the
+phenomenon is driven by structural reorganization rather than by local conformity
+pressure. Its emergence instead hinges on two boundary conditions: a heavy-tailed,
+hub-dominated degree distribution and a high degree of agent adherence to
+intrinsic opinions. The effect strengthened monotonically with stubbornness and
+was essentially absent in networks lacking a heavy tail; 
+restricting the analysis to genuinely high-degree targets
+sharpened this pattern, confirming that the structural prominence of the shifted
+hub is its proximate driver. Direct measurement of the causal chain further showed
+that the effect operates through echo-chamber deepening via hub loss: the
+manipulated hub is selectively abandoned by its opposing followers, severing the
+cross-partisan bridge it provided and collapsing those former followers---but not
+agents who never relied on it---into homogeneous feeds.
+\par
+
+
+Several limitations bound the scope of these conclusions. First, our claims are
+internal to the model: the backfire effect is established as a robust property of
+a particular class of opinion-dynamics models rather than as a directly observed
+empirical regularity. Although we anchored the pre-manipulation equilibrium to
+three stylized facts, this evidence is qualitative and partly directional (SF3
+matches only in direction), is drawn from a small number of Twitter/X studies
+covering specific platforms and time windows, and does not validate the
+post-manipulation dynamics themselves, for which comparable ground-truth data
+remain scarce. This asymmetry is itself informative: whereas the pre-manipulation
+equilibrium can be anchored to established stylized facts, no comparable empirical
+regularities have yet been documented for the post-backfire regime---the very
+window in which the structural backfire effect unfolds. We therefore treat this gap
+not merely as a caveat but as a methodological opening for future work: it
+identifies a concrete need to establish post-intervention stylized facts and to
+specify observable structural signatures of the mechanism we describe (for example,
+hub-loss-driven fragmentation or echo-chamber-deepening indices) that could be
+measured in longitudinal platform traces, thereby offering a stepping stone toward
+the empirical validation of post-manipulation dynamics. Second, the model is
+simplified for tractability:
+opinion is abstracted as a single one-dimensional issue and
+the feed is governed solely by follow ties; we deliberately omit algorithmic
+recommendation and curation, which demonstrably shape exposure on contemporary
+platforms and could either amplify or dampen the structural cascade we describe.
+Third, the manipulation is reduced to a single, exogenously driven hub whose
+opinion is displaced deterministically; this design isolates the structural
+mechanism but does not capture coordinated multi-actor influence operations or the
+endogenous heterogeneity of real radicalization trajectories. Finally, several
+behavioral-update parameters (e.g., the intensity-adjustment and confidence-decay
+rates) were fixed by qualitative reasoning rather than calibrated to data, and our
+results derive from synthetic networks of fixed size ($N = 1{,}000$); while the
+sensitivity analysis indicates that the qualitative findings are stable across a
+broad parameter region and several topologies, their precise quantitative
+magnitudes should not be read as platform-scale predictions.
+\par
+
+
+Addressing these limitations---in particular, comparative validation against
+empirical traces of real-world influence operations, the incorporation of
+algorithmic curation, and richer multi-actor manipulation scenarios---constitutes a
+natural and important direction for future work. Notwithstanding these caveats, our
+findings consistently identify the joint role of hub-dominated structure and user
+stubbornness in rendering networks vulnerable to backfire, offering a structural
+framework for anticipating when well-intentioned or adversarial interventions on
+influential users may perversely deepen polarization, and thereby contributing
+organizing conditions for the design of more resilient web-communication systems.
+\par
+
+
+%%===========================================================================================%%
+%% If you are submitting to one of the Nature Portfolio journals, using the eJP submission   %%
+%% system, please include the references within the manuscript file itself. You may do this  %%
+%% by copying the reference list from your .bbl file, paste it into the main manuscript .tex %%
+%% file, and delete the associated \verb+\bibliography+ commands.                            %%
+%%===========================================================================================%%
+
+
+%Added by Sugawara, eliminate the next one line when submission.
+%\clearpage
+\Black
+
+\backmatter
+%\Blue
+
+\iffalse
+\bmhead{Supplementary information}
+If your article has accompanying supplementary file/s please state so here. 
+Authors reporting data from electrophoretic gels and blots should supply the full unprocessed scans for key as part of their Supplementary information. This may be requested by the editorial team/s if it is missing.
+
+\bmhead{Acknowledgements}
+Acknowledgements are not compulsory. Where included they should be brief. Grant or contribution numbers may be acknowledged.
+
+\fi
+
+\section*{Declarations}
+
+\subsection*{Funding} This work is partly supported by JST ERATO (Grant Number JPMJER2502), 
+by JSPS KAKENHI (Grant Numbers 25K03188 and 22H03906), 
+and by the Open Access publication support system of Waseda University.
+\subsection*{Conflict of interest}
+The authors declare no conflict of interest.
+\subsection*{Data availability}
+No datasets were generated or analysed during the current study.
+\subsection*{Code availability}
+The modified implementations of all algorithms
+used in the experiments of this study can be found at https://github.com/tooooomoya/manipulation-backfire-model
+\subsection*{Author contribution}
+Conceptualization: TT, FT and TS; Methodology: TT;
+Implementation and experimental analysis: TT; Writing - original
+draft preparation: TT; Writing - review and editing: TS and FT;
+Supervision: TS
+\subsection*{Corresponding author}
+Correspondence to Tomoya Takeda.
+
+
+
+
+\iffalse
+  Some journals require declarations to be submitted in a standardised format. Please check the Instructions for Authors of the journal to which you are submitting to see if you need to complete this section. If yes, your manuscript must contain the following sections under the heading `Declarations':
+
+\begin{itemize}
+\item Funding
+\item Conflict of interest/Competing interests (check journal-specific guidelines for which heading to use)
+\item Ethics approval and consent to participate
+\item Consent for publication
+\item Data availability 
+\item Materials availability
+\item Code availability 
+\item Author contribution
+\end{itemize}
+
+\noindent
+If any of the sections are not relevant to your manuscript, please include the heading and write `Not applicable' for that section. 
+
+
+%%===================================================%%
+%% For presentation purpose, we have included        %%
+%% \bigskip command. Please ignore this.             %%
+%%===================================================%%
+\bigskip
+\begin{flushleft}%
+Editorial Policies for:
+
+\bigskip\noindent
+Springer journals and proceedings: \url{https://www.springer.com/gp/editorial-policies}
+
+\bigskip\noindent
+Nature Portfolio journals: \url{https://www.nature.com/nature-research/editorial-policies}
+
+\bigskip\noindent
+\textit{Scientific Reports}: \url{https://www.nature.com/srep/journal-policies/editorial-policies}
+
+\bigskip\noindent
+BMC journals: \url{https://www.biomedcentral.com/getpublished/editorial-policies}
+\end{flushleft}
+
+\fi
+
+%\bibliographystyle{bst/sn-mathphys-num}
+\bibliography{refs}% common bib file
+
+%% if required, the content of .bbl file can be included here once bbl is generated
+%%\input sn-article.bbl
+
+\end{document}
+
+
+
+
+

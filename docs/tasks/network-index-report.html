@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Network Index Calculation Methods — Directed Graph Formulations</title>
+<script>
+  MathJax = {
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      tags: 'ams'
+    }
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+<style>
+  :root {
+    --text: #1a1a1a;
+    --muted: #555;
+    --border: #d0d0d0;
+    --accent: #2c5f8a;
+    --accent-light: #eaf2fb;
+    --warn-bg: #fff8e1;
+    --warn-border: #f0c040;
+    --code-bg: #f5f5f5;
+    --serif: Georgia, 'Times New Roman', serif;
+    --mono: 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--serif);
+    font-size: 15.5px;
+    line-height: 1.72;
+    color: var(--text);
+    background: #fafafa;
+    padding: 0 0 80px 0;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--accent);
+    color: #fff;
+    padding: 42px 60px 36px;
+  }
+  header h1 { font-size: 1.55rem; font-weight: normal; letter-spacing: 0.01em; margin-bottom: 8px; }
+  header .subtitle { font-size: 0.92rem; opacity: 0.82; font-family: sans-serif; }
+
+  /* ── Layout ── */
+  .wrapper { max-width: 900px; margin: 0 auto; padding: 0 40px; }
+
+  /* ── TOC ── */
+  nav.toc {
+    margin: 36px 0 0 0;
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 20px 28px;
+    font-family: sans-serif;
+    font-size: 0.88rem;
+  }
+  nav.toc h2 { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--accent); margin-bottom: 10px; }
+  nav.toc ol { padding-left: 18px; }
+  nav.toc li { margin: 3px 0; }
+  nav.toc a { color: var(--accent); text-decoration: none; }
+  nav.toc a:hover { text-decoration: underline; }
+
+  /* ── Sections ── */
+  section { margin-top: 52px; }
+  section + section { border-top: 1px solid var(--border); padding-top: 44px; }
+
+  h2 {
+    font-size: 1.22rem;
+    color: var(--accent);
+    font-weight: bold;
+    margin-bottom: 16px;
+  }
+  h3 {
+    font-size: 1.02rem;
+    font-weight: bold;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
+  h4 {
+    font-size: 0.92rem;
+    font-weight: bold;
+    font-style: italic;
+    margin: 20px 0 6px;
+    color: var(--muted);
+  }
+
+  p { margin: 10px 0; }
+
+  /* ── Metric cards ── */
+  .metric-card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    margin: 28px 0;
+    overflow: hidden;
+  }
+  .metric-card .card-header {
+    background: var(--accent);
+    color: #fff;
+    padding: 10px 20px;
+    font-family: sans-serif;
+    font-size: 0.88rem;
+    letter-spacing: 0.04em;
+  }
+  .metric-card .card-body { padding: 18px 24px; }
+
+  /* ── Definition / formula blocks ── */
+  .formula-block {
+    background: var(--code-bg);
+    border-left: 3px solid var(--accent);
+    padding: 14px 20px;
+    margin: 14px 0;
+    overflow-x: auto;
+  }
+
+  /* ── Warning / note boxes ── */
+  .note {
+    background: var(--warn-bg);
+    border-left: 4px solid var(--warn-border);
+    padding: 12px 18px;
+    margin: 16px 0;
+    font-family: sans-serif;
+    font-size: 0.88rem;
+  }
+  .note strong { color: #7a5a00; }
+
+  .info {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 12px 18px;
+    margin: 16px 0;
+    font-family: sans-serif;
+    font-size: 0.88rem;
+  }
+
+  /* ── Table ── */
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.9rem;
+    font-family: sans-serif;
+    margin: 18px 0;
+  }
+  th {
+    background: var(--accent);
+    color: #fff;
+    padding: 8px 14px;
+    text-align: left;
+    font-weight: normal;
+  }
+  td { padding: 7px 14px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) td { background: #f7f7f7; }
+
+  /* ── Code ── */
+  code {
+    font-family: var(--mono);
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 18px;
+    margin: 14px 0;
+    overflow-x: auto;
+    line-height: 1.5;
+  }
+
+  /* ── References ── */
+  .ref-list { font-size: 0.88rem; font-family: sans-serif; }
+  .ref-list li { margin: 6px 0; padding-left: 6px; }
+
+  /* ── Inline badges ── */
+  .badge {
+    display: inline-block;
+    font-family: sans-serif;
+    font-size: 0.75em;
+    padding: 1px 7px;
+    border-radius: 10px;
+    vertical-align: middle;
+    margin-left: 4px;
+  }
+  .badge-directed { background: #c8e6c9; color: #1b5e20; }
+  .badge-hybrid   { background: #fff3e0; color: #bf360c; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Network Index Calculation Methods — Directed Graph Formulations</h1>
+  <div class="subtitle">
+    Technical appendix for <em>result-summary.ipynb</em> and <em>structural-backfire-analysis.ipynb</em><br>
+    NetworkX 3.6.1 &nbsp;·&nbsp; Python 3
+  </div>
+</header>
+
+<div class="wrapper">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#graph">Graph Representation and Edge Semantics</a></li>
+    <li><a href="#overview">Metrics Overview</a></li>
+    <li><a href="#density">Network Density</a></li>
+    <li><a href="#clustering">Clustering Coefficient (Fagiolo 2007)</a></li>
+    <li><a href="#gamma">Power-Law Exponent &gamma; (Clauset et al. 2009)</a></li>
+    <li><a href="#modularity">Modularity Q — Two-Step Directed Procedure</a></li>
+    <li><a href="#indegree">In-Degree</a></li>
+    <li><a href="#betweenness">Betweenness Centrality</a></li>
+    <li><a href="#pagerank">PageRank</a></li>
+    <li><a href="#eigenvector">Eigenvector Centrality (Left Eigenvector)</a></li>
+    <li><a href="#refs">References</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="graph">
+<h2>1 · Graph Representation and Edge Semantics</h2>
+
+<p>
+All simulated networks are stored as <strong>directed graphs</strong>
+(<code>networkx.DiGraph</code>). An edge $i \to j$ means agent $i$ <em>follows</em>
+agent $j$: $i$ is exposed to $j$'s posts and is influenced by $j$'s opinion.
+The distinction from an undirected graph is substantive, not merely notational.
+</p>
+
+<table>
+  <thead>
+    <tr><th>Concept</th><th>Directed interpretation</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>In-degree of $j$</td><td>Number of agents who follow $j$ — <em>follower count</em>, the primary influence carrier</td></tr>
+    <tr><td>Out-degree of $i$</td><td>Number of agents $i$ follows — <em>following count</em></td></tr>
+    <tr><td>Reciprocal edge $i \leftrightarrow j$</td><td>Mutual follow; both agents directly influence each other</td></tr>
+    <tr><td>Directed triangle</td><td>Ordered triple $(u,v,w)$ such that at least two of the three possible directed paths exist</td></tr>
+  </tbody>
+</table>
+
+<p>
+Throughout this document, $n = |V|$ is the number of nodes, $m = |E|$ is the
+number of directed edges, $\mathbf{A}$ is the directed adjacency matrix
+($A_{ij} = 1$ iff $i \to j$ exists), and $k_i^{\mathrm{in}}, k_i^{\mathrm{out}}$
+denote in-degree and out-degree of node $i$, respectively.
+</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="overview">
+<h2>2 · Metrics Overview</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Metric</th><th>Scope</th><th>Directed formula?</th><th>Notebook</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Density</td><td>Network</td>
+      <td>Yes — denominator $n(n-1)$, not $\tfrac{n(n-1)}{2}$</td>
+      <td>result-summary</td>
+    </tr>
+    <tr>
+      <td>Average clustering $\bar{C}$</td><td>Network (mean of node-level)</td>
+      <td>Yes — Fagiolo (2007) directed triangle count</td>
+      <td>result-summary, structural</td>
+    </tr>
+    <tr>
+      <td>Power-law exponent $\gamma$</td><td>Network (degree distribution)</td>
+      <td>Yes — applied to <em>in-degree</em> sequence only</td>
+      <td>result-summary</td>
+    </tr>
+    <tr>
+      <td>Modularity Q</td><td>Network</td>
+      <td>Hybrid — partition on undirected projection;<br>score on directed graph (Leicht &amp; Newman 2008)</td>
+      <td>result-summary, structural</td>
+    </tr>
+    <tr>
+      <td>In-degree $k^{\mathrm{in}}$</td><td>Node</td>
+      <td>Yes — directed in-neighbor count</td>
+      <td>structural</td>
+    </tr>
+    <tr>
+      <td>Betweenness centrality $B$</td><td>Node</td>
+      <td>Yes — directed shortest paths</td>
+      <td>structural</td>
+    </tr>
+    <tr>
+      <td>PageRank PR</td><td>Node</td>
+      <td>Yes — asymmetric diffusion</td>
+      <td>structural</td>
+    </tr>
+    <tr>
+      <td>Eigenvector centrality $x$</td><td>Node</td>
+      <td>Yes — left eigenvector (in-neighbor authority sum)</td>
+      <td>structural</td>
+    </tr>
+  </tbody>
+</table>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="density">
+<h2>3 · Network Density</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>Density measures the fraction of all possible directed edges that actually exist.</p>
+
+<div class="formula-block">
+$$d = \frac{m}{n(n-1)}$$
+</div>
+
+<p>
+The denominator $n(n-1)$ (not $\tfrac{n(n-1)}{2}$) reflects that the maximum
+possible number of directed edges between $n$ nodes is $n(n-1)$, since
+$i \to j$ and $j \to i$ are distinct.
+In a complete directed graph $d = 1$; in an empty graph $d = 0$.
+</p>
+
+<h4>NetworkX call</h4>
+<pre>nx.density(G)   # G : nx.DiGraph</pre>
+
+<p>
+NetworkX's <code>density</code> function is direction-aware: it checks
+<code>G.is_directed()</code> and applies the $n(n-1)$ denominator for
+directed graphs.
+</p>
+
+<div class="info">
+<strong>Interpretive note.</strong>
+In preferential-attachment networks density is typically very low ($d \ll 0.01$)
+and decreasing as $n$ grows. A <em>rise</em> in density over simulation steps
+indicates accelerating edge formation, which in this model signals reinforcement
+of existing follower relationships rather than network sparsification.
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="clustering">
+<h2>4 · Clustering Coefficient — Fagiolo (2007)</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>
+The classical Watts–Strogatz clustering coefficient is defined for undirected
+graphs. Applying it to a directed graph by ignoring edge direction collapses
+the distinction between a node's follower and following circles, producing a
+measure that is insensitive to the asymmetric information-flow structure central
+to this model.
+</p>
+
+<h3>4.1 Node-Level Formula</h3>
+
+<p>
+The directed clustering coefficient due to Fagiolo (2007) — which NetworkX
+implements for <code>DiGraph</code> — counts directed triangles weighted by
+both their presence and their orientation:
+</p>
+
+<div class="formula-block">
+$$c_i = \frac{T(i)}{2\!\left[k_i^{\mathrm{tot}}\!\left(k_i^{\mathrm{tot}}-1\right) - 2k_i^{\leftrightarrow}\right]}$$
+</div>
+
+<p>where:</p>
+<ul style="margin: 8px 0 8px 24px; line-height: 2;">
+  <li>$k_i^{\mathrm{tot}} = k_i^{\mathrm{in}} + k_i^{\mathrm{out}}$ — total degree (in + out)</li>
+  <li>$k_i^{\leftrightarrow}$ — reciprocal (bilateral) degree: number of neighbors $j$ such that <em>both</em> $i \to j$ and $j \to i$ exist</li>
+  <li>$T(i)$ — number of directed triangles through $i$, counting all distinct
+      orientations in which $i$ participates (cycles, fan-in, fan-out, middleman).</li>
+</ul>
+
+<p>
+The denominator subtracts $2k_i^{\leftrightarrow}$ because reciprocal edges
+would otherwise be counted twice in the $k_i^{\mathrm{tot}}(k_i^{\mathrm{tot}}-1)$
+maximum, inflating the denominator unfairly for hubs with many mutual follows.
+When $k_i^{\mathrm{tot}} < 2$ (isolated or degree-1 nodes), $c_i = 0$ by convention.
+</p>
+
+<h3>4.2 Network-Level Average</h3>
+
+<div class="formula-block">
+$$\bar{C} = \frac{1}{n}\sum_{i \in V} c_i$$
+</div>
+
+<h4>NetworkX calls</h4>
+<pre>nx.average_clustering(G)    # network-level mean
+nx.clustering(G, node_id)   # per-node, used in structural analysis</pre>
+
+<p>Both calls dispatch to the Fagiolo formula when <code>G</code> is a <code>DiGraph</code>.</p>
+
+<div class="note">
+<strong>Limitation.</strong>
+The Fagiolo coefficient conflates structurally different triangle types (cycle,
+fan-in, fan-out) into a single scalar. In opinion-dynamics contexts, cycle
+triangles ($i \to j \to k \to i$) and fan-in triangles ($j \to i$, $k \to i$,
+$j \to k$) carry very different implications for information reinforcement.
+Decomposing $c_i$ by motif type (Zhang &amp; Lun 2009) would yield sharper
+structural predictors of echo-chamber formation, but is not currently computed.
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="gamma">
+<h2>5 · Power-Law Exponent &gamma; — Clauset, Shalizi &amp; Newman (2009)</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>
+A scale-free degree distribution satisfies $P(k) \sim k^{-\gamma}$. For directed
+social networks, <em>in-degree</em> (follower count) is the theoretically motivated
+choice: hub influence is determined by how many agents receive from them, not by
+how many they follow. Out-degree is set partly by agent strategy and platform
+constraints; in-degree reflects emergent social selection.
+</p>
+
+<h3>5.1 MLE Estimator</h3>
+
+<p>
+For a discrete power law with lower bound $k_{\min}$, the maximum-likelihood
+estimator (Clauset et al. 2009, eq. 3.3) is:
+</p>
+
+<div class="formula-block">
+$$\hat{\gamma} = 1 + n_{\mathrm{tail}} \left[\,\sum_{i=1}^{n_{\mathrm{tail}}} \ln\frac{k_i}{k_{\min} - \tfrac{1}{2}}\right]^{-1}$$
+</div>
+
+<p>
+where $n_{\mathrm{tail}}$ is the number of nodes with $k^{\mathrm{in}} \geq k_{\min}$.
+The $-\tfrac{1}{2}$ correction is the standard discrete continuity adjustment.
+</p>
+
+<h3>5.2 $k_{\min}$ Selection</h3>
+
+<p>
+$k_{\min}$ is not fixed a priori; it is chosen to minimize the Kolmogorov–Smirnov
+(KS) distance between the empirical survival function and the Pareto approximation
+used as a continuous surrogate:
+</p>
+
+<div class="formula-block">
+$$\hat{k}_{\min} = \operatorname*{arg\,min}_{k_{\min}} \sup_k \left|F_{\mathrm{emp}}(k) - \left(\frac{k}{k_{\min}}\right)^{-(\hat{\gamma}-1)}\right|$$
+</div>
+
+<p>
+The search is conducted over unique observed in-degree values. To avoid tail
+noise dominating the fit, the search terminates at the first $k_{\min}$ for which
+fewer than 5 nodes remain in the tail.
+</p>
+
+<h4>Implementation</h4>
+<pre>degrees = np.array([d for _, d in G.in_degree()], dtype=float)  # in-degree only
+gamma_hat, k_min = _mle_powerlaw(degrees)</pre>
+
+<div class="note">
+<strong>Validity check.</strong>
+The MLE produces a point estimate regardless of whether the true distribution
+is actually a power law. A rigorous test (e.g., the likelihood-ratio test
+against log-normal or exponential alternatives; Clauset et al. 2009, §4)
+is not computed here. The $\gamma$ value should be interpreted as a descriptive
+summary of tail heaviness, not as confirmation of scale-freeness.
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="modularity">
+<h2>6 · Modularity Q — Two-Step Directed Procedure</h2>
+
+<span class="badge badge-hybrid">Hybrid (partition undirected / score directed)</span>
+
+<p>
+Modularity $Q$ quantifies the degree to which a network decomposes into densely
+connected communities, relative to a random null graph with the same degree
+sequence. High modularity implies strong echo-chamber structure; values near
+zero indicate no detectable community organisation.
+</p>
+
+<h3>6.1 Why Two Steps Are Necessary</h3>
+
+<p>
+The standard Louvain algorithm (Blondel et al. 2008) optimises the undirected
+modularity objective and is not defined for directed graphs. At the same time,
+simply converting the directed graph to undirected before scoring would apply
+the <em>wrong null model</em> — one based on total degree rather than on the
+asymmetric generating process. The two-step procedure resolves this tension:
+</p>
+
+<ol style="margin: 12px 0 12px 28px; line-height: 2.1;">
+  <li>
+    <strong>Partition discovery (undirected projection).</strong>
+    The directed graph is projected to an undirected graph $G_{\mathrm{und}}$
+    via <code>G.to_undirected()</code>, which places an undirected edge
+    $\{i,j\}$ whenever $i \to j$ or $j \to i$ (or both) exists. Louvain
+    community detection runs on $G_{\mathrm{und}}$. This step identifies
+    cohesive groups based on mutual connectivity, which is appropriate for
+    echo-chamber analysis: strong echo chambers are characterised by dense
+    bidirectional interaction within the group.
+  </li>
+  <li>
+    <strong>Partition scoring (directed graph).</strong>
+    The community assignment $\{c_1, \ldots, c_k\}$ discovered in step 1
+    is evaluated against the original directed graph $G$ using the
+    Leicht–Newman directed modularity formula. This scores how well the
+    partition explains the <em>directed</em> edge structure relative to
+    the directed configuration-model null.
+  </li>
+</ol>
+
+<h3>6.2 Directed Modularity Formula (Leicht &amp; Newman 2008)</h3>
+
+<div class="formula-block">
+$$Q = \frac{1}{m}\sum_{c}\left[L_c - \frac{k_c^{\mathrm{out}}\, k_c^{\mathrm{in}}}{m}\right]$$
+</div>
+
+<p>where for each community $c$:</p>
+<ul style="margin: 8px 0 8px 24px; line-height: 2;">
+  <li>$m = |E|$ — total number of directed edges</li>
+  <li>$L_c = \sum_{i,j \in c} A_{ij}$ — number of directed edges internal to community $c$</li>
+  <li>$k_c^{\mathrm{out}} = \sum_{i \in c} k_i^{\mathrm{out}}$ — total out-degree of community $c$</li>
+  <li>$k_c^{\mathrm{in}}  = \sum_{i \in c} k_i^{\mathrm{in}} $ — total in-degree of community $c$</li>
+</ul>
+
+<p>
+The null model term $k_c^{\mathrm{out}} k_c^{\mathrm{in}} / m^2$ is the
+expected fraction of all directed edges falling within community $c$ if edges
+were placed independently with probability proportional to
+$k_i^{\mathrm{out}} \cdot k_j^{\mathrm{in}} / m$ — the directed configuration
+model. This is the correct null for a preferential-attachment follower network,
+where high-in-degree nodes attract more incoming edges and high-out-degree nodes
+send more.
+</p>
+
+<h3>6.3 Contrast with Undirected Formula</h3>
+
+<p>
+For comparison, the undirected Newman–Girvan formula (which would result from
+evaluating on <code>G_und</code>) is:
+</p>
+
+<div class="formula-block">
+$$Q_{\mathrm{undir}} = \frac{1}{2m_{\mathrm{u}}}\sum_c\left[L_c^{\mathrm{u}} - \frac{k_c^2}{2m_{\mathrm{u}}}\right]$$
+</div>
+
+<p>
+where $m_{\mathrm{u}}$ is the undirected edge count and $k_c = \sum_{i \in c} k_i$
+(total degree, not distinguished by direction). Applying this formula to a
+directed follower network would treat a node's followers and followees
+symmetrically, ignoring the asymmetric influence mechanism that motivates the
+model.
+</p>
+
+<h4>NetworkX calls</h4>
+<pre>G_und = G.to_undirected()
+
+# Step 1: community detection on undirected projection
+try:
+    communities = nx.community.louvain_communities(G_und, seed=42)
+except AttributeError:                           # NetworkX < 2.7 fallback
+    communities = list(nx.community.greedy_modularity_communities(G_und))
+
+# Step 2: score on original directed graph — NetworkX branches on G.is_directed()
+Q = nx.community.modularity(G, communities)</pre>
+
+<div class="info">
+<strong>NetworkX implementation detail.</strong>
+<code>nx.community.modularity(G, communities)</code> inspects
+<code>G.is_directed()</code> internally. For directed graphs it computes
+$k_c^{\mathrm{out}} k_c^{\mathrm{in}}$ as the null-model term; for undirected
+graphs it uses $k_c^2$. Passing the original <code>DiGraph</code> (not the
+undirected projection) to this call is therefore sufficient to activate the
+directed formula automatically.
+</div>
+
+<div class="note">
+<strong>Caveat on partition origin.</strong>
+Because the community partition is derived from the undirected projection, it
+maximises an objective that does not account for edge direction.
+A high-$Q$ community in the directed sense might contain structural asymmetries
+(e.g., a star topology where all edges point inward) that would not constitute
+a "community" in opinion-dynamics terms. Interpreting $Q$ as an echo-chamber
+proxy therefore assumes that mutual-follow density is a valid surrogate for
+bidirectional opinion reinforcement — an assumption that is standard in CSS
+but not formally guaranteed.
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="indegree">
+<h2>7 · In-Degree</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<div class="formula-block">
+$$k_i^{\mathrm{in}} = \sum_{j \in V} A_{ji}$$
+</div>
+
+<p>
+In-degree counts the number of agents who follow node $i$ — its <em>follower count</em>.
+It is the primary influence measure in the model: the admin selects intervention
+targets from the pool of moderate-opinion nodes with follower count above a
+minimum threshold, so $k_i^{\mathrm{in}}$ directly governs target eligibility
+and expected reach.
+</p>
+
+<h4>NetworkX call</h4>
+<pre>G.in_degree(node_id)   # returns int for a single node</pre>
+
+<p>
+Out-degree ($k_i^{\mathrm{out}}$) is <em>not</em> included as a structural
+predictor because in this model agents follow based on opinion proximity, so
+out-degree reflects filtering behaviour rather than social influence.
+</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="betweenness">
+<h2>8 · Betweenness Centrality</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>
+Betweenness centrality measures the fraction of all directed shortest paths
+that pass through a node, making it a proxy for brokerage or gatekeeping power.
+</p>
+
+<div class="formula-block">
+$$B(v) = \frac{1}{(n-1)(n-2)}\sum_{\substack{s,t \in V \\ s \neq v \neq t}} \frac{\sigma(s,t \mid v)}{\sigma(s,t)}$$
+</div>
+
+<p>where:</p>
+<ul style="margin: 8px 0 8px 24px; line-height: 2;">
+  <li>$\sigma(s,t)$ — number of directed shortest paths from $s$ to $t$</li>
+  <li>$\sigma(s,t \mid v)$ — number of those paths that pass through $v$</li>
+  <li>The normalisation constant $(n-1)(n-2)$ is the maximum number of
+      ordered node pairs $(s, t)$ that exclude $v$ in a directed graph
+      (cf. $\tfrac{(n-1)(n-2)}{2}$ in the undirected case)</li>
+</ul>
+
+<p>
+The direction matters: a node that sits on many $s \to t$ paths but few
+$t \to s$ paths has high directed betweenness because it <em>gates the
+flow of influence in one direction</em>. An undirected betweenness
+computation would conflate these asymmetric brokerage roles.
+</p>
+
+<h4>NetworkX call</h4>
+<pre>bc_all = nx.betweenness_centrality(G, normalized=True)  # G : DiGraph</pre>
+
+<p>
+NetworkX uses Brandes' algorithm (2001) adapted for directed graphs:
+a forward BFS from each source computes $\sigma(s, \cdot)$; a backward
+accumulation pass distributes the dependency scores. Complexity is
+$O(nm)$ for unweighted graphs. With $n \approx 10^3$–$10^4$ and sparse
+networks, this is the computationally dominant step in the structural
+analysis pipeline.
+</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="pagerank">
+<h2>9 · PageRank</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>
+PageRank assigns centrality scores by simulating a random walk with teleportation.
+A walker at node $i$ follows a uniformly random out-edge with probability $\alpha$
+(damping factor) and jumps to a uniformly random node with probability $1-\alpha$.
+</p>
+
+<div class="formula-block">
+$$\mathrm{PR}(i) = \frac{1-\alpha}{n} + \alpha \sum_{j:\, j\to i} \frac{\mathrm{PR}(j)}{k_j^{\mathrm{out}}}$$
+</div>
+
+<p>
+A node has high PageRank if many high-PageRank nodes follow it and those
+followers are otherwise selective (low out-degree). This combines in-degree
+with qualitative weighting — a single follower who follows very few agents
+contributes more to $\mathrm{PR}$ than ten followers who follow everyone.
+</p>
+
+<h4>NetworkX call</h4>
+<pre>pr_all = nx.pagerank(G, alpha=0.85, max_iter=200)</pre>
+
+<p>
+The damping factor $\alpha = 0.85$ is the canonical value from the original
+Brin &amp; Page (1998) paper and is standard in CSS network analysis.
+The maximum iteration count is raised from the NetworkX default (100) to 200
+to improve convergence on large or poorly-conditioned graphs.
+</p>
+
+<div class="info">
+<strong>Relation to in-degree.</strong>
+In a directed configuration model (edges drawn independently proportional to
+degree sequence), PageRank converges to $\mathrm{PR}(i) \propto k_i^{\mathrm{in}}$
+as $\alpha \to 1$. In structured networks with hubs, PageRank and in-degree
+diverge: PageRank rewards being followed by influential agents, while in-degree
+treats all followers equally. The Spearman correlation between the two metrics
+is therefore informative about the homophily structure of the follower network.
+</div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="eigenvector">
+<h2>10 · Eigenvector Centrality — Left Eigenvector</h2>
+
+<span class="badge badge-directed">Fully directed</span>
+
+<p>
+Eigenvector centrality generalises degree centrality by weighting each
+in-neighbor's contribution by that neighbor's own centrality, creating a
+recursive definition of prestige.
+</p>
+
+<h3>10.1 Formula and Convention</h3>
+
+<p>
+For directed graphs, two eigenvector variants exist. This implementation
+uses the <strong>left eigenvector</strong> of the adjacency matrix $\mathbf{A}$,
+the solution $\mathbf{x}$ to:
+</p>
+
+<div class="formula-block">
+$$\lambda\, \mathbf{x}^{\top} = \mathbf{x}^{\top} \mathbf{A}
+\quad \Longleftrightarrow \quad
+\lambda\, x_i = \sum_{j \to i} x_j$$
+</div>
+
+<p>
+Node $i$'s score equals (up to the eigenvalue $\lambda$) the sum of centrality
+scores of nodes that <em>follow</em> $i$ (in-neighbors/predecessors). This is
+an <strong>authority/prestige</strong> score: a node is central if it is
+followed by other central nodes.
+</p>
+
+<div class="note">
+<strong>Terminology note.</strong>
+In the HITS framework (Kleinberg 1999), this quantity is called the
+<em>authority</em> score, not the hub score. The hub score would be the
+right eigenvector ($\mathbf{Ax} = \lambda\mathbf{x}$, summing over out-neighbors).
+The notebook description "left eigenvector (hub score)" conflates these; the
+computation is authority-based.
+The authority score is the correct choice for characterising influence
+in a follower network, because it rewards being selected as a followee by
+prestigious agents.
+</div>
+
+<h3>10.2 Convergence and Fallback</h3>
+
+<p>
+Power iteration is used with <code>max_iter=1000</code> and
+<code>tol=1e-6</code>. Convergence is not guaranteed when $G$ is not strongly
+connected (the Perron–Frobenius theorem applies to strongly connected graphs;
+for weakly connected or disconnected directed graphs, the dominant eigenvector
+may not be unique, or some entries may be zero). In such cases
+<code>nx.PowerIterationFailedConvergence</code> is caught and the metric is
+recorded as <code>NaN</code> rather than propagating an error.
+</p>
+
+<h4>NetworkX call</h4>
+<pre>try:
+    ec_all = nx.eigenvector_centrality(G, max_iter=1000, tol=1e-6)
+    eigenvector = ec_all.get(target_id, np.nan)
+except nx.PowerIterationFailedConvergence:
+    eigenvector = np.nan</pre>
+
+<p>
+Compared with PageRank, eigenvector centrality has no teleportation term and
+no out-degree normalisation. It can therefore be more sensitive to structural
+asymmetries (e.g., a node followed by a single extremely central agent may
+outscore a node with many low-centrality followers).
+</p>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<section id="refs">
+<h2>References</h2>
+<ol class="ref-list">
+  <li>
+    Blondel, V. D., Guillaume, J.-L., Lambiotte, R., &amp; Lefebvre, E. (2008).
+    Fast unfolding of communities in large networks.
+    <em>Journal of Statistical Mechanics: Theory and Experiment</em>, 2008(10), P10008.
+  </li>
+  <li>
+    Brandes, U. (2001). A faster algorithm for betweenness centrality.
+    <em>Journal of Mathematical Sociology</em>, 25(2), 163–177.
+  </li>
+  <li>
+    Brin, S., &amp; Page, L. (1998). The anatomy of a large-scale hypertextual Web search engine.
+    <em>Computer Networks and ISDN Systems</em>, 30(1–7), 107–117.
+  </li>
+  <li>
+    Clauset, A., Newman, M. E. J., &amp; Moore, C. (2004). Finding community structure in very large networks.
+    <em>Physical Review E</em>, 70(6), 066111.
+  </li>
+  <li>
+    Clauset, A., Shalizi, C. R., &amp; Newman, M. E. J. (2009). Power-law distributions in empirical data.
+    <em>SIAM Review</em>, 51(4), 661–703.
+  </li>
+  <li>
+    Fagiolo, G. (2007). Clustering in complex directed networks.
+    <em>Physical Review E</em>, 76(2), 026107.
+  </li>
+  <li>
+    Kleinberg, J. M. (1999). Authoritative sources in a hyperlinked environment.
+    <em>Journal of the ACM</em>, 46(5), 604–632.
+  </li>
+  <li>
+    Leicht, E. A., &amp; Newman, M. E. J. (2008). Community structure in directed networks.
+    <em>Physical Review Letters</em>, 100(11), 118703.
+  </li>
+  <li>
+    Newman, M. E. J. (2003). Mixing patterns in networks.
+    <em>Physical Review E</em>, 67(2), 026126.
+  </li>
+  <li>
+    Watts, D. J., &amp; Strogatz, S. H. (1998). Collective dynamics of 'small-world' networks.
+    <em>Nature</em>, 393, 440–442.
+  </li>
+  <li>
+    Zhang, B., &amp; Horvath, S. (2005). A general framework for weighted gene co-expression network analysis.
+    <em>Statistical Applications in Genetics and Molecular Biology</em>, 4(1), Article 17.
+  </li>
+</ol>
+</section>
+
+</div><!-- /wrapper -->
+</body>
+</html>

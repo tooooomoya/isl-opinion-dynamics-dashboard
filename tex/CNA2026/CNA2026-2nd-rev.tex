@@ -1,0 +1,764 @@
+\documentclass{svproc}
+%
+\usepackage{graphicx}%
+\usepackage{multirow}%
+\usepackage{amsmath,amssymb,amsfonts}%
+\usepackage{mathrsfs}%
+\usepackage[title]{appendix}%
+\usepackage{xcolor}%
+\usepackage{textcomp}%
+\usepackage{manyfoot}%
+\usepackage{booktabs}%
+\usepackage{algorithm}%
+\usepackage{algorithmicx}%
+\usepackage{algpseudocode}%
+\usepackage{listings}%
+\usepackage{url}
+\def\UrlFont{\rmfamily}
+
+\renewcommand{\topfraction}{.99}
+\renewcommand{\dbltopfraction}{.99}
+\renewcommand{\bottomfraction}{.99}
+\renewcommand{\textfraction}{.01}
+\renewcommand{\floatpagefraction}{0.9}
+\renewcommand{\dblfloatpagefraction}{0.9}
+
+\usepackage[normalem]{ulem}
+\usepackage{bm}
+\usepackage{xspace}
+\usepackage{subcaption}
+
+\usepackage{color}
+\def\green#1{\textcolor[rgb]{0,0.6,0}{#1}}
+\def\black#1{\textcolor[rgb]{0,0,0}{#1}}
+\def\dgreen#1{\textcolor[rgb]{0.02,0.50,0.05}{#1}}
+\def\gray#1{\textcolor[rgb]{0.5,0.5,0.7}{#1}}
+\def\red#1{\textcolor{red}{#1}}
+\def\blue#1{\textcolor{blue}{#1}}
+\def\Blue{\color[rgb]{0,0,1}}
+\def\Red{\color[rgb]{1,0,0}}
+\def\Dgreen{\color[rgb]{0.02,0.55,0.04}}
+\def\Black{\color[rgb]{0,0,0}}
+\def\ignore#1{}
+
+\usepackage[normalem]{ulem}
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{xspace}
+\usepackage{subcaption}
+
+% track-changes helpers (kept from last year's setup)
+\newcommand{\add}[1]{\textcolor{blue}{#1}}
+\newcommand{\erase}[1]{\textcolor{red}{\sout{#1}}}
+\def\subst#1#2{\add{#1}{ \erase{#2}}}
+
+% parameters definition (same convention as docs/journal.tex)
+\def\post{\rho}                 % posting probability
+\def\BoundedConfidence{\epsilon} % bounded confidence (rejection) threshold
+\def\feed{F}                    % feed
+\def\Stubbornness{\mu}           % stubbornness
+\def\maxfollower{S_{\it fol}}    % max followee capacity
+\def\maxfeed{S_{\it fd}}         % feed capacity
+\def\VCR{\kappa}                 % vocal comfort radius (expression threshold)
+
+\begin{document}
+\mainmatter
+
+\title{When Do Moderate Hubs Fuel Extreme Opinion Activation? \\ A Two-Layer Homophily Mechanism in Adaptive Social Networks}
+\titlerunning{Moderate Hubs and Two-Layer Homophily}
+
+\author{Tomoya Takeda\inst{1}, Fujio Toriumi\inst{2}, Toshiharu Sugawara\inst{1}}
+\authorrunning{Tomoya Takeda, Fujio Toriumi and Toshiharu Sugawara} % abbreviated author list (for running head)
+
+\institute{Department of Computer Science and Communications Engineering,
+\\Waseda University, 3-4-1 Okubo, Shinjyuku-ku, 169-8555, Tokyo, Japan.\\
+\email{tomoya.leo9@fuji.waseda.jp}, \email{sugawara@waseda.jp}
+\and
+Department of Systems Innovation, The University of Tokyo, \\7-3-1
+Hongo, Bunkyo-ku, 113-8656, Tokyo, Japan.\\
+\email{tori@sys.t.u-tokyo.ac.jp}
+}
+
+\maketitle
+
+\begin{abstract}\Dgreen
+With the rapid expansion of web communication platforms, hub users
+have become critical actors in online opinion dynamics, yet their
+effects on polarized posting behavior remain poorly understood. Using
+an agent-based model on heavy-tailed adaptive social networks, we
+study how moderately positioned hubs shape opinion-sharing
+behavior. Active moderate hubs consistently boost moderate-camp
+posting while suppressing near-extreme posting. Their influence on the
+ideologically distant extreme camp, however, is conditional: moderate
+hubs can act as mediators or facilitators of activation depending on
+network conditions. We trace this regime shift to a two-layer
+homophily mechanism—structural and perceptual—which determines
+whether the two camps are perceived as one group (mediation) or as
+separate communities (facilitation). Moderate hubs are therefore not
+universally stabilizing bridges; their brokerage role flips between
+mediation and facilitation depending on how homophilic the two camps
+are perceived to be.
+\ignore{With the rapid expansion of web communication platforms, hub users have become critical actors in online opinion expression dynamics; however, their effects on polarized posting behavior remain poorly understood. Using an agent-based model on heavy-tailed adaptive social networks, we study how moderately positioned hubs shape opinion-sharing behavior. Across a comprehensive suite of experiments, we observe a consistent pattern in which active moderate hubs boost moderate-camp posting while suppressing near-extreme posting. Their influence on the ideologically distant extreme camp, however, is highly complex: moderate hubs can act as mediators or facilitators of activation depending on network conditions. We trace this regime shift to a two-layer homophily mechanism, structural and perceptual, which determines whether the two camps are perceived as one group (mediation) or as separate communities (facilitation). Moderate hubs are therefore not universally stabilizing bridges; their brokerage role flips between mediation and facilitation depending on how homophilic the two camps are perceived to be.}
+\Black
+\keywords{Social networks, Opinion dynamics, Agent-based simulation,
+  Social media, Computational Social Science} 
+\end{abstract}
+
+\Blue
+
+
+\section{Introduction}\label{sec:intro}
+Social media and web communication platforms have become the primary
+venues for various styles of speech and discussion, rather than merely
+for sharing individual ideas, thereby exerting a significant effect on
+public opinion formation. Unlike traditional face-to-face
+communication, hub users or influencers --- followed by a large number
+of users --- can create posts that are disproportionately amplified
+across a platform's population, giving them immense influence on a
+given opinion environment. The role and effect of these hubs have been
+well studied through agent-based simulation and data mining,
+particularly from the perspective of information diffusion. However,
+their effects on polarized, controversial opinion dynamics are not yet
+fully understood, specifically regarding moderately positioned hubs as
+opposed to strongly identified opinion leaders.
+\par
+
+
+Therefore, we investigate how the sharing activity of these moderate
+hubs affects polarized opinion dynamics. Using an agent-based
+simulation on heavy-tailed adaptive social networks, we find that
+active moderate hubs do not uniformly mediate extreme-camp posting:
+they consistently boost posting activity among aligned moderate users
+while suppressing that of the ideologically nearby near-extreme camp,
+but their effect on the ideologically distant extreme camp is
+conditional. The results show that this conditional effect manifests
+as a clear regime shift governed by perceptual and structural
+parameters.
+\par
+
+
+Although mechanistically distinct, the effects of these two parameters
+appear to converge on a single, unifying homophily logic: when the
+near-extreme and extreme camps are effectively perceived as one
+homogeneous group, suppressing near-extreme posting also mediates
+extreme-camp activity. When they are instead perceived as separate,
+distinct communities, moderate hubs' suppression of near-extreme
+posting does not reach the extreme camp. Instead, it isolates the
+extreme camp into a more pure, self-contained echo chamber, which
+facilitates, rather than dampens, its activation. This perception of
+homophily versus heterophily is governed by two distinct layers: a
+perceptual layer, defined by how wide an opinion difference users find
+comfortable to engage with, which determines whether reached content
+registers as similar enough to elicit participation; and a structural
+layer, defined by how readily agents disconnect from ties they no
+longer tolerate, which shifts the threshold of opinion difference that
+must be tolerated for the two camps to be treated as a single group.
+\par
+
+\Black
+
+%[How these two layers relate to one another]
+
+The role of bridge nodes, or brokers, has long been studied, yet its
+effect on social media remains highly complex due to the varied
+dynamics such platforms exhibit.This study offers a novel, mechanistic
+account of the conditional role of brokerage nodes.
+
+\Blue
+
+\section{Related Work}\label{sec:related}
+Although social networks have long been studied as static structures,
+most notably in seminal work on small-world topology~\cite{watts1998},
+they have recently been modeled as systems whose topology coevolves
+with the opinions and behaviors of the individuals embedded in
+them. Building on the classic \emph{voter model}~\cite{clifford1973},
+Vazquez et al.~\cite{vazquez2008} used an {\em agent-based model}
+(ABM) to analyze coevolutionary dynamics based on two coupled rules
+--- state updating and edge rewiring --- revealing a phase transition
+between connected and fragmented networks governed by degree
+settings. The study of opinion dynamics is one of the major fields
+where this style of coevolving network model has been fruitfully
+applied: Kozma and Barrat~\cite{kozma2008} modeled how agents
+adaptively rewire their social ties in response to disagreement,
+showing the dominant effect of homophilic rewiring on the resulting
+network structure. This coevolving network model is based on {\em bounded
+confidence}, formalized by Deffuant et al.~\cite{deffuant2000} and
+Hegselmann and Krause~\cite{hegselmann2002}, in which an agent updates
+its opinion only by averaging with others whose opinion falls within a
+fixed tolerance window. With the rapid proliferation of social media
+in recent years, public discourse has shifted significantly from
+traditional face-to-face communication. In line with this
+homophilic-rewiring mechanism, Sasahara et al.~\cite{sasahara2020}
+used an ABM to confirm that social influence combined with the
+unfollowing process successfully reproduces the politically polarized
+follow network observed in real-world social media
+data~\cite{conover2011}.
+\par
+
+
+Whether such bridging roles are inherently stabilizing, however, is
+far from settled in the context of social media. Classic network
+theory established that ties bridging otherwise disconnected
+communities act as a source of connectivity and innovation rather than
+redundancy, whether characterized as \emph{weak ties} diffusing
+influence across group boundaries~\cite{granovetter1973} or as
+\emph{broker} nodes spanning structural holes~\cite{burt1992}. This
+bridging role was later quantified via \emph{betweenness centrality},
+defined as the proportion of the shortest paths between node pairs
+passing through a given node~\cite{freeman1977}. On social media,
+however, this integrative reading does not hold unconditionally: Cha
+et al.~\cite{cha2010} observed that highly followed users do not
+necessarily exert a larger influence, which is an important caveat for
+influence maximization in social media marketing --- and subsequent
+ABM studies found a hub's effect on the surrounding population to be
+conditional rather than uniformly integrative. Using an ABM, Helfmann
+et al.~\cite{helfm2023} showed that hub users who adopt extreme
+attitudes can gain more followers on social media. Also with an ABM,
+Betts et al.~\cite{betts2023} found that, unlike an extremist
+influencer whose activity always accelerates polarization, a neutral
+influencer's effect on polarization inverts depending on its own
+tolerance for disagreeing views; that is, brokerage by a moderate hub
+is not inherently stabilizing.
+\par
+
+
+As reviewed above, most of these studies focus on opinion positions
+themselves as the primary outcome, whether analyzing an influencer's
+own attitude~\cite{helfm2023} or a population's aggregate
+polarization~\cite{betts2023,sasahara2020}. On social media, however,
+influence operates not only through changes in private opinion but
+also through the decision to express or withhold it. Following the
+\emph{spiral-of-silence} tradition, in which individuals modulate
+whether they voice an opinion according to their perceived opinion
+climate~\cite{noelle-neumann1974}, Krassa~\cite{krassa1988} used an
+ABM to test this dynamic through social groups and selective
+perception. Yet, even simulation-based studies focusing on social
+media tend to treat opinion position as the primary outcome, leaving
+expression secondary. Therefore, we take posting, or vocality, as our
+primary outcome throughout, investigating under what conditions
+moderate hubs' ostensibly mediating role produces complex effects on
+opinion expression across groups.
+\par
+
+
+\section{Model}\label{sec:model}
+\subsection{Agent-Based Model}\label{sec:model-abm}
+
+We simulate opinion and posting dynamics on a directed graph
+$G=(V,E)$, where $V=\{1,2,\dots,N\}$ is the set of $N$ agents
+representing individual social media users and $E\subseteq V\times V$
+is the set of directed follow edges, so that $(i,j)\in E$ means agent
+$i$ follows agent $j$, with a corresponding adjacency matrix
+$\mathbf{A}$ whose $(i, j)$-th entry is $\mathbf{A}_{ij}=1$ if
+$(i,j)\in E$ and $\mathbf{A}_{ij}=0$ otherwise. This follow graph
+evolves through the 
+social media behaviors introduced in
+Section~\ref{sec:model-behaviors}. The dynamics proceed in discrete
+time steps $t\in\{0,1,2,\dots\}$.
+\par
+
+Agent $i\in V$ holds an opinion $O_i(t)\in[-1,1]$, representing
+its stance on a single controversial issue at time $t$; the boundaries
+$-1$ and $1$ denote the two most extreme opposing positions, and $0$
+denotes a neutral stance. Hereafter, we group agents into three camps
+according to their opinion strength by dividing $[-1,1]$ into five
+equal-width bins: agents with $\vert O_i(t)\vert <0.2$, in the
+innermost bin, form the \emph{moderate} camp; agents with
+$0.2\le\vert O_i(t)\vert<0.6$, in either of the two intermediate
+bins, form the \emph{near-extreme} camp; and agents with
+$\vert O_i(t)\vert\ge0.6$, in either of the two outer bins, form
+the \emph{extreme} camp, with their ideological alignment determined
+by the sign of $O_i(t)$.
+% As is standard in the opinion dynamics literature,
+% we compress an agent's stance to this single dimension, 
+% under the assumption that a specific controversial 
+% topic can be usefully represented along one axis 
+% even though real-world opinions are inherently 
+% multidimensional~\cite{deffuant2000,hegselmann2002}.
+Agent's initial opinion $O_i(0)$, which
+we call its \emph{intrinsic opinion} representing a latent attitude,
+is drawn independently from a Gaussian distribution, resampling any
+draw that falls outside $[-1,1]$.
+\par
+
+
+Beyond its opinion, each agent is characterized by two further
+internal states, summarized in Table~\ref{tab:state}: a posting
+probability $\post_i(t)$, governing how actively it posts, and a
+{\em bounded confidence threshold} $\BoundedConfidence_i(t)$, governing
+which content from other agents it tolerates well enough to remain
+connected with.
+\par
+
+% Every agent additionally carries a fixed
+% stubbornness $\Stubbornness$, representing the extent
+% to which it adheres to its own
+% intrinsic opinion $O_i(0)$ rather than
+% being moved by the opinions it encounters;
+% in the experiments reported here $\Stubbornness$ is
+% held at a constant value across the population,
+% though the implementation supports drawing it
+% heterogeneously per agent.
+
+\begin{table}[t]\Blue
+\centering
+\caption{Agent state variables and their value
+  ranges.}\label{tab:state}
+\tabcolsep=5pt
+\begin{tabular}{llll}
+\toprule
+State variable & Symbol & Range & Initial value \\
+\midrule
+Opinion & $O_i(t)$ & $[-1.0,\ 1.0]$ & $\mathcal{N}(0.0,\ 0.6^2)$ \\
+Posting probability & $\post_i(t)$ & $[0.01,\ 1.0]$ & $0.26$ \\
+Bounded confidence threshold & $\BoundedConfidence_i(t)$ & $[0.2,\ 1.0]$ & $0.8$ \\
+\bottomrule
+\end{tabular}\Black
+\end{table}
+
+
+
+\subsection{Modeling Social Adaptation}\label{sec:model-adaptation}
+Each agent updates its internal state only when it accesses the
+platform, an event that occurs independently at each time step with
+access probability $P_a$. Therefore, every rule introduced below is
+understood to fire once per access rather than once per step.
+\par
+
+
+\paragraph{Social influence.} 
+Upon accessing the platform, agent $i$ reads all posts in its current
+feed $\feed_i(t)$, which is defined as the set of posts delivered to
+$i$ during that access. It then updates its opinion by averaging the
+subset of posts within its tolerance threshold. This average is
+blended with the agent's intrinsic opinion $O_i(0)$ according to its
+stubbornness parameter $\Stubbornness\in[0,1]$, which acts as a fixed
+weight on its intrinsic opinion relative to social influence, as
+expressed in Eq.~\eqref{eq:social-influence}.
+%
+\begin{equation}
+O_i(t) = \Stubbornness\cdot O_i(0) + (1-\Stubbornness)\cdot\frac{\sum_{p_j\in \feed_i(t):\,|O(p_j)-O_i(t)|<\BoundedConfidence_i(t)} O(p_j)}{\big|\{p_j\in \feed_i(t):\,|O(p_j)-O_i(t)|<\BoundedConfidence_i(t)\}\big|}.
+\label{eq:social-influence}
+\end{equation}
+%
+If no post in the feed
+falls within $\BoundedConfidence_i(t)$, the agent's opinion remains
+unchanged.
+% for that access.
+
+
+
+\paragraph{Confidence decline and recovery.} 
+Bounded confidence $\BoundedConfidence_i(t)$ is adjusted at every
+access toward a target level determined by how much of the feed the
+agent tolerates, with out-of-tolerance posts narrowing this
+threshold. Writing $r_i(t)$ for the fraction of $i$'s feed that falls
+within its current threshold, the target level is defined as
+%
+\begin{equation} 
+  \BoundedConfidence_i^{\ast}(t) =
+  \BoundedConfidence_{\mathrm{floor}} + (\BoundedConfidence_{\mathrm{ceil}}-\BoundedConfidence_{\mathrm{floor}})\cdot r_i(t), 
+\end{equation} 
+%
+and the threshold is relaxed toward it according to 
+%
+\begin{equation} 
+  \BoundedConfidence_i(t{+}1) = \BoundedConfidence_i(t) +
+  \begin{cases}
+    \delta_{\BoundedConfidence},
+    \big(\BoundedConfidence_i^{\ast}(t)-\BoundedConfidence_i(t)\big)
+    & \text{if } \BoundedConfidence_i^{\ast}(t) <
+    \BoundedConfidence_i(t), \\[2pt]
+    \gamma_{\BoundedConfidence},
+    \big(\BoundedConfidence_i^{\ast}(t)-\BoundedConfidence_i(t)\big)
+      & \text{otherwise},
+  \end{cases}\label{eq:bc} 
+\end{equation} 
+%
+clipped to
+$[\BoundedConfidence_{\mathrm{floor}},\BoundedConfidence_{\mathrm{ceil}}]$,
+where $\delta_{\BoundedConfidence}$ and $\gamma_{\BoundedConfidence}$
+($\delta_{\BoundedConfidence}\gg\gamma_{\BoundedConfidence}$) 
+reflects the well-documented asymmetry by which negative experiences
+carry greater psychological weight~\cite{baumeister2001}.
+
+
+\paragraph{Social reinforcement and vocality.} 
+Whether an agent tolerates a post in the bounded confidence sense
+described above is conceptually distinct from whether that content
+emboldens the agent to express its opinion. Therefore, a distinct
+second criterion is introduced. A {\em post} $p_j$ by agent $j$ is
+defined as {\em comfortable} for agent $i$ if $|O_i(t)-O(p_j)|<\VCR$, where the vocal comfort
+radius $\VCR$ is a population-wide threshold, deliberately set apart
+from the agent-specific threshold $\BoundedConfidence_i(t)$. The two
+criteria capture different functional mechanisms:
+$\BoundedConfidence_i(t)$ acts as a rejection threshold, governing how
+much disagreement an agent tolerates before disengaging, whereas
+$\VCR$ serves as an expression threshold that determines how much
+agreement with the surrounding opinion climate is required before
+posting.
+% An agent can in 
+% principle be narrowly tolerant of disagreement 
+% yet still easily emboldened to speak, or the reverse. 
+Letting $c_i(t)$ denote the fraction of $i$'s feed that is
+comfortable, the posting probability relaxes toward a target value
+determined linearly by $c_i(t)$:
+%
+\begin{equation}
+\post_i^{\ast}(t) = \post_{\min} + (\post_{\max}-\post_{\min})\cdot c_i(t), \qquad
+\post_i(t{+}1) = \post_i(t) + \eta\,\big(\post_i^{\ast}(t)-\post_i(t)\big),
+\end{equation}
+%
+where the updated value is clipped to
+$[\post_{\min},\post_{\max}]$. As with the confidence-decline rule
+above, this graded formulation ensures that every comfort level yields
+a distinct, stable equilibrium vocality.
+\par
+
+
+\subsection{Modeling Behaviors on Social Media}\label{sec:model-behaviors}
+%\paragraph{Post.}
+At each access, agent $i$ creates a post $p_i$ reflecting its current
+opinion $O_i(t)$ with probability $\post_i(t)$. This post is made
+available to every current follower of $i$ and is delivered via their
+feeds, as described below.
+%\paragraph{Feed.}
+Agent $i$'s {\em feed} $\feed_i(t)$ is assembled
+in a strictly reverse-chronological order from the agents that $i$ follows,
+comprising the $\maxfeed$ most recent original or reposted posts.
+%\paragraph{Repost.} 
+Upon reading its feed, agent $i$ reposts each post it finds tolerable,
+i.e., within its bounded confidence threshold
+$\BoundedConfidence_i(t)$, independently with probability $P_r$. A
+post that falls outside $\BoundedConfidence_i(t)$ may still be
+reposted, but only at the much lower rate $P_r^{\text{out}}\ll P_r$,
+reflecting the possibility of occasional out-of-tolerance
+amplification, such as quoting a disagreeable post to react to it.
+% A repost retains the original post's opinion 
+% content and original authorship (i.e. agent index), 
+% and is delivered to every follower of the reposting 
+% agent exactly as an original post would be.
+\par
+
+
+%\paragraph{Follow.} 
+After reading its feed, agent $i$ collects, as candidates, the authors
+of all posts within its bounded confidence threshold whom it does not
+already follow and has not blocked. With probability $P_f$, it follows
+one candidate chosen uniformly at random from these candidates. The
+maximum number of agents that any agent can follow is fixed at
+$\maxfollower$ throughout the experiments, based on the concept of
+\emph{limited attention}: although a user may nominally follow
+hundreds of accounts, the number of information sources that can
+effectively influence it at any given time is constrained by human
+cognitive limits and information
+overload~\cite{goncalves2011,weng2012}. Once at capacity, a new follow
+immediately evicts the currently followed agent whose opinion is
+farthest from $i$'s own.
+\par
+
+
+%\paragraph{Unfollow and block.} 
+At each access, agent $i$ first makes a single probabilistic decision
+with probability $P_u$ about whether it will act on any
+out-of-tolerance content encountered during that access. If this
+decision succeeds, $i$ scans its feed for the first post whose author
+it follows but whose opinion lies outside $\BoundedConfidence_i(t)$;
+if such a post exists, $i$ unfollows and blocks that
+author. Otherwise, if the feed contains any out-of-tolerance post from
+an author that $i$ does not follow, $i$ blocks one such author, chosen
+uniformly at random. Therefore, at most one follow edge is severed, or
+one author blocked, per access. Thus, $P_u$ sets the population's
+overall propensity to prune out-of-tolerance ties. We treat it as the
+model's central structural knob, governing how readily the network
+fragments into mutually invisible clusters as opposed to remaining
+broadly connected.
+\par
+
+Posting probability $\post_i(t)$ is deliberately kept independent of
+opinion extremity $\vert O_i(t)\vert$ throughout the rules
+above. This independence ensures that posting and reposting behaviors
+serve directly as the primary outcomes of interest in this study: it
+is this surfaced, vocalized activity that other users actually
+perceive and are influenced by, rather than the unexpressed internal
+opinions themselves.
+\par
+
+
+\begin{table}[t]\Blue
+\centering
+\caption{Model parameters and their default values.}\label{tab:param}
+\tabcolsep=5pt
+\begin{tabular}{lll}
+\toprule
+Parameter & Symbol & Default value \\
+\midrule
+Probability of accessing the platform & $P_a$ & 0.1 \\
+Probability of following & $P_f$ & 0.01 \\
+Probability of reposting (in/out of tolerance) & $P_r$, $P_r^{\text{repost}}$ & 0.1, 0.01 \\
+Probability of unfollowing/blocking & $P_u$ & 0.05 (variable) \\
+Maximum number of followees & $\maxfollower$ & 43.9 \\
+Feed capacity & $\maxfeed$ & 15 \\
+Confidence decline/recovery rate & $\delta_{\BoundedConfidence}$, $\gamma_{\BoundedConfidence}$ & 0.5, $10^{-4}$ \\
+Bounded confidence floor/ceiling & $\BoundedConfidence_{\mathrm{floor}},\BoundedConfidence_{\mathrm{ceil}}$ & 0.2, 1.0 \\
+Vocal comfort radius & $\VCR$ & 0.1 (variable) \\
+Posting-probability relaxation rate & $\eta$ & 0.1 \\
+Posting-probability floor/ceiling & $\post_{\min},\post_{\max}$ & 0.01, 1.0 \\
+Stubbornness & $\Stubbornness$ & 0.82 \\
+\bottomrule
+\end{tabular}\Black
+\end{table}
+
+
+\subsection{Modeling the Moderate Hub Intervention}\label{sec:model-intervention}
+The manipulation central to this study exogenously fixes the opinions
+of a designated set of highly reachable agents. At $t=0$, we rank all
+agents by their initial follower count and select the
+$N_{\mathrm{hub}}=60$ highest-ranked as the hub pool. Follower count
+is chosen here because it is currently the only channel through which
+reach operates in this model. The number $N_{\mathrm{hub}}=60$ is
+fixed well above the several dozen agents to which the network
+generator's heavy tail (Section~\ref{sec:experiments}) gives
+comparably large in-degree, so that the hub pool conservatively covers
+this entire plateau of high-reach agents. This pool is partitioned
+into five categories, symmetric about the moderate center and weighted
+toward it: ten agents each at the extreme positions $O=-1.0$ and
+$O=+1.0$; ten agents each at the near-extreme positions $O=-0.4$ and
+$O=+0.4$; and twenty agents at the moderate position $O=0.0$, the
+moderate hubs whose activity is the object of this study --- with
+these five target values being representative of the \emph{extreme},
+\emph{near-extreme}, and \emph{moderate} camps defined in
+Section~\ref{sec:model-abm}, respectively. Every hub agent's intrinsic
+and current opinion is reset once, at $t=0$, to its assigned target
+and held fixed thereafter by exempting it from
+Eq.~\eqref{eq:social-influence}; its stubbornness, posting
+probability, and bounded confidence dynamics are otherwise left
+unmodified.
+\par
+
+The model further supports silencing a hub category. A silenced hub is
+prevented from posting original content or reposting, while continuing
+to read its feed and to follow or unfollow exactly as before, so its
+follow relationships evolve identically to those under an active
+hub. Contrasting an active-hub condition against an otherwise
+identical hub-silenced condition therefore isolates the effect
+specifically attributable to the hub's own vocal activity. The
+specific experimental arms constructed from this mechanism are
+described in Section~\ref{sec:experiments}.
+\par
+
+%
+\Black%%{}######
+%
+
+\section{Experimental Design}\label{sec:experiments}
+
+The initial follow graph is generated by a directed
+Holme--Kim growing network process~\cite{holme2002} 
+with $m=15$, $A_0=4$ 
+and $p_t=0.05$, which produces 
+synthetic heavy-tailed network mimicing real-world 
+asymmetric web social networks.
+Most of the parameter values listed in
+Table~\ref{tab:param}, together with the
+network-generator parameters, were 
+fixed by a joint parameter
+sweep against several empirical targets drawn from
+prior studies of Twitter/X
+highliging heavy-tailed degree distribution~\cite{kwak2010}, 
+high modularity of the reposting network~\cite{conover2011}, 
+posting dynamics weighted by opinion strength~\cite{buntain2025}, 
+thereby enable the model to reproduce realistic polarized posting dynamics
+on social media. 
+The two
+parameters swept as experimental factors below,
+$P_u$ and $\VCR$, are excluded from this
+calibration and instead varied directly.
+
+Within this calibrated network, 
+we manipulate the moderate hub category
+introduced in Section~\ref{sec:model-intervention}
+across two arms: a \emph{control} arm, in which
+all five hub categories remain active throughout,
+and an \emph{M-silent} arm, in which only the
+moderate hub category is silenced while the
+extreme and near-extreme categories remain active
+in both arms. Because silencing leaves every
+hub's follow relationships unchanged
+(Section~\ref{sec:model-intervention}), the isolated
+difference between the two arms is whether the
+moderate hubs actually post and repost, so that
+any difference in outcome between them can be
+attributed to the moderate hubs' own vocal
+activity.
+
+We cross this arm manipulation with a full
+factorial sweep of the two parameters: the
+vocal comfort radius $\VCR\in\{0.1,0.15,0.2\}$,
+capped at the bounded confidence floor
+$\BoundedConfidence_{\mathrm{floor}}=0.2$
+(Table~\ref{tab:param}) reflecting the notion that 
+an agent's
+tolerance can never decline below what it needs
+to feel comfortable enough to speak, and
+the unfollow/block propensity $P_u\in\{0.05,0.15\}$,
+giving six parameter cells crossed with the two
+arms above. Each of these $6\times2=12$ conditions
+is simulated with $N=1000$ agents over $40{,}000$
+steps, replicated across $n=15$ independent
+network seeds per condition.
+
+The outcome we compare between arms is the
+posting activity of each 5 camp
+(Section~\ref{sec:model-abm}), restricted to
+non-hub agents, since the hub agents' own opinions
+and activity are exogenously fixed rather than a
+response to be measured.
+Reposts are excluded from this
+count, so that the outcome reflects agents' own
+willingness to voice an opinion rather than their
+willingness to amplify someone else's.
+
+\section{Results}\label{sec:results}
+
+\begin{figure}[t]
+\centering
+\fbox{\parbox[c][6cm]{0.9\linewidth}{\centering
+TODO: heatmap figure --- moderate / near-extreme /
+extreme camp posting-rate difference (M-silent
+minus control), one panel per camp, $P_u$ on one
+axis and $\VCR$ on the other}}
+\caption{Per-camp posting-rate difference
+(M-silent minus control) across the $P_u\times\VCR$
+grid, for the moderate, near-extreme, and extreme
+camps.}
+\label{heatmap}
+\end{figure}
+
+Fig.~\ref{heatmap} shows heatmaps of the difference
+in per-step per-capita posting counts for each of
+the three opinion camps, averaged over steps
+[39000, 40000], comparing \emph{M-silent} against
+\emph{control}.
+Steadily, the moderate camp boosts its posting
+activity when it can perceive aligned-opinion
+hubs' vocality, whereas the near-extreme camp
+shrinks its posting by contrast.
+Compared to these fairly intuitive results, the
+extreme camp does not show a linear result: its
+posting activity is reduced (a negative value in
+the heatmap) when $\VCR$ is relatively low, for
+each $P_u$ row, and it crosses the sign of its
+effect at a different value of $\VCR$ depending on
+the $P_u$ value.
+Equivalently, reversing the contrast from
+\emph{M-silent -- control} to \emph{control --
+M-silent} lets us easily interpret the same difference
+from the complementary perspective of the moderate
+hub's activity rather than its absence. 
+From this point of view, focusing on the presence
+of moderate hubs, under the same propensity to
+prune out-of-tolerance ties ($P_u$), moderate hubs
+facilitate the extreme camp's posting activity
+when agents speak only in the presence of
+sufficient nearby agreement (low $\VCR$), and
+mediate it in the opposite environment.
+
+Also, $P_u$ can be interpreted as a modulator that
+shifts the $\VCR$ cross-sign point, the watershed
+value at which moderate hubs' vocality switches
+between acting as a facilitator or a mediator for
+the extreme camp.
+In the extreme camp result of Fig.~\ref{heatmap},
+the effect size in higher $P_u$ rows stays
+negative across a wider range of low $\VCR$ before
+turning positive at higher $\VCR$, compared with
+lower $P_u$ rows.
+This confirms that $P_u$ governs where this
+regime shift occurs. 
+
+\section{Discussion}\label{sec:discussion}
+Our intuitive results for moderate and near-extreme camps ---
+the former amplified and the latter silenced under moderate hubs 
+vocalization--- 
+show its linearness seemingly because the both camp basically 
+stay inside the reach of moderate hubs. As an agent in our 
+model modulate their posting probability only depending on 
+the extent to which it feel comfortable in its feed, 
+peripheral moderate agents receive more posts from moderate 
+hubs in \emph{control} arm which lead to their higher 
+comfortable feed resulting in larger vocalization. 
+Subsequently, near-extreme camp much frequently encounter 
+moderate-opinion posts when moderate hubs activate, thereby 
+their feeds relatively reduce its critically aligned near-extreme 
+posts which suffcietnly amplify their vocality. 
+This silence effect for near-extreme could happen because 
+posts from moderate hubs is mechanically able to reach their 
+feeds through the networks. 
+
+The regime shift results of the effect for extreme camp 
+seems to be organized above a single mechanistic hypothesis: 
+moderate hubs act as a mediator when extreme camp can 
+be considered to homophilic to near-extreme camp, and 
+act as a facilitator when considered to heterophic to 
+near-extreme camp. 
+First, the watershed depending on two variables appear to 
+indicate this homophily-or-heterophy logic between 
+near-extremes and extremes. 
+
+Let's see results of the column where $\VCR$ is between 
+0.1 and 0.2. This means that the role of moderate hubs 
+whether as a facilitator or a mediator could change 
+in the same $\VCR$ depending on the disconnecting 
+propensity of the population($P_u$). 
+In order to organize this crossing-point, 
+we focus on the distinct effect of $P_u$ and $\VCR$, 
+which govern structural and perceptional homophilic range. 
+First, for $P_u$, in its higher value, social network 
+prone to be segregated, thereby the range to which extreme 
+camp can reach and perceive homophilic 
+in neighbor near-extreme camp 
+shall be structurally limited. 
+Upon this structural layer, for $\VCR$, 
+the range of homophily reach from extremes 
+toward near-extremes is to be larger 
+when $P_u$ is low because of its 
+much many absolute number of connections with them. 
+
+Then, the regime shift in the extremes could be 
+explained by organizing this two layer 
+homophily hypothesis and 
+the moderate hubs' silence effect over near-extremes discussed above. 
+As near-extremes are always silenced under moderate hubs' vocalization, 
+extremes seem to be also silenced when these two camps 
+considered to be homophilic governed by two layer 
+mechanism. 
+On the contrary, when these two camps are not considered 
+to be sufficiently homophilic, 
+the vocality of extrems is amplified under the silence of 
+near-extreme that let extremes be more isolated and purified. 
+More mechanically, because the effect of moderate hubs 
+vocalization here 
+in this model can be considered to replace some amount of 
+posts in agents' feeds with their moderate-opinion posts
+whether through posting or reposting, 
+how far in a social-network-wise the hubs can reach and influence 
+decides their replacement reachability. 
+Interestingly, we find an analogous sign inversion related to 
+moderate hubs effect in a former research~\cite{betts2023}, 
+which indicates 
+that moderate influencer could worsen polarization 
+depending on the influencer's own assimilation tolerance, 
+independently converging on the same qualitative phenomenon 
+regarding moderate hubs. 
+
+\section{Conclusion}\label{sec:conclusion}
+Although the separation by fifth bins with agents' opinions 
+degenerate this continuous ripple-ish effect, this formalization 
+sufficiently gives us the implication of counter-intuitive 
+effect by moderate hubs' vocality. -> as a limitation and 
+hint for further reserach.
+
+\bibliographystyle{spmpsci}
+\bibliography{refs}
+\end{document}

@@ -1,0 +1,15 @@
+# network topology
+topology: "CNNR"          # "ER", "BA", "CNNR"
+
+# network parameters
+network_params:
+  p: 0.3
+  r: 0.01
+
+# simulation parameters
+N: 1000
+mu: 0.5           # stubbornness in social influence
+epsilon_s: 0.5    # opinion prevalence 
+delta_p: 0.1
+delta_bc: 0.01
+opinion_std: 0.6  # standard deviation of initial opinions

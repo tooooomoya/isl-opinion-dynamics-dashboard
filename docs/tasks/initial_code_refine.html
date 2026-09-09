@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Refinement Reference Log — SNAM2026</title>
+<style>
+  body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; background: #f4f6fb; color: #1e2332; line-height: 1.6; }
+  header { background: #16213e; color: #fff; padding: 2rem 2.5rem 1.6rem; }
+  header h1 { margin: 0 0 0.25rem; font-size: 1.75rem; }
+  header p  { margin: 0; opacity: 0.65; font-size: 0.92rem; }
+  header .meta { margin-top: 0.7rem; display: flex; gap: 1.5rem; font-size: 0.82rem; opacity: 0.8; }
+  main { max-width: 1020px; margin: 2rem auto; padding: 0 1.5rem 5rem; }
+
+  /* TOC */
+  .toc { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.09); padding: 1.2rem 1.5rem; margin-bottom: 2rem; }
+  .toc h2 { margin: 0 0 0.8rem; font-size: 0.95rem; color: #555; text-transform: uppercase; letter-spacing: 0.06em; }
+  .toc ol { margin: 0; padding-left: 1.4rem; }
+  .toc li { font-size: 0.88rem; padding: 0.15rem 0; }
+  .toc a { color: #2255aa; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Sections */
+  section { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.09); margin-bottom: 2rem; overflow: hidden; }
+  .sh { display: flex; align-items: center; gap: 0.7rem; padding: 0.85rem 1.4rem; background: #1e3160; color: #fff; }
+  .sh h2 { margin: 0; font-size: 1.05rem; font-weight: 600; flex: 1; }
+  .body { padding: 1.3rem 1.5rem; }
+
+  /* Sub-sections within body */
+  .change { border-left: 3px solid #3a6bc4; margin: 1.2rem 0; padding: 0.5rem 0 0.5rem 1rem; }
+  .change h3 { margin: 0 0 0.3rem; font-size: 0.96rem; color: #1a2a5e; }
+  .change.tweak  { border-left-color: #27ae60; }
+  .change.arch   { border-left-color: #e67e22; }
+  .change.fix    { border-left-color: #c0392b; }
+  .change.defer  { border-left-color: #8e44ad; }
+  .change.output { border-left-color: #2980b9; }
+
+  /* Badges */
+  .badge { font-size: 0.70rem; padding: 0.18rem 0.5rem; border-radius: 12px; font-weight: 700; letter-spacing: 0.04em; white-space: nowrap; }
+  .b-done   { background: #27ae60; color: #fff; }
+  .b-arch   { background: #e67e22; color: #fff; }
+  .b-tweak  { background: #16a085; color: #fff; }
+  .b-fix    { background: #c0392b; color: #fff; }
+  .b-defer  { background: #8e44ad; color: #fff; }
+  .b-nb     { background: #2980b9; color: #fff; }
+
+  /* File tag */
+  .ftag { display: inline-block; font-family: 'Courier New', monospace; font-size: 0.80rem;
+          background: #eef1f7; border: 1px solid #c5cfe0; border-radius: 4px;
+          padding: 0.12rem 0.45rem; margin: 0 0.15rem; }
+
+  /* Code blocks */
+  pre { background: #1b2333; color: #b8c8e0; border-radius: 6px; padding: 0.85rem 1.1rem;
+        font-size: 0.80rem; overflow-x: auto; line-height: 1.55; margin: 0.5rem 0; }
+  code { font-family: 'Courier New', monospace; font-size: 0.88em; }
+  .del { color: #e07070; }
+  .add { color: #7ec87e; }
+  .cmt { color: #7a8fa8; }
+
+  /* Inline note / warning */
+  .note  { background: #fef9ee; border-left: 4px solid #f0ad4e; border-radius: 4px;
+           padding: 0.65rem 1rem; font-size: 0.88rem; margin: 0.7rem 0; }
+  .warn  { background: #fff0f0; border-left: 4px solid #c0392b; border-radius: 4px;
+           padding: 0.65rem 1rem; font-size: 0.88rem; margin: 0.7rem 0; }
+  .note strong, .warn strong { font-weight: 700; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.87rem; margin: 0.6rem 0; }
+  th { background: #eef1f7; text-align: left; padding: 0.45rem 0.8rem; border-bottom: 2px solid #c5cfe0; }
+  td { padding: 0.4rem 0.8rem; border-bottom: 1px solid #e8ecf3; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td code { font-size: 0.82em; }
+
+  p  { margin: 0.3rem 0 0.5rem; font-size: 0.92rem; }
+  ul, ol { padding-left: 1.4rem; margin: 0.3rem 0; }
+  li { font-size: 0.91rem; margin: 0.2rem 0; }
+
+  footer { text-align: center; color: #99aabb; font-size: 0.82rem; padding: 1.5rem; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>SNAM2026 — Code Refinement Reference Log</h1>
+  <p>Complete annotated change log for use as a refactoring reference across similar agent-based simulation projects.</p>
+  <div class="meta">
+    <span>Date: 2026-04-27</span>
+    <span>Base task: <code>docs/tasks/initial_code_refine.md</code></span>
+    <span>Review source: <code>docs/outputs/initial_code_review.html</code></span>
+  </div>
+</header>
+
+<main>
+
+<!-- ==================== TOC ==================== -->
+<div class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#summary">Change summary table</a></li>
+    <li><a href="#const">Const.java — Metrics output registration</a></li>
+    <li><a href="#admin">AdminOptim.java — Graph adjacency list refactor (architecture)</a></li>
+    <li><a href="#agent">Agent.java — Dead code and redundant fields</a></li>
+    <li><a href="#dynamics">OpinionDynamics.java — Per-step logic and correctness fixes</a></li>
+    <li><a href="#writer">Writer.java — Batch CSV output refactor</a></li>
+    <li><a href="#notebooks">Notebooks — Batch CSV reader update</a></li>
+    <li><a href="#defer">Deferred items (flag in future reports)</a></li>
+    <li><a href="#patterns">Patterns extracted — applicable to similar projects</a></li>
+  </ol>
+</div>
+
+<!-- ==================== SUMMARY TABLE ==================== -->
+<section id="summary">
+  <div class="sh"><h2>1 — Change Summary</h2></div>
+  <div class="body">
+    <table>
+      <tr><th>File</th><th>Change type</th><th>What</th><th>Status</th></tr>
+      <tr><td><code>Const.java</code></td><td>Output</td><td>Added <code>shannonIndex</code>, <code>disagreement</code> to <code>RESULT_LIST</code></td><td><span class="badge b-done">DONE</span></td></tr>
+      <tr><td><code>AdminOptim.java</code></td><td>Architecture</td><td>Dense W matrix → <code>Set&lt;Integer&gt;[]</code> adjacency lists; on-demand matrix; O(edges) disagreement; incremental edge update</td><td><span class="badge b-arch">ARCH</span></td></tr>
+      <tr><td><code>Agent.java</code></td><td>Cleanup</td><td>Removed <code>followerNum</code> field, <code>getFollwerNum()</code>, <code>setFollowerNum(W)</code>, <code>decayFunc()</code>, commented-out follow block</td><td><span class="badge b-tweak">TWEAK</span></td></tr>
+      <tr><td><code>OpinionDynamics.java</code></td><td>Perf + correctness</td><td>Per-step W removed; post/repost O(N)→O(degree); AssertionChecker moved out of agent loop; local W5k at checkpoint; <code>flush()</code>; <code>setFollowerNum</code> removed</td><td><span class="badge b-fix">FIX</span></td></tr>
+      <tr><td><code>Writer.java</code></td><td>Output + cleanup</td><td>Batch output (1000 steps/file, StringBuilder); <code>flush()</code>; removed unused <code>feedVar</code>; renamed <code>handleSingleMetric</code>→<code>appendSingleMetric</code></td><td><span class="badge b-done">DONE</span></td></tr>
+      <tr><td><code>result-summary.ipynb</code> cells <code>647b3a69</code>, <code>35601fd5</code></td><td>Notebook</td><td>Updated post/seed loaders for batch CSV (concat + iterrows, no per-step filename parsing)</td><td><span class="badge b-nb">NOTEBOOK</span></td></tr>
+      <tr><td><code>polarization-analysis.ipynb</code> cells <code>35601fd5</code>, <code>05ea30e4</code></td><td>Notebook</td><td>Same pattern applied to seed/opinion loaders</td><td><span class="badge b-nb">NOTEBOOK</span></td></tr>
+      <tr><td>postProb/useProb constants frozen</td><td>Model issue</td><td>MAX=MIN=INITIAL makes adaptive engagement inert — <em>deferred</em></td><td><span class="badge b-defer">DEFER</span></td></tr>
+      <tr><td>Comfort threshold uses static MINIMUM_BC</td><td>Model issue</td><td>Should use dynamic <code>this.bc</code> — <em>deferred</em></td><td><span class="badge b-defer">DEFER</span></td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- ==================== CONST ==================== -->
+<section id="const">
+  <div class="sh"><h2>2 — Const.java <span class="badge b-done" style="margin-left:.5rem">DONE</span></h2></div>
+  <div class="body">
+    <div class="change output">
+      <h3>Added shannonIndex and disagreement to RESULT_LIST</h3>
+      <p>
+        Both metrics were already computed (<code>analyzer.computeShannonWienerIndex()</code>
+        and what was then <code>analyzer.computeDisagreement()</code>) and passed to
+        <code>Writer</code> via setters.  However, because neither key appeared in
+        <code>RESULT_LIST</code>, <code>Writer.write()</code>'s loop never reached their
+        <code>switch</code> cases and they were silently omitted from CSV output.
+      </p>
+      <p><strong>Fix:</strong> Insert both keys after <code>"opinionAvg"</code>:</p>
+      <pre><code><span class="del">- "opinionAvg", "feedPostOpinionMean_0", ...</span>
+<span class="add">+ "opinionAvg", "shannonIndex", "disagreement", "feedPostOpinionMean_0", ...</span></code></pre>
+      <p>
+        No other files needed changing because the Writer's <code>appendSingleMetric()</code>
+        switch already handled these two cases.
+      </p>
+      <div class="note"><strong>Reference pattern:</strong> When adding a new metric to a similar
+      simulation, the minimum change is (a) register in <code>RESULT_LIST</code>, (b) add a setter
+      in Writer, (c) add a switch case in the metric handler.  All three must be present or the
+      metric silently disappears.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== ADMIN ==================== -->
+<section id="admin">
+  <div class="sh"><h2>3 — AdminOptim.java <span class="badge b-arch" style="margin-left:.5rem">ARCHITECTURE</span></h2></div>
+  <div class="body">
+
+    <div class="change arch">
+      <h3>3.1 — Replace dense double[N][N] with Set&lt;Integer&gt;[] adjacency lists</h3>
+      <p>
+        <strong>Before:</strong> <code>AdminOptim</code> held a <code>double[][] W</code>
+        field (1000×1000 = 1M cells).  Every follower lookup required scanning an entire
+        row or column, i.e. O(N) per query.
+      </p>
+      <p>
+        <strong>After:</strong> Two <code>HashSet&lt;Integer&gt;[]</code> arrays —
+        <code>followees[i]</code> (agents i follows) and <code>followers[j]</code>
+        (agents that follow j).  Both are built once in the constructor from the initial W
+        in O(N²) (one-time cost), then updated incrementally.
+      </p>
+      <p>
+        The field <code>private int[] followerNumArray</code> is kept as a cached in-degree
+        count used by the follower ranking and manipulation-target logic.
+        It is updated synchronously in <code>updateAdjacencyMatrix()</code>.
+      </p>
+      <p>
+        <strong>Declaration requires</strong> <code>@SuppressWarnings("unchecked")</code>
+        on the constructor because Java cannot create generic arrays directly:
+      </p>
+      <pre><code><span class="cmt">// in constructor</span>
+@SuppressWarnings("unchecked")
+this.followees = new HashSet[n];
+this.followers = new HashSet[n];</code></pre>
+    </div>
+
+    <div class="change arch">
+      <h3>3.2 — getAdjacencyMatrix() becomes on-demand only</h3>
+      <p>
+        A <code>getAdjacencyMatrix()</code> method is kept but is now a generator — it
+        rebuilds <code>double[n][n]</code> from the adjacency sets each time it is called.
+        This is intentional: the method is only invoked at 5000-step checkpoints for GEXF
+        export and degree/clustering writes, so paying the O(N²) rebuild cost 8 times per
+        40 000-step run is acceptable.
+      </p>
+      <pre><code>public double[][] getAdjacencyMatrix() {
+    double[][] matrix = new double[n][n];
+    for (int i = 0; i &lt; n; i++)
+        for (int j : followees[i])
+            matrix[i][j] = 1.0;
+    return matrix;
+}</code></pre>
+    </div>
+
+    <div class="change arch">
+      <h3>3.3 — New getFollowers() and getFollowees() accessors</h3>
+      <p>
+        <code>public Set&lt;Integer&gt; getFollowers(int userId)</code> and
+        <code>getFollowees(int userId)</code> return the live set directly (no copy).
+        Callers iterate these sets for post/repost distribution — O(degree) rather than O(N).
+      </p>
+      <div class="warn"><strong>Mutation risk:</strong> The sets are returned by reference.
+      Callers must not modify them during iteration.  In the current codebase this is safe
+      because distribution loops only read; <code>updateAdjacencyMatrix()</code> is the
+      sole writer and is called after the per-agent inner block.</div>
+    </div>
+
+    <div class="change arch">
+      <h3>3.4 — updateAdjacencyMatrix() becomes O(1) incremental</h3>
+      <p>
+        Three conditional branches handle: (a) new follow [<code>followedIds[0]</code>],
+        (b) displaced follow when capacity exceeded [<code>followedIds[1]</code>],
+        (c) unfollow [<code>unfollowedId</code>].  Each branch does a constant-time
+        <code>Set.add()</code> or <code>Set.remove()</code> on both <code>followees</code>
+        and <code>followers</code>, plus an increment or decrement of
+        <code>followerNumArray</code>.
+      </p>
+      <p>
+        <strong>Java integer autoboxing note:</strong> <code>Set&lt;Integer&gt;.remove(int)</code>
+        autoboxes the <code>int</code> to <code>Integer</code> and calls
+        <code>remove(Object)</code> — correct behaviour, no explicit cast needed.
+      </p>
+    </div>
+
+    <div class="change arch">
+      <h3>3.5 — computeDisagreement() moved from Analysis to AdminOptim</h3>
+      <p>
+        The prior <code>Analysis.computeDisagreement(agentSet, W)</code> accepted the full
+        matrix and iterated N² cells.  The new <code>AdminOptim.computeDisagreement(agentSet)</code>
+        iterates only directed edges in <code>followees</code>:
+      </p>
+      <pre><code>double sum = 0.0; int edgeCount = 0;
+for (int i = 0; i &lt; n; i++)
+    for (int j : followees[i]) {
+        double diff = agentSet[i].getOpinion() - agentSet[j].getOpinion();
+        sum += diff * diff; edgeCount++;
+    }
+return edgeCount &gt; 0 ? sum / edgeCount : 0.0;</code></pre>
+      <p>
+        Moving it to <code>AdminOptim</code> is the right ownership since only Admin has
+        access to the adjacency sets.  The call in <code>OpinionDynamics</code> was updated
+        from <code>analyzer.computeDisagreement(agentSet, W)</code> to
+        <code>admin.computeDisagreement(agentSet)</code>.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>3.6 — Removed setW() method</h3>
+      <p>
+        <code>setW(double[][] W)</code> was a setter for the old matrix field.  It had no
+        callers after the refactor and was removed with no other side effects.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== AGENT ==================== -->
+<section id="agent">
+  <div class="sh"><h2>4 — Agent.java <span class="badge b-tweak" style="margin-left:.5rem">CLEANUP</span></h2></div>
+  <div class="body">
+
+    <div class="change tweak">
+      <h3>4.1 — Removed followerNum field and its getter/setter</h3>
+      <p>
+        <code>private int followerNum</code> was a per-agent cached in-degree count.
+        It was set by <code>setFollowerNum(double[][] W)</code> which looped over
+        the entire column W[*][agentId] — an O(N) scan — called once per agent per step
+        from inside the agent loop, giving O(N²) total per step.
+      </p>
+      <p>
+        This duplicated <code>AdminOptim.followerNumArray[i]</code> which is maintained
+        incrementally.  Removing the field and its setter/getter eliminates the O(N²)
+        per-step column scan entirely.
+      </p>
+      <p>Removed symbols:</p>
+      <ul>
+        <li><code>private int followerNum;</code></li>
+        <li><code>public int getFollwerNum()</code> (note: misspelled in original)</li>
+        <li><code>public void setFollowerNum(double[][] W)</code></li>
+      </ul>
+    </div>
+
+    <div class="change tweak">
+      <h3>4.2 — Removed commented-out follow() block</h3>
+      <p>
+        A large <code>/*public int follow() { ... }*/</code> block — a previous version of
+        the follow algorithm — had been retained across multiple refactor iterations inside
+        a multi-line comment.  No references existed.  Removed.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>4.3 — Removed decayFunc()</h3>
+      <p>
+        <code>private double decayFunc(double time)</code> returned
+        <code>Math.exp(-lambda * time)</code> where <code>lambda</code> was a local
+        variable always initialised to 0.  The function therefore always returned 1.0.
+        All callers had already been commented out in earlier refactors.  Removed.
+      </p>
+      <div class="note"><strong>Pattern:</strong> When a decay/schedule function's parameter
+      is zero or its callers are all commented out, remove the function rather than leaving it
+      as documentation — it implies the feature is active when it is not.</div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== DYNAMICS ==================== -->
+<section id="dynamics">
+  <div class="sh"><h2>5 — OpinionDynamics.java <span class="badge b-fix" style="margin-left:.5rem">PERF + CORRECTNESS</span></h2></div>
+  <div class="body">
+
+    <div class="change fix">
+      <h3>5.1 — Per-step W matrix materialisation removed</h3>
+      <p>
+        <code>double[][] W = admin.getAdjacencyMatrix();</code> appeared at the top of
+        the per-step loop.  This allocated a 1000×1000 double array on every step (40 000
+        times per run), and every post/repost distribution scanned a full column of it.
+        This line is deleted entirely.
+      </p>
+    </div>
+
+    <div class="change fix">
+      <h3>5.2 — Post distribution: O(N) scan → O(degree) iteration</h3>
+      <pre><code><span class="del">// BEFORE: scan all N agents</span>
+<span class="del">for (Agent otherAgent : agentSet) {</span>
+<span class="del">    if (W[otherAgent.getId()][agentId] &gt; 0.00)</span>
+<span class="del">        otherAgent.addToPostCash(post);</span>
+<span class="del">}</span>
+
+<span class="add">// AFTER: iterate only actual followers</span>
+<span class="add">for (int followerId : admin.getFollowers(agentId)) {</span>
+<span class="add">    agentSet[followerId].addToPostCash(post);</span>
+<span class="add">}</span></code></pre>
+      <p>Applied identically to both post creation and repost distribution.</p>
+    </div>
+
+    <div class="change fix">
+      <h3>5.3 — AssertionChecker moved outside the agent loop</h3>
+      <p>
+        <strong>Bug:</strong> <code>ASChecker.assertionChecker(agentSet, admin, agentNum, step)</code>
+        was called inside the per-agent loop, after each individual agent updated.  This means
+        it ran N = 1000 times per step and validated global invariants against a partially-updated
+        state (the remaining agents in the shuffled list had not yet acted).  This is both
+        semantically incorrect (step-level invariant should be checked once after all agents
+        have acted) and wasteful (999 redundant checks per step).
+      </p>
+      <pre><code><span class="del">// BEFORE: inside agent loop</span>
+<span class="del">agent.resetFeed();</span>
+<span class="del">ASChecker.assertionChecker(agentSet, admin, agentNum, step);</span>
+<span class="del">    if (followedIds[0] &gt;= 0) { followActionNum++; }  // misindented</span>
+
+<span class="add">// AFTER: inside agent loop, clean</span>
+<span class="add">agent.resetFeed();</span>
+<span class="add">if (followedIds[0] &gt;= 0) { followActionNum++; }</span>
+<span class="add">if (unfollowedId &gt;= 0) { unfollowActionNum++; }</span>
+<span class="add">}  // end agent loop</span>
+<span class="add">ASChecker.assertionChecker(agentSet, admin, agentNum, step); // once per step</span></code></pre>
+      <div class="note"><strong>Indentation fix:</strong> The <code>followActionNum++</code>
+      and <code>unfollowActionNum++</code> blocks had inconsistent indentation in the original
+      (one was indented under <code>assertionChecker</code>, the other was not) — both are now
+      correctly inside the agent loop at the same indent level.</div>
+    </div>
+
+    <div class="change fix">
+      <h3>5.4 — 5000-step checkpoint uses locally-scoped W5k</h3>
+      <p>
+        GEXF export, degree CSV, and clustering computation still require a dense matrix.
+        Rather than keeping W alive for the whole step, a local variable is generated only
+        when needed:
+      </p>
+      <pre><code>if (step % 5000 == 0) {
+    double[][] W5k = admin.getAdjacencyMatrix(); <span class="cmt">// local, discarded after block</span>
+    network.setAdjacencyMatrix(W5k);
+    gephi.updateGraph(agentSet, network);
+    gephi.exportGraph(step, folerPath);
+    ...
+    writer.writeDegrees(W5k, folerPath);
+    writer.writeClusteringCoefficients(
+        analyzer.computeClusteringCoefficients(W5k), folerPath);
+}</code></pre>
+    </div>
+
+    <div class="change fix">
+      <h3>5.5 — writer.flush() after simulation loop</h3>
+      <p>
+        Without this call, the final partial batch in <code>Writer</code>'s StringBuilder
+        buffers is silently discarded when the JVM exits.  Added immediately after the
+        closing brace of the <code>for (int step = 1; step &lt;= t; step++)</code> loop.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>5.6 — setFollowerInfo() cleaned</h3>
+      <p>
+        <code>agent.setFollowerNum(tempAdjacencyMatrix)</code> removed from
+        <code>setFollowerInfo()</code>.  Only <code>agent.setFollowList(tempAdjacencyMatrix)</code>
+        is kept (this initialises the agent's own boolean follow-list which is still needed for
+        the follow/unfollow logic in <code>Agent.java</code>).
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>5.7 — agent.setFollowerNum(W) removed from inner agent loop</h3>
+      <p>
+        This call appeared at the top of the per-agent block inside the shuffled-agent loop.
+        It was the sole consumer of the removed field.  Deleted.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== WRITER ==================== -->
+<section id="writer">
+  <div class="sh"><h2>6 — Writer.java <span class="badge b-done" style="margin-left:.5rem">BATCH OUTPUT REFACTOR</span></h2></div>
+  <div class="body">
+
+    <div class="change arch">
+      <h3>6.1 — Accumulate-and-flush batch architecture</h3>
+      <p>
+        <strong>Before:</strong> <code>write()</code> opened a <code>PrintWriter</code>,
+        wrote header + one row, and closed the file — once per step.  40 000 steps × 3
+        output types = 120 000 file open/close operations per run.
+      </p>
+      <p>
+        <strong>After:</strong> Three <code>StringBuilder</code> fields
+        (<code>metricsBuf</code>, <code>postsBuf</code>, <code>opinionBuf</code>) accumulate
+        rows.  On first row of each batch the header is prepended to the buffer.  When
+        <code>simulationStep - batchStartStep + 1 &gt;= BATCH_SIZE (1000)</code>,
+        <code>flushBatch()</code> is called automatically.
+      </p>
+      <p>New fields:</p>
+      <pre><code>private static final int BATCH_SIZE = 1000;
+private int batchStartStep = 0;
+private StringBuilder metricsBuf  = new StringBuilder();
+private StringBuilder postsBuf    = new StringBuilder();
+private StringBuilder opinionBuf  = new StringBuilder();</code></pre>
+    </div>
+
+    <div class="change arch">
+      <h3>6.2 — flushBatch() private method</h3>
+      <p>
+        Writes each buffer to a file, resets buffer length to 0 (via
+        <code>StringBuilder.setLength(0)</code>), and advances <code>batchStartStep</code>.
+        File naming convention:
+      </p>
+      <pre><code>metrics/result_{batchStart}_{batchEnd}.csv
+posts/post_result_{batchStart}_{batchEnd}.csv
+opinion/opinion_result_{batchStart}_{batchEnd}.csv</code></pre>
+      <p>
+        The actual write is delegated to <code>private void writeBuffer(StringBuilder buf, String filePath)</code>
+        which wraps a <code>PrintWriter(new FileWriter(path, false))</code> in a try-with-resources.
+      </p>
+    </div>
+
+    <div class="change arch">
+      <h3>6.3 — flush() public method</h3>
+      <p>
+        Handles end-of-simulation partial batch (e.g. steps 39 000–39 999 would flush
+        naturally; steps 40 000 alone would not unless <code>flush()</code> is called).
+        Guard: only calls <code>flushBatch()</code> if <code>metricsBuf.length() &gt; 0</code>.
+      </p>
+      <p>Called from <code>OpinionDynamics.evolve()</code> after the main loop.</p>
+    </div>
+
+    <div class="change tweak">
+      <h3>6.4 — Removed unused feedVar scalar field</h3>
+      <p>
+        <code>private double feedVar</code> was initialised to -1 in the constructor and
+        had a <code>setFeedVar(double value)</code> setter, but the setter was never called
+        from <code>OpinionDynamics</code>.  The <code>"feedVar"</code> key was absent from
+        <code>RESULT_LIST</code>, so even the <code>switch</code> case for it in
+        <code>handleSingleMetric</code> was dead code.  All three removed together.
+      </p>
+      <p>
+        Note: <code>feedVarArray</code> (per-bin variance) is different and was kept —
+        it is actively set and written via the <code>"feedPostOpinionVar_N"</code> keys.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>6.5 — handleSingleMetric renamed to appendSingleMetric</h3>
+      <p>
+        The old name suggested the method handled (i.e. wrote) a metric.  The new name
+        reflects what it actually does: appends a formatted value to a <code>StringBuilder</code>
+        passed as an argument.  Signature unchanged; purely a naming correction.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>6.6 — Switch expressions preserved (Java 14+ arrow syntax)</h3>
+      <p>
+        The existing <code>switch (key) { case "x" -&gt; { sb.append(...); return true; } }</code>
+        pattern was kept as-is.  No changes to the switch body other than removal of the
+        <code>"feedVar"</code> case.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== NOTEBOOKS ==================== -->
+<section id="notebooks">
+  <div class="sh"><h2>7 — Notebooks <span class="badge b-nb" style="margin-left:.5rem">BATCH CSV READER</span></h2></div>
+  <div class="body">
+
+    <div class="change output">
+      <h3>7.1 — General pattern: step_file_map → concat + iterrows</h3>
+      <p>
+        All affected loaders previously used a two-phase approach:
+      </p>
+      <ol>
+        <li>Regex-extract the step number from a single-step filename
+            (<code>post_result_123.csv</code>), build a <code>step_file_map</code> dict.</li>
+        <li>Iterate sorted steps, open one file per step, take <code>df.iloc[0]</code>
+            (the single data row).</li>
+      </ol>
+      <p>New pattern:</p>
+      <ol>
+        <li>Read all <code>post_result_*.csv</code> files (glob matches both legacy
+            single-step and new batch filenames).</li>
+        <li>Concat all DataFrames, sort by <code>"step"</code> column.</li>
+        <li>Apply <code>MAX_INDEX</code> filter on the unified DataFrame (simpler than
+            filtering filenames by step range).</li>
+        <li>Iterate rows with <code>for _, row in all_df.iterrows()</code>.</li>
+      </ol>
+      <p>
+        Backward compatibility: the glob <code>post_result_*.csv</code> matches both
+        <code>post_result_123.csv</code> (old) and <code>post_result_0_999.csv</code> (new),
+        so existing results directories continue to work without renaming.
+      </p>
+    </div>
+
+    <table>
+      <tr><th>Notebook</th><th>Cell ID</th><th>Function</th><th>Key change</th></tr>
+      <tr>
+        <td>result-summary.ipynb</td><td><code>647b3a69</code></td>
+        <td><code>load_post_data_all_steps()</code></td>
+        <td>Full rewrite: no per-step file map; concat all batch files; return sorted
+            DataFrame with <code>["step"] + BINS</code> columns only.</td>
+      </tr>
+      <tr>
+        <td>result-summary.ipynb</td><td><code>35601fd5</code></td>
+        <td><code>load_and_process_seed()</code></td>
+        <td>Same concat+iterrows pattern; also removed old sorted step loop and
+            <code>step_file_map</code> dict.</td>
+      </tr>
+      <tr>
+        <td>polarization-analysis.ipynb</td><td><code>35601fd5</code></td>
+        <td><code>load_and_process_seed()</code></td>
+        <td>Identical to the result-summary.ipynb version (cell shares same ID across both
+            notebooks — they were originally copy-pasted).</td>
+      </tr>
+      <tr>
+        <td>polarization-analysis.ipynb</td><td><code>05ea30e4</code></td>
+        <td><code>load_and_process_opinion_seed()</code></td>
+        <td>Same pattern on <code>opinion_result_*.csv</code>.  No structural logic change —
+            only the file-reading loop was replaced.  All plotting and aggregation code in
+            the same cell preserved verbatim.</td>
+      </tr>
+    </table>
+
+    <div class="change tweak">
+      <h3>7.2 — MAX_INDEX filter moved to post-concat</h3>
+      <p>
+        Old code filtered filenames by step before reading (<code>sorted_steps = [s for s in
+        sorted_steps if s &lt;= MAX_INDEX]</code>).  New code reads all files first, then
+        filters the unified DataFrame: <code>all_df = all_df[all_df["step"] &lt;= MAX_INDEX]</code>.
+        This is necessary because a batch file named <code>post_result_0_999.csv</code>
+        cannot be excluded based on the start-step alone.
+      </p>
+    </div>
+
+    <div class="change tweak">
+      <h3>7.3 — Also updated load_post_data_all_steps in result-summary.ipynb (cell 647b3a69)</h3>
+      <p>
+        This is a separate helper used by <code>process_experiment_data_timeseries()</code>
+        (the full pipeline function in result-summary.ipynb).  It uses a simpler form of the
+        same pattern — no smoothing, just concat and return the raw step/bin DataFrame.
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== DEFER ==================== -->
+<section id="defer">
+  <div class="sh"><h2>8 — Deferred items <span class="badge b-defer" style="margin-left:.5rem">FLAG IN ALL FUTURE REPORTS</span></h2></div>
+  <div class="body">
+    <div class="note">These issues were identified and documented but intentionally left
+    unchanged.  They must be flagged in any future simulation report or parameter
+    sensitivity analysis.</div>
+
+    <div class="change defer">
+      <h3>8.1 — postProb and useProb dynamics are numerically inert</h3>
+      <p>In <code>Const.java</code>:</p>
+      <pre><code>public static final double INITIAL_PU = 0.0025;
+public static final double MAX_PU = INITIAL_PU;   <span class="cmt">// = 0.0025</span>
+public static final double MIN_PU = INITIAL_PU;   <span class="cmt">// = 0.0025</span></code></pre>
+      <p>
+        Because <code>MAX_PU == MIN_PU == INITIAL_PU</code>, the clamp in
+        <code>Agent.updateMyself()</code>:
+      </p>
+      <pre><code>this.useProb = Math.max(Const.MIN_PU, Math.min(this.useProb, Const.MAX_PU));</code></pre>
+      <p>
+        …pins <code>useProb</code> to exactly 0.0025 regardless of the multiplicative
+        updates (<code>*= 1.1</code> / <code>*= 0.9</code>) that precede it.  The adaptive
+        engagement mechanism is mathematically modelled but has zero effect on simulation
+        outcomes.
+      </p>
+      <p>
+        <code>postProb</code> has slightly more room (<code>MIN_PP=0.05</code>,
+        <code>MAX_PP=1.0</code>), but <code>POST_COST = 0.0</code> removes the cost
+        penalty, leaving only the comfort-rate multiplier active.
+      </p>
+      <p>
+        <strong>Impact for reports:</strong> Any claim that "platform engagement adapts to
+        echo-chamber exposure" is numerically unsupported by the current parameter settings.
+      </p>
+    </div>
+
+    <div class="change defer">
+      <h3>8.2 — Comfort threshold is the static floor MINIMUM_BC, not dynamic bc</h3>
+      <p>In <code>Agent.updateMyself()</code>:</p>
+      <pre><code>if (Math.abs(post.getPostOpinion() - this.opinion) &lt; <span class="del">Const.MINIMUM_BC</span>) {</code></pre>
+      <p>
+        The intent is to count posts within the agent's current bounded-confidence window.
+        However, this uses the global constant <code>MINIMUM_BC = 0.2</code> instead of
+        <code>this.bc</code>, which can decay via <code>bc *= BC_DEC_RATE</code> per
+        discomfort event.
+      </p>
+      <p>
+        Additionally, the bc clamp on line 313 reads:
+      </p>
+      <pre><code>this.bc = Math.max(this.bc, Math.min(Const.MINIMUM_BC, 1.0));</code></pre>
+      <p>
+        Since <code>Math.min(0.2, 1.0) = 0.2</code> always, this is equivalent to
+        <code>this.bc = Math.max(this.bc, 0.2)</code> — which enforces the floor but
+        never raises bc (there is no ceiling clamp).  The asymmetry means bc only
+        decreases (or stays at floor).
+      </p>
+      <p>
+        <strong>Net effect:</strong> Comfort rate is computed against a fixed
+        0.2-width window while the opinion update uses a potentially narrower window.
+        The comfort signal systematically over-counts comfortable posts for agents with
+        bc &lt; 0.2 (which should be impossible given the floor, but structurally the
+        two quantities are decoupled).
+      </p>
+    </div>
+
+  </div>
+</section>
+
+<!-- ==================== PATTERNS ==================== -->
+<section id="patterns">
+  <div class="sh"><h2>9 — Reusable patterns for similar ABM projects</h2></div>
+  <div class="body">
+
+    <div class="change">
+      <h3>P1 — Graph adjacency list vs dense matrix</h3>
+      <ul>
+        <li>Use <code>Set&lt;Integer&gt;[]</code> (<code>HashSet</code>) for runtime follow/unfollow,
+            post distribution, and edge-based metric computation.</li>
+        <li>Keep <code>getAdjacencyMatrix()</code> as an on-demand generator for export-only operations.</li>
+        <li>Cache in-degree counts separately if ranking is needed (O(1) read vs O(degree) set-size call).</li>
+        <li>Incremental updates: <code>Set.add()</code>/<code>Set.remove()</code> on both
+            followees and followers in one method — never update one without the other.</li>
+      </ul>
+    </div>
+
+    <div class="change">
+      <h3>P2 — Post-loop assertion checking</h3>
+      <ul>
+        <li>Step-level invariant checks belong after the full agent loop, not inside it.</li>
+        <li>Inside the loop = O(N) redundant checks against partially-updated state.</li>
+        <li>Outside the loop = single check against the fully-committed step state.</li>
+      </ul>
+    </div>
+
+    <div class="change">
+      <h3>P3 — Batch CSV output with StringBuilder</h3>
+      <ul>
+        <li>Accumulate rows in StringBuilder fields; flush every N steps.</li>
+        <li>Always expose a public <code>flush()</code> for end-of-simulation partial batches.</li>
+        <li>Headers are written once per batch (check <code>buf.length() == 0</code>).</li>
+        <li>File naming: <code>result_{batchStart}_{batchEnd}.csv</code> makes both
+            the range and ordering obvious without a manifest file.</li>
+        <li>Keep <code>writeBuffer(StringBuilder, String)</code> as a private utility so
+            all three output types (metrics, posts, opinion) share one I/O path.</li>
+      </ul>
+    </div>
+
+    <div class="change">
+      <h3>P4 — Notebook batch CSV reader</h3>
+      <ul>
+        <li>Glob pattern <code>result_*.csv</code> matches both old single-step names and
+            new batch names — backward compatible.</li>
+        <li>Concat all files first, then filter by step — do not try to filter files by
+            name when files cover ranges.</li>
+        <li>Replace per-file <code>pd.read_csv</code> + <code>iloc[0]</code> with
+            concat + <code>iterrows()</code> when moving to multi-row files.</li>
+      </ul>
+    </div>
+
+    <div class="change">
+      <h3>P5 — Metric registration checklist</h3>
+      <p>Three locations must all be updated when adding a new scalar metric:</p>
+      <ol>
+        <li>Add key to <code>RESULT_LIST</code> in <code>Const.java</code></li>
+        <li>Add <code>setXxx()</code> setter in <code>Writer</code></li>
+        <li>Add <code>case "xxx" -&gt; { ... return true; }</code> in <code>appendSingleMetric()</code></li>
+      </ol>
+      <p>Missing any one of these causes the metric to be silently absent from CSV output.</p>
+    </div>
+
+    <div class="change">
+      <h3>P6 — Dead code indicators</h3>
+      <ul>
+        <li>A helper whose lambda / exponent parameter is always 0 → always returns 1 → dead.</li>
+        <li>A setter that is never called from outside the class → field is effectively read-only at init value.</li>
+        <li>A field duplicated in another class with a more efficient maintenance strategy → remove the duplicate.</li>
+        <li>A commented-out block retained across multiple refactor iterations → remove it; history is in git.</li>
+      </ul>
+    </div>
+
+  </div>
+</section>
+
+</main>
+<footer>SNAM2026 &middot; Code Refinement Reference Log &middot; 2026-04-27</footer>
+</body>
+</html>

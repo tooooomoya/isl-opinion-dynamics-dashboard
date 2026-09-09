@@ -1,0 +1,74 @@
+{
+  // pdflatex version
+  
+  // ---------- 言語ごとのエディタ設定 ----------
+  "[tex]": {
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.tabSize": 2
+  },
+  "[latex]": {
+    "editor.suggest.snippetsPreventQuickSuggestions": false,
+    "editor.tabSize": 2
+  },
+  "[bibtex]": {
+    "editor.tabSize": 2
+  },
+
+  // ---------- LaTeX Workshop の設定 ----------
+  "latex-workshop.intellisense.package.enabled": true,
+  "latex-workshop.latex.outDir": "out",
+
+  "latex-workshop.latex.clean.fileTypes": [
+    "*.aux", "*.bbl", "*.blg", "*.idx", "*.ind", "*.lof", "*.lot", "*.out",
+    "*.toc", "*.acn", "*.acr", "*.alg", "*.glg", "*.glo", "*.gls", "*.ist",
+    "*.fls", "*.log", "*.fdb_latexmk", "*.snm", "*.nav", "*.synctex.gz"
+  ],
+
+  // ビルドレシピの定義
+  "latex-workshop.latex.recipes": [
+    {
+      "name": "latexmk (pdflatex)",
+      "tools": ["latexmk"]
+    },
+    {
+      "name": "pdflatex x2 + bibtex",
+      "tools": ["pdflatex", "bibtex", "pdflatex", "pdflatex"]
+    }
+  ],
+
+  // 各ビルドツールの定義
+  "latex-workshop.latex.tools": [
+    {
+      "name": "latexmk",
+      "command": "/Library/TeX/texbin/latexmk",
+      "args": [
+        "-pdf",
+        "--shell-escape",
+        "-f",
+        "-silent",
+        "-outdir=out",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "pdflatex",
+      "command": "/Library/TeX/texbin/pdflatex",
+      "args": [
+        "-synctex=1",
+        "-interaction=nonstopmode",
+        "-file-line-error",
+        "-output-directory=out",
+        "%DOC%"
+      ]
+    },
+    {
+      "name": "bibtex",
+      "command": "/Library/TeX/texbin/bibtex",
+      "args": [
+        "out/%DOCFILE%"
+      ]
+    }
+  ],
+  // ---------- chktex パス ----------
+  "latex-workshop.linter.chktex.path": "/Library/TeX/texbin/chktex"
+}

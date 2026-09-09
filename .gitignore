@@ -1,0 +1,17 @@
+results/
+bin/
+.DS_Store
+venv/
+logs/
+*.log
+*.png
+*.gif
+node_modules/
+.javafiles.txt
+__pycache__/
+docs/reference/
+dashboard/color_presets.local.json
+
+# raw per-run experiment output (BO evaluations, CCDF/topk dumps, ...) - disposable/regeneratable
+# from seed+params; commit the .md report with the written-up conclusions, not the raw CSV.
+docs/report/*.csv
