@@ -38,8 +38,8 @@ Maintain a running record of research progress and design-policy changes in `doc
 - If a run that's normally ~90-180s (single seed, n=1000/steps=20000) takes 5x+ longer with no code change, don't just shrug it off as noise — check `du -sh results/`, disk I/O, and memory pressure first. A bloated `results/` directory or over-subscribed concurrency is a more likely explanation than the simulation itself getting slower, and is usually fixable by cleaning up rather than waiting it out.
 
 ## Project scope
-- Active work extends `docs/wssit2026-TomoyaTakeda.tex` (moderate-influencer / repost-hub role in opinion polarization).
-- `docs/journal.tex` (Structural Backfire Effect, single-hub gradual shift) is a **separate** paper using the same model — out of scope unless explicitly stated.
+- This repo was forked from `Dev-ComplexNetworks2026` (imported at commit `7354d91`, see git log) to expand the model with a **recommendation/feed-ranking algorithm governing agents' feeds** — a new research direction, separate from the CNA2026 moderate-influencer/repost-hub paper.
+- `docs/wssit2026-TomoyaTakeda.tex`, `docs/journal.tex`, and `docs/research-direction.md` (the Type 1/Type 2 polarization frame, Complex Networks 2026 timeline) describe the **prior** paper's scope inherited from the fork — out of scope here unless explicitly stated. Treat them as historical background on the base model, not this repo's objective.
 
 ## North star (read first)
-- **`docs/research-direction.md` is the canonical research objective** — the Type 1 / Type 2 polarization frame, the "moderate conduit produces Type-2 affective polarization" goal, the code-grounded reality of the model, required model changes, and the **Complex Networks 2026** timeline (sim ~mid-July 2026, first draft ~end-July 2026). **Read it at the start of work on this paper** and keep it updated as direction evolves.
+- **TBD** — this repo has no research-direction doc yet for the recommendation-algo-in-feed work. Before non-trivial design work, write one (e.g. `docs/research-direction.md`, replacing the inherited one) capturing: what "recommendation algorithm in the feed" concretely means in this model (ranking/filtering of which posts an agent sees, by whom, on what signal), what outcome it's meant to produce or explain, and the target venue/timeline once set.
