@@ -5,6 +5,7 @@ import math
 import random
 import threading
 import warnings
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from . import core
 from .core import result_dir, rnd, decimate
@@ -19,18 +20,92 @@ GRAPH_LOCK = threading.Lock()
 # exclusion (~5-11% of actively-tweeting users, not force-assigned to a camp).
 NEUTRAL_BAND_HALF_WIDTH = 0.2
 
+_GEXF_ATTR_CASTERS = {
+    "double": float, "float": float, "integer": int, "int": int, "long": int,
+    "boolean": lambda v: v.lower() == "true",
+}
+
+
+def _read_gexf(path) -> "networkx.Graph":
+    """Standalone GEXF reader, standing in for networkx.read_gexf().
+
+    2026-09-22: networkx (any version through at least 3.3) only recognizes the
+    "1.1draft"/"1.2draft" GEXF namespaces (http://www.gexf.net/1.Xdraft) -- see
+    networkx.readwrite.gexf's hardcoded `versions` dict. This project's bundled
+    Gephi Toolkit (lib/gephi/gephi-toolkit-0.10.0-all.jar, used by
+    gephi.GraphVisualize/RepostVisualize) writes the modern GEXF "1.3" namespace
+    (http://gexf.net/1.3, no "www."/"draft"), which nx.read_gexf silently fails
+    on ("No <graph> element in GEXF file") since it looks for the wrong
+    namespace URI entirely -- this is a hard incompatibility, not a malformed
+    file (xmllint validates it fine), and it has apparently affected every
+    GEXF-backed panel (Network Snapshot/Structure/Behavior) on any environment
+    that installed networkx fresh via requirements.txt's unpinned `networkx`.
+    Namespace is auto-detected from the root element rather than hardcoded, so
+    this also still reads any older 1.2draft-namespaced GEXF that might exist
+    in archived results/. Ported from the same namespace-aware
+    attribute/node/edge walk gephi.GephiReader.java already uses Java-side for
+    this identical format.
+    """
+    import networkx as nx
+    root = ET.parse(path).getroot()
+    ns = root.tag.split("}")[0] + "}" if root.tag.startswith("{") else ""
+    graph_el = root.find(f"{ns}graph")
+    if graph_el is None:
+        raise ValueError(f"no <graph> element in {path}")
+    G = nx.Graph() if graph_el.get("defaultedgetype") == "undirected" else nx.DiGraph()
+
+    # attribute id -> (title, python caster), separately for node/edge attribute classes
+    attr_defs = {"node": {}, "edge": {}}
+    for attrs_el in graph_el.findall(f"{ns}attributes"):
+        cls = attrs_el.get("class", "node")
+        for a in attrs_el.findall(f"{ns}attribute"):
+            attr_defs.setdefault(cls, {})[a.get("id")] = (
+                a.get("title", a.get("id")), _GEXF_ATTR_CASTERS.get(a.get("type"), str))
+
+    def read_attvalues(el, cls):
+        data = {}
+        av_parent = el.find(f"{ns}attvalues")
+        if av_parent is None:
+            return data
+        for av in av_parent.findall(f"{ns}attvalue"):
+            title, caster = attr_defs[cls].get(av.get("for"), (av.get("for"), str))
+            raw = av.get("value")
+            try:
+                data[title] = caster(raw)
+            except (TypeError, ValueError):
+                data[title] = raw
+        return data
+
+    nodes_el = graph_el.find(f"{ns}nodes")
+    if nodes_el is not None:
+        for n in nodes_el.findall(f"{ns}node"):
+            G.add_node(n.get("id"), **read_attvalues(n, "node"))
+
+    edges_el = graph_el.find(f"{ns}edges")
+    if edges_el is not None:
+        for e in edges_el.findall(f"{ns}edge"):
+            data = read_attvalues(e, "edge")
+            if e.get("weight") is not None:
+                data["weight"] = float(e.get("weight"))
+            G.add_edge(e.get("source"), e.get("target"), **data)
+    return G
+
+
+def _file_revision(path: Path):
+    st = os.stat(path)
+    return (st.st_ino, st.st_size, st.st_mtime_ns)
+
 
 def parse_gexf_cached(path: Path):
-    st = os.stat(path)
+    revision = _file_revision(path)
     key = str(path)
     with GRAPH_LOCK:
         hit = GRAPH_CACHE.get(key)
-        if hit and hit[0] == st.st_size:
+        if hit and hit[0] == revision:
             return hit[1]
-    import networkx as nx  # deferred to keep core startup fast
-    G = nx.read_gexf(path)
+    G = _read_gexf(path)
     with GRAPH_LOCK:
-        GRAPH_CACHE[key] = (st.st_size, G)
+        GRAPH_CACHE[key] = (revision, G)
         while len(GRAPH_CACHE) > 128:
             GRAPH_CACHE.pop(next(iter(GRAPH_CACHE)))
     return G
@@ -45,14 +120,23 @@ def load_network(path: Path):
     nodes = []
     for nid in ids:
         d = G.nodes[nid]
-        outs = list(G.successors(nid))
+        outs = list(G.successors(nid)) if G.is_directed() else list(G.neighbors(nid))
         nbr = round(sum(op[v] for v in outs) / len(outs), 4) if outs else None
+        # community: Louvain modularity class from Gephi's own statistics plugin
+        # (org.gephi.statistics.plugin.Modularity), run in GraphVisualize/RepostVisualize's
+        # computeCommunities() at the same 5000-step export cadence as the rest of this
+        # snapshot (2026-09-22). -1 means "not computed for this snapshot" (e.g. zero-edge
+        # graph, or a GEXF written before this feature existed) -- distinct from Q_sign
+        # elsewhere in this dashboard, which is the *signed* modularity of the fixed
+        # opinion-sign two-camp split, not this unsupervised structural clustering.
         nodes.append({
             "op": round(op[nid], 4),
-            "indeg": G.in_degree(nid), "outdeg": G.out_degree(nid),
+            "indeg": G.in_degree(nid) if G.is_directed() else G.degree(nid),
+            "outdeg": G.out_degree(nid) if G.is_directed() else G.degree(nid),
             "hub": bool(d.get("target", False)),
             "bc": round(float(d.get("boundedConfidence", 0.0)), 4),
             "pp": round(float(d.get("postProb", 0.0)), 4),
+            "community": int(d.get("community", -1)),
             "nbrOp": nbr,
         })
     # weight: repost count on that edge (repostNW); Gephi's GEXF exporter omits the
@@ -69,7 +153,7 @@ TRAJ_MAX_STEPS = 300          # default per-agent opinion-trajectory decimation
 TRAJ_MAX_AGENTS = 2000        # above this, agents are subsampled (equal stride)
 
 
-def trajectory_data(seed: int, net: str = "follow"):
+def trajectory_data(seed: int, net: str = "follow", path_hint=None):
     """Per-agent opinion trajectories at GEXF-snapshot cadence.
 
     Ported from dashboard-remote/yabe's gexf_trajectory_data — but this repo's
@@ -80,7 +164,7 @@ def trajectory_data(seed: int, net: str = "follow"):
     only as dense as the snapshot cadence, not per-step — that's inherent to
     what this pipeline writes, not a decimation choice.
     """
-    d = result_dir(seed)
+    d = result_dir(seed, path_hint)
     empty = {"step": [], "agents": [], "ids": []}
     if d is None or not (d / "GEXF").is_dir():
         return empty
@@ -135,7 +219,8 @@ def api_trajectories(qs):
     seed = int(qs.get("seed", ["-1"])[0])
     net = qs.get("net", ["follow"])[0]
     max_steps = int(qs.get("max_steps", [str(TRAJ_MAX_STEPS)])[0])
-    data = trajectory_data(seed, net)
+    group = core.selected_group(qs.get("group", [None])[0])
+    data = trajectory_data(seed, net, core.group_path_hint(core.SERVE_LOGDIR, group))
     steps, agents, ids = data["step"], data["agents"], data["ids"]
     if not steps or not agents:
         return {"step": [], "agents": [], "ids": [], "shown": 0, "total": 0}
@@ -452,7 +537,9 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
     key = str(gexf_path)
     with STRUCT_LOCK:
         hit = STRUCT_CACHE.get(key)
-        if hit and hit[0] == st.st_size:
+        revision = (_file_revision(gexf_path), _file_revision(degree_csv) if degree_csv.exists() else None,
+                    _file_revision(clustering_csv) if clustering_csv.exists() else None)
+        if hit and hit[0] == revision:
             return hit[1]
     import networkx as nx
     G = parse_gexf_cached(gexf_path)
@@ -517,7 +604,7 @@ def compute_structural(gexf_path: Path, degree_csv: Path, clustering_csv: Path):
         "density": density, "avgPathLength": avg_path_length, "diameter": diameter,
     }
     with STRUCT_LOCK:
-        STRUCT_CACHE[key] = (st.st_size, payload)
+        STRUCT_CACHE[key] = (revision, payload)
         while len(STRUCT_CACHE) > 128:
             STRUCT_CACHE.pop(next(iter(STRUCT_CACHE)))
     return payload
@@ -532,7 +619,8 @@ def api_network(qs):
     # scope this seed lookup to the currently-active run set's own tag, for the same reason
     # poll_all() does (a seed number reused by another arm of the same sweep must not resolve
     # to that other arm's folder just because it happens to be mtime-newer).
-    path_hint = qs.get("pathHint", [None])[0] or core.group_path_hint(core.SERVE_LOGDIR, core.SERVE_GROUP)
+    group = core.selected_group(qs.get("group", [None])[0])
+    path_hint = qs.get("pathHint", [None])[0] or core.group_path_hint(core.SERVE_LOGDIR, group)
     d = result_dir(seed, path_hint)
     empty = {"steps": [], "step": None, "nodes": [], "edges": []}
     if d is None or not (d / "GEXF").is_dir():

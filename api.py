@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/" or u.path == "/index.html":
                 self._send(200, HTML_PATH.read_bytes(), "text/html; charset=utf-8")
             elif u.path == "/api/summary":
-                self._json(core.api_summary())
+                self._json(core.api_summary(qs))
             elif u.path == "/api/series":
                 self._json(core.api_series(qs))
             elif u.path == "/api/opinion":
@@ -124,8 +124,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/color-presets":
                 self._json(save_color_preset(self._read_json_body()))
-            elif u.path == "/api/group":
-                self._json(core.set_group(self._read_json_body().get("prefix")))
             else:
                 self._send(404, b"not found", "text/plain")
         except BrokenPipeError:
