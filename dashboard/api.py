@@ -1,4 +1,5 @@
 import json
+import math
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -63,6 +64,17 @@ def save_color_preset(payload):
     return api_color_presets()
 
 
+def _finite(o):
+    """Recursively replace non-finite floats (NaN, +/-Infinity) with None."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: _finite(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_finite(v) for v in o]
+    return o
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *args):
         pass  # quiet; the terminal is for run.sh output
@@ -76,7 +88,10 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _json(self, obj):
-        self._send(200, json.dumps(obj).encode(), "application/json")
+        # json.dumps writes NaN/Infinity as bare tokens, which are not valid JSON: the browser's
+        # JSON.parse rejects the WHOLE response (e.g. a power-law fit that fails on a constant
+        # out-degree turned the entire Network Structure panel blank). Send null instead.
+        self._send(200, json.dumps(_finite(obj), allow_nan=False).encode(), "application/json")
 
     def _read_json_body(self):
         n = int(self.headers.get("Content-Length", "0") or "0")
@@ -89,7 +104,7 @@ class Handler(BaseHTTPRequestHandler):
             if u.path == "/" or u.path == "/index.html":
                 self._send(200, HTML_PATH.read_bytes(), "text/html; charset=utf-8")
             elif u.path == "/api/summary":
-                self._json(core.api_summary())
+                self._json(core.api_summary(qs))
             elif u.path == "/api/series":
                 self._json(core.api_series(qs))
             elif u.path == "/api/opinion":
@@ -124,8 +139,6 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if u.path == "/api/color-presets":
                 self._json(save_color_preset(self._read_json_body()))
-            elif u.path == "/api/group":
-                self._json(core.set_group(self._read_json_body().get("prefix")))
             else:
                 self._send(404, b"not found", "text/plain")
         except BrokenPipeError:

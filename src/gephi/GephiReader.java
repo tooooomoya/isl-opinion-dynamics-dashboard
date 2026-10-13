@@ -63,12 +63,6 @@ public class GephiReader {
                             case "opinion":
                                 agentSet[id].setOpinion(Double.parseDouble(value));
                                 break;
-                            case "boundedconfidence":
-                                agentSet[id].setBoundedConfidence(Double.parseDouble(value));
-                                break;
-                            case "postprob":
-                                agentSet[id].setPostProb(Double.parseDouble(value));
-                                break;
                             case "accessProb":
                                 agentSet[id].setAccessProb(Double.parseDouble(value));
                                 break;

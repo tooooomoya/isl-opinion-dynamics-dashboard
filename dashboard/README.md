@@ -1,5 +1,15 @@
 # ライブダッシュボード (`dashboard/dashboard.py` + `dashboard/dashboard.html`)
 
+> **2026-10-12 (ブランチ `attention-economy`) — モデル変更への追従:** このダッシュボードは新しいアテンション経済モデル
+> (`docs/report/2026-10-12-attention-economy-model-spec-and-code-change-plan.md`)に合わせてある。変更点:
+> 旧メトリクス(bc・コンフォート率・follow/unfollow/block系)を削除し、`actionShare_{post,like,reshare,rewire}`、
+> `meanIdentityFit`、`meanRecognition`、`meanQ_*`、`rewire`、`attnGini`、`attnTop1pctShare`、`alivePosts`、`postsPerVisit`
+> などを追加(`METRIC_DESC`と`DEFAULT_METRICS`)。ネットワークの節点属性は`bc/pp`から`fit`(identityFit)/`rec`(recognition)に変更
+> (GEXF属性名も`identityFit`/`recognition`)。リポスト辺の homophily/hostile 色分けは bounded confidence の廃止で無意味になったため非表示。
+> `run.sh --name NAME`を使うと`logs/NAME_seed<seed>_NAME.log`が作られ、`--results_subdir=NAME`と合わせれば各条件が別の run set として選べる。
+> ネットワークタブを使うには`log_gexf=true`(デフォルト)で実行すること(パイロットは`log_gexf=false`)。
+
+
 `./run.sh`がseedのバッチを実行している間に使うリアルタイム監視ダッシュボードのリファレンス文書。別マシンのClaude Codeセッションが予備知識なしでも把握できるように書いてある — どちらのファイルにも手を入れる前にまずこれを読むこと。
 
 ## 何のためのものか

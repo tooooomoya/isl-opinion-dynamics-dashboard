@@ -1,0 +1,134 @@
+[
+  {
+    "arm": "ws_chrono",
+    "seed": 0,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2048
+  },
+  {
+    "arm": "ws_chrono",
+    "seed": 1,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2083
+  },
+  {
+    "arm": "ws_chrono",
+    "seed": 2,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2034
+  },
+  {
+    "arm": "dba_fy",
+    "seed": 0,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2442
+  },
+  {
+    "arm": "dba_fy",
+    "seed": 1,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2441
+  },
+  {
+    "arm": "dba_fy",
+    "seed": 2,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2456
+  },
+  {
+    "arm": "ws_trend",
+    "seed": 0,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2155
+  },
+  {
+    "arm": "ws_trend",
+    "seed": 1,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2210
+  },
+  {
+    "arm": "ws_trend",
+    "seed": 2,
+    "checks": 6016,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 2224
+  },
+  {
+    "arm": "ws_mixed_rewire",
+    "seed": 0,
+    "checks": 6015,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 1538
+  },
+  {
+    "arm": "ws_mixed_rewire",
+    "seed": 1,
+    "checks": 6015,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 1749
+  },
+  {
+    "arm": "ws_mixed_rewire",
+    "seed": 2,
+    "checks": 6015,
+    "errors": [
+      "diagnostic_final_window_missing"
+    ],
+    "last_step": "1001",
+    "rows": 1002,
+    "cascades": 1643
+  }
+]

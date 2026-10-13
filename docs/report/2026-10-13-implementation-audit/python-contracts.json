@@ -1,0 +1,52 @@
+[
+  {
+    "id": "LAUNCHER_JAVA_FAILURE_NONZERO",
+    "pass": false,
+    "detail": "java exits42; run_one exit=0; END marker=True"
+  },
+  {
+    "id": "LAUNCHER_CLEANUP_OWN_PROCESSES",
+    "pass": false,
+    "detail": "static check only; cleanup handler was never executed"
+  },
+  {
+    "id": "DASHBOARD_ABORT_FAILED",
+    "pass": false,
+    "detail": "ABORT classified running"
+  },
+  {
+    "id": "DASHBOARD_OOM_FAILED",
+    "pass": false,
+    "detail": "OOM classified running"
+  },
+  {
+    "id": "DASHBOARD_LIFESPAN_TOP_PRESERVED",
+    "pass": false,
+    "detail": "true max1000; retained max=1.0"
+  },
+  {
+    "id": "DASHBOARD_EVENT_COUNT_EXACT",
+    "pass": false,
+    "detail": "true10 events; retained=4"
+  },
+  {
+    "id": "DASHBOARD_CASCADE_TOPOLOGY_PRESERVED",
+    "pass": false,
+    "detail": "full=(2.6666666666666665, 7); decimated=(1.0, 2)"
+  },
+  {
+    "id": "CSV_TAIL_PARTIAL_LINE",
+    "pass": true,
+    "detail": "partial append read once"
+  },
+  {
+    "id": "DASHBOARD_GROUP_ISOLATION",
+    "pass": true,
+    "detail": "ambiguous/unmatched rejected; matching arm resolved"
+  },
+  {
+    "id": "DASHBOARD_NEUTRAL_BAND_CONFIG",
+    "pass": false,
+    "detail": "neutral_band=0 should include +/- .1, dashboard fixed threshold=0.2; camps=0/0 (CLI linkage absent)"
+  }
+]

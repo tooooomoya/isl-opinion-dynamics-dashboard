@@ -12,29 +12,28 @@ import java.util.Arrays;
  * population-level behavioral metrics. Fields marked "all agents" are the exception.
  */
 public class StepStats {
-    public int activeCount;             // population agents processed this step
-    public int outGroupExposureCount;   // population: feed posts read with opposite-sign opinion
-    public int repostCount;             // population: reposts performed (Agent.getLastReposts())
-    public int crossRepostCount;        // population: of the above, opposite-sign reposts
-    public int outGroupSanctionCount;   // population: evictions/unfollows targeting an opposite-sign agent
-    public int blockCount;              // population: new blocks (Agent.getLastBlocks())
-    public int unfollowCount;           // population: successful unfollow() calls
-    public int followCount;             // population: successful follow() calls (2026-08-06 addition --
-                                         // "follow" existed as an all-agents-including-hubs count
-                                         // (followActionNum) but had no population-only counterpart,
-                                         // unlike unfollowCount above; added for the network-dynamism
-                                         // analysis, docs/report 2026-08-06)
-    public int evictionCount;           // population: capacity-eviction events
+    public int activeCount;             // population agents that visited this step
+    public int outGroupExposureCount;   // population: feed posts read with opposite-sign X
+    public int repostCount;             // population: reshares performed
+    public int crossRepostCount;        // population: of the above, opposite-sign reshares
+    public int likeCount;               // population: likes given
+    public int rewireCount;             // population: executed rewires (candidate found AND more similar than the dropped front followee)
+    public int[] actionCount = new int[4]; // population: chosen action per visit {post, like, reshare, rewire}
+    public double feedSizeSum;          // population: sum of feed sizes over visits
+    public int emptyFeedCount;          // population: visits with an empty feed
+    public double identityFitSum;       // population: sum of identity fit over visits (divide by activeCount)
+    public double recognitionSum;       // population: sum of recognition over visits
 
     public int originalPostCount;       // all agents (including pinned hubs)
     public int allRepostCount;          // all agents (including pinned hubs)
 
     // Feed-composition-by-camp: population agents only, camp = reader's opinionClass (5-bin,
     // Const.NUM_OF_BINS_OF_OPINION) at feed-build time. Counted in AdminOptim.AdminFeedback()
-    // before chrono/forYou are merged (channel provenance is otherwise lost once merged into
+    // before the chrono/Trend/For You streams are merged (channel provenance is otherwise lost once merged into
     // Agent.feed). Sums are divided by feedClassAgentCount[cls] in buildMetricsRow to get the
     // per-agent average count, mirroring the feedPostOpinionMean_i / cRateMean_i convention.
-    public double[] feedForYouCountSum = new double[Const.NUM_OF_BINS_OF_OPINION];   // delivered via algorithmic For-You slot
+    public double[] feedTrendCountSum = new double[Const.NUM_OF_BINS_OF_OPINION];   // delivered via the Trend (popularity) slots
+    public double[] feedForYouCountSum = new double[Const.NUM_OF_BINS_OF_OPINION];  // delivered via the For You (perspective similarity) slots
     public double[] feedChronoCountSum = new double[Const.NUM_OF_BINS_OF_OPINION];   // delivered via chronological-from-follows
     public double[] feedRepostCountSum = new double[Const.NUM_OF_BINS_OF_OPINION];   // post is a relay (Post.isRelay())
     public double[] feedOriginalCountSum = new double[Const.NUM_OF_BINS_OF_OPINION]; // post is an original (not relayed)
@@ -57,33 +56,21 @@ public class StepStats {
     // of each opinion class's posts in a given camp's feed, control vs N_silent" directly.
     public double[][] feedAuthorClassCountSum =
             new double[Const.NUM_OF_BINS_OF_OPINION][Const.NUM_OF_BINS_OF_OPINION];
-    // 2026-08-06: subset of feedAuthorClassCountSum's [readerClass][authorClass] cells that also
-    // satisfy the READER's own vocal-comfort-radius check (Agent.updateMyself()'s withinComfort,
-    // same threshold that drives comfortPostRate/postProb) -- added to test whether moderate
-    // content displacing the silenced Neutral hub actually falls inside readers' comfort windows,
-    // or just adds volume outside it. Tallied in Agent.updateMyself() (the only place a reader's own
-    // vcr/opinion and each feed post are both in scope at once), using the SAME
-    // agentSet[post.getPostUserId()].getOpinionClass() lookup as AdminFeedback's
-    // feedAuthorClassCountSum tally, in the same agent's turn (feed build then feed read happen
-    // back-to-back with no other agent's turn in between), so the two arrays are on an IDENTICAL
-    // author-classification basis -- feedClassComfortCountSum[r][a] / feedAuthorClassCountSum[r][a]
-    // (both population-averaged the same way) is a valid "fraction of author-class-a content that
-    // counts as comfortable to reader-class-r" ratio.
-    public double[][] feedClassComfortCountSum =
-            new double[Const.NUM_OF_BINS_OF_OPINION][Const.NUM_OF_BINS_OF_OPINION];
-
     public void reset() {
         activeCount = 0;
         outGroupExposureCount = 0;
         repostCount = 0;
         crossRepostCount = 0;
-        outGroupSanctionCount = 0;
-        blockCount = 0;
-        unfollowCount = 0;
-        followCount = 0;
-        evictionCount = 0;
+        likeCount = 0;
+        rewireCount = 0;
+        Arrays.fill(actionCount, 0);
+        identityFitSum = 0.0;
+        feedSizeSum = 0.0;
+        emptyFeedCount = 0;
+        recognitionSum = 0.0;
         originalPostCount = 0;
         allRepostCount = 0;
+        Arrays.fill(feedTrendCountSum, 0.0);
         Arrays.fill(feedForYouCountSum, 0.0);
         Arrays.fill(feedChronoCountSum, 0.0);
         Arrays.fill(feedRepostCountSum, 0.0);
@@ -92,6 +79,5 @@ public class StepStats {
         Arrays.fill(feedNeutCountSum, 0.0);
         Arrays.fill(feedHubCountSum, 0.0);
         for (double[] row : feedAuthorClassCountSum) Arrays.fill(row, 0.0);
-        for (double[] row : feedClassComfortCountSum) Arrays.fill(row, 0.0);
     }
 }

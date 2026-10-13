@@ -1,0 +1,39 @@
+PASS Q_NEXT_ACTION_MASK | expected 9, actual 9.0
+PASS Q_ONLY_PREVIOUS_ENTRY | other entry=200.0
+PASS LIKE_SELECTOR_UNIQUE | liked item removed from reaction candidates
+PASS LIKE_POLICY_UNIQUE | all feed items already liked
+FAIL LIKE_API_IDEMPOTENT | direct repeated call likes=2
+PASS RESHARE_ROOT_SELECTOR_UNIQUE | same root has already been reshared
+PASS RESHARE_LINEAGE | root, parent and originator preserved
+PASS RESHARE_RECOGNITION_CREDIT | likes on reshare enter resharer's recognition
+FAIL NO_ACTION_RESPECT_CHANNEL_EPS0.0 | no permitted action; returned=0 (POST=0)
+FAIL NO_ACTION_RESPECT_CHANNEL_EPS1.0 | no permitted action; returned=0 (POST=0)
+FAIL PINNED_VALUE_FIXED | pinned intrinsic=0, actual opinion=0.1
+PASS LIFE_BOUNDARY | alive through t=L only
+PASS LIFE_REFRESH | last reaction controls death
+PASS RECOGNITION_FORGETS_DEAD | likes of dead own posts removed
+FAIL PICK_UNDERFLOW_STABLE | beta=1000, distances=1 and 2; nearer item should dominate
+FAIL FY_UNDERFLOW_NONEMPTY | eligible posts=2, delivered=0
+FAIL REWIRE_UNDERFLOW_STABLE | expected new followee=2, actual=-1
+FAIL TREND_REACH_AFTER_EDGE_CHANGE | now follows 2; shown=1
+FAIL FY_REACH_AFTER_EDGE_CHANGE | now follows 2; shown=1
+PASS FEED_INVARIANTS_100_SEEDS | capacity, own author exclusion, root dedup, live posts, pool conservation
+FAIL WS_SMALL_NO_SELF | n=8, default ws_out=15
+PASS GRAPH_REVERSE_INDEX_5000_OPERATIONS | forward/reverse edges and follower counts agree
+PASS HK_FIXED_OUT_DEGREE | valid hk_m=15,hk_a=1,hk_pt=.05; none
+FAIL FEED_METRIC_POPULATION_FILTER | population reader mean=-1, reported=0.0
+FAIL EMPTY_POPULATION_FINITE | all targeted: variance=NaN, mean=NaN
+AC Error: opinion is out of the range in user 0
+FAIL ASSERT_FINAL_STEP_INCLUDED | the sum of error reported : 0
+FAIL ASSERT_REJECTS_NAN | NaN opinion error count=0
+FAIL CONFIG_REJECT_INVALID | invalid configs accepted=15/15
+FAIL CONFIG_REJECT_REMOVED_KEY | removed knob bc_dec silently accepted=true
+FAIL CONFIG_ID_DISTINCT | distinct output path collisions=4/4
+FAIL CONFIG_SAVED_WITHOUT_HUBS | run_config.csv lines=1
+FAIL GEXF_ACCESS_ROUNDTRIP | exported accessprob=.8, read=0.1
+FAIL GEXF_CURRENT_AND_INTRINSIC | current .5 / intrinsic .1, read=0.1 / 0.1
+FAIL GEXF_NAMESPACE12 | 1.2draft valid edge 0->1
+FAIL GEXF_MISSING_FAILS | missing input returns an empty graph instead of failing=true
+FAIL OUTPUT_FAILURE_PROPAGATES | flush returned; remaining metrics buffer=0
+FAIL CSV_LOCALE_INDEPENDENT | header=step,value, row=0,0,5000
+CONTRACT_TOTAL passed=13 failed=24

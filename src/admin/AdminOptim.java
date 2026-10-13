@@ -18,7 +18,9 @@ public class AdminOptim {
     // Sliding window of recently-created original posts; ranked by absolute (not
     // follower-normalised, see velocityScore below) velocity for the For-You slots. Only
     // populated/used when FEED_ALGO_SHARE > 0.
-    private final Deque<Post> recentPosts = new ArrayDeque<>();
+    private final List<Post> recentPosts = new ArrayList<>(); // all alive posts (originals and reshares), creation order
+    private long createdPostCount = 0;
+    private long diedPostCount = 0;
     // R11.1 (2026-07-16): cached ranking + last-refresh step, so rankByVelocity only rescores/
     // resorts every velocityRankInterval() steps instead of every step (see rankByVelocity).
     private List<Post> cachedRanked = null;
@@ -50,18 +52,33 @@ public class AdminOptim {
         this.followers = new HashSet[n];
         this.followerNumArray = new int[n];
         for (int i = 0; i < n; i++) {
-            followees[i] = new HashSet<>();
+            followees[i] = new LinkedHashSet<>(); // insertion order = the follow queue (front = oldest)
             followers[i] = new HashSet<>();
         }
         for (int i = 0; i < n; i++) {
+            List<Integer> outs = new ArrayList<>();
             for (int j = 0; j < n; j++) {
                 if (W[i][j] > 0.0) {
-                    followees[i].add(j);
+                    outs.add(j);
                     followers[j].add(i);
                     followerNumArray[j]++;
                 }
             }
+            // initial queue order is random, not by id (id order would make rewire drop low ids first)
+            Collections.shuffle(outs, randomGenerator.network());
+            followees[i].addAll(outs);
         }
+    }
+
+    /** Front of agent's follow queue (the followee it has reacted to least recently), or null. */
+    public Integer frontFollowee(int userId) {
+        Iterator<Integer> it = followees[userId].iterator();
+        return it.hasNext() ? it.next() : null;
+    }
+
+    /** Agent reacted to a post by {@code authorId}: if followed, move that followee to the back. */
+    public void touchFollowee(int userId, int authorId) {
+        if (followees[userId].remove(authorId)) followees[userId].add(authorId);
     }
 
     public double[][] getAdjacencyMatrix() {
@@ -135,36 +152,33 @@ public class AdminOptim {
         }
     }
 
-    public void updateAdjacencyMatrix(int userId, int[] followedIds, int unfollowedId) {
-        if (followedIds[0] >= 0) {
-            followees[userId].add(followedIds[0]);
-            followers[followedIds[0]].add(userId);
-            followerNumArray[followedIds[0]]++;
-        }
-        if (followedIds[1] >= 0) {
-            followees[userId].remove(followedIds[1]);
-            followers[followedIds[1]].remove(userId);
-            followerNumArray[followedIds[1]]--;
-        }
-        if (unfollowedId >= 0) {
-            followees[userId].remove(unfollowedId);
-            followers[unfollowedId].remove(userId);
-            followerNumArray[unfollowedId]--;
-        }
-    }
-
     // ================= Velocity-primary "For You" recommender =================
 
     /** Register a freshly-created original post into the For-You candidate window. */
     public void addRecentPost(Post post) {
-        recentPosts.addLast(post);
+        recentPosts.add(post);
+        createdPostCount++;
     }
 
-    /** Drop posts older than the velocity window from the candidate pool. */
-    private void pruneRecentPosts(int step) {
-        int cutoff = step - Const.VELOCITY_WINDOW;
-        while (!recentPosts.isEmpty() && recentPosts.peekFirst().getPostedStep() < cutoff) {
-            recordLifespan(recentPosts.removeFirst(), step);
+    public int getAlivePostCount() { return recentPosts.size(); }
+    public long getCreatedPostCount() { return createdPostCount; }
+    public long getDiedPostCount() { return diedPostCount; }
+    public List<Post> getAlivePosts() { return recentPosts; }
+
+    /**
+     * Death sweep: a post is dead once {@code step - lastReactionStep > deadAfter}. Dead posts leave
+     * the pool for good (a dead post is never seen or reshared again). Call once per step.
+     */
+    public void sweepDead(int step) {
+        int L = p.deadAfter();
+        Iterator<Post> it = recentPosts.iterator();
+        while (it.hasNext()) {
+            Post post = it.next();
+            if (!post.isAlive(step, L)) {
+                recordLifespan(post, step);
+                it.remove();
+                diedPostCount++;
+            }
         }
     }
 
@@ -182,7 +196,7 @@ public class AdminOptim {
         lifespanCount++;
         evictedRepostedCount++;
         int quietSteps = evictionStep - post.getLastRepostStep();
-        boolean stillActive = quietSteps <= Const.VELOCITY_WINDOW / 10;
+        boolean stillActive = quietSteps <= Math.max(1, p.deadAfter() / 10);
         if (stillActive) stillActiveAtEvictionCount++;
         pendingLifespanEvents.add(new LifespanEvent(post, stillActive));
     }
@@ -282,7 +296,6 @@ public class AdminOptim {
         if (cachedRanked != null && step - lastRankStep < velocityRankInterval()) {
             return cachedRanked;
         }
-        pruneRecentPosts(step);
         List<Post> ranked = new ArrayList<>(recentPosts);
         boolean windowed = p.velMode().equals("windowed");
         // Precompute scores once (safe with the comparator; and windowed updates snapshots after).
@@ -315,7 +328,7 @@ public class AdminOptim {
         boolean stale = (reachDistCache == null) || (reachCachedH != h)
                 || (step - reachCachedStep >= Const.REACH_REFRESH_INTERVAL);
         if (!stale) return;
-        computeReachable(h, excludeIds);
+        reachDistCache = computeReachable(h, excludeIds);
         reachCachedStep = step;
         reachCachedH = h;
     }
@@ -336,8 +349,8 @@ public class AdminOptim {
     // at depth h, so this is not a computation-time regression. Distance (BFS layer, 1-based) is
     // recorded per node instead of a flat boolean, feeding acceptProbability's decay below.
     @SuppressWarnings("unchecked")
-    private void computeReachable(int h, Set<Integer> excludeIds) {
-        reachDistCache = new HashMap[n];
+    private Map<Integer, Integer>[] computeReachable(int h, Set<Integer> excludeIds) {
+        Map<Integer, Integer>[] reachDistCache = new HashMap[n];
         for (int src = 0; src < n; src++) {
             Map<Integer, Integer> dist = new HashMap<>();
             Deque<Integer> frontier = new ArrayDeque<>();
@@ -358,6 +371,17 @@ public class AdminOptim {
             dist.remove(src);
             reachDistCache[src] = dist;
         }
+        return reachDistCache;
+    }
+
+    /** Distance-decay acceptance factor for a candidate d hops away (d >= 1); 1.0 in "hard" mode. */
+    private double decayFactor(int d) {
+        double lambda = p.feedDecayLambda();
+        return switch (p.feedDecayMode()) {
+            case "exp" -> Math.exp(-lambda * (d - 1));
+            case "inverse" -> 1.0 / (1.0 + lambda * (d - 1));
+            default -> 1.0;
+        };
     }
 
     /**
@@ -380,6 +404,125 @@ public class AdminOptim {
         };
     }
 
+    // ================= For You: perspective-similarity recommender =================
+    // The platform holds an estimate Xhat_i of every agent's X (random start, then pulled toward the X
+    // of the posts the agent likes or reshares). For You ranks candidates by closeness to Xhat_i.
+
+    private double[] xhat;                                   // platform's estimate of each agent's X
+    private Map<Integer, Integer>[] fyReachDist;             // For You hop-distance cache (own reach)
+    private int fyReachStep = -1, fyReachH = Integer.MIN_VALUE;
+    private List<Post>[] postsByAuthor;                      // alive posts per author, rebuilt once per step
+    private double[] fyW = new double[1024];                 // scratch buffers for one candidate scan
+    private Post[] fyP = new Post[1024];
+
+    /** Start the estimates at random X in [-1,1], independent of the true X. */
+    public void initEstimates(java.util.Random rng) {
+        xhat = new double[n];
+        for (int i = 0; i < n; i++) xhat[i] = 2.0 * rng.nextDouble() - 1.0;
+    }
+
+    public double getEstimate(int i) { return xhat == null ? Double.NaN : xhat[i]; }
+
+    /** Like or reshare of a post with X = xp: Xhat <- (1-rho) Xhat + rho xp. Post/rewire leave it unchanged. */
+    public void updateEstimate(int i, double xp, double rho) {
+        if (xhat == null) return;
+        xhat[i] = (1.0 - rho) * xhat[i] + rho * xp;
+    }
+
+    /** Mean |Xhat_i - X_i| over the given agents (how far the platform's picture is from the truth). */
+    public double meanEstimateError(Agent[] agents) {
+        if (xhat == null) return Double.NaN;
+        double s = 0; int c = 0;
+        for (int i = 0; i < n; i++) {
+            if (agents[i].getTarget()) continue;
+            s += Math.abs(xhat[i] - agents[i].getOpinion());
+            c++;
+        }
+        return c > 0 ? s / c : 0.0;
+    }
+
+    /** Rebuild the per-author index of alive posts (call once per step, after sweepDead). */
+    @SuppressWarnings("unchecked")
+    public void rebuildAuthorIndex() {
+        if (postsByAuthor == null) {
+            postsByAuthor = new List[n];
+            for (int i = 0; i < n; i++) postsByAuthor[i] = new ArrayList<>();
+        }
+        for (List<Post> l : postsByAuthor) l.clear();
+        for (Post post : recentPosts) postsByAuthor[post.getPostUserId()].add(post);
+    }
+
+    /**
+     * Draw up to {@code slots} posts for {@code userId}, without replacement, with probability
+     * proportional to exp(-beta |xr - X_post|) x decay(hop distance), over the alive posts of authors
+     * within the For You reach (all authors when foryou_hop <= 0). Never the reader's own posts, posts already shown to the reader before, posts
+     * whose root is already in the feed ({@code seenRoots}), or two posts of one root.
+     */
+    private void selectForYou(Agent user, Agent[] agentSet, int step, int slots, Set<Integer> seenRoots, List<Post> out) {
+        if (postsByAuthor == null) return;
+        int userId = user.getId();
+        int h = p.foryouHopH();
+        double xr = (p.foryouProfile() && xhat != null) ? xhat[userId] : agentSet[userId].getOpinion();
+        double beta = p.foryouBeta();
+        if (h > 0) {
+            boolean stale = fyReachDist == null || fyReachH != h || step - fyReachStep >= Const.REACH_REFRESH_INTERVAL;
+            if (stale) {
+                fyReachDist = computeReachable(h, p.algoExcludeIds());
+                fyReachStep = step;
+                fyReachH = h;
+            }
+        }
+        int m = 0;
+        if (h > 0) {
+            for (Map.Entry<Integer, Integer> e : fyReachDist[userId].entrySet()) {
+                int author = e.getKey();
+                if (p.algoExcludeIds().contains(author)) continue;
+                m = scanAuthor(user, postsByAuthor[author], decayFactor(e.getValue()), xr, beta, step, seenRoots, m);
+            }
+        } else {
+            for (int author = 0; author < n; author++) {
+                if (author == userId || p.algoExcludeIds().contains(author)) continue;
+                m = scanAuthor(user, postsByAuthor[author], 1.0, xr, beta, step, seenRoots, m);
+            }
+        }
+        // weighted draws without replacement (inverse CDF over the scratch weights)
+        for (int slot = 0; slot < slots && m > 0; slot++) {
+            double total = 0.0;
+            for (int j = 0; j < m; j++) total += fyW[j];
+            if (total <= 0.0) break;
+            double r = randomGenerator.dynamics().nextDouble() * total;
+            double cum = 0.0;
+            int pick = -1;
+            for (int j = 0; j < m; j++) {
+                if (fyW[j] <= 0.0) continue;
+                cum += fyW[j];
+                pick = j;
+                if (r < cum) break;
+            }
+            if (pick < 0) break;
+            Post chosen = fyP[pick];
+            out.add(chosen);
+            int root = chosen.getRootPostId();
+            for (int j = 0; j < m; j++) if (fyP[j].getRootPostId() == root) fyW[j] = 0.0; // no second post of this root
+        }
+    }
+
+    private int scanAuthor(Agent user, List<Post> posts, double decay, double xr, double beta, int step, Set<Integer> seenRoots, int m) {
+        int deadAfter = p.deadAfter();
+        for (Post post : posts) {
+            if (!post.isAlive(step, deadAfter)) continue;
+            if (seenRoots.contains(post.getRootPostId()) || user.hasSeen(post)) continue;
+            if (m == fyW.length) {
+                fyW = java.util.Arrays.copyOf(fyW, m * 2);
+                fyP = java.util.Arrays.copyOf(fyP, m * 2);
+            }
+            fyW[m] = Math.exp(-beta * Math.abs(xr - post.getPostOpinion())) * decay;
+            fyP[m] = post;
+            m++;
+        }
+        return m;
+    }
+
     /**
      * Build user {@code userId}'s feed for this step: floor(alpha*S) For-You slots
      * (velocity-ranked, opinion-blind, reachable within h hops) + remainder chronological
@@ -390,11 +533,12 @@ public class AdminOptim {
      */
     public void AdminFeedback(int userId, Agent[] agentSet, int step, List<Post> velocityRanked, StepStats stepStats) {
         Agent user = agentSet[userId];
-        boolean[] blocked = user.getBlockedUserList();
+        int deadAfter = p.deadAfter();
 
         int capacity = p.feedCapacity();
-        int algoSlots = (int) Math.floor(p.feedAlgoShare() * capacity);
-        int chronoSlots = capacity - algoSlots;
+        int algoSlots = (int) Math.floor(p.trendShare() * capacity);         // Trend slots
+        int fySlots = (int) Math.floor(p.foryouShare() * capacity);          // For You slots
+        int chronoSlots = capacity - algoSlots - fySlots;
 
         // ---- chronological-from-follows stream (legacy substrate) ----
         // Uniform sample of the postCash window (PostCash itself is a fixed-size FIFO, so
@@ -407,7 +551,7 @@ public class AdminOptim {
         List<Post> chrono = new ArrayList<>();
         List<Post> chronoCandidates = new ArrayList<>();
         for (Post post : user.getPostCash().getAllPosts()) {
-            if (!blocked[post.getPostUserId()]) chronoCandidates.add(post);
+            if (post.isAlive(step, deadAfter) && !user.hasSeen(post)) chronoCandidates.add(post);
         }
         Collections.shuffle(chronoCandidates, randomGenerator.dynamics());
         Set<Integer> seenRoots = new HashSet<>();
@@ -416,10 +560,20 @@ public class AdminOptim {
             if (seenRoots.add(post.getRootPostId())) chrono.add(post);
         }
 
-        // ---- For-You (velocity-primary) stream ----
-        List<Post> forYou = new ArrayList<>();
+        // ---- For You (perspective-similarity) stream ----
+        // Personalised by X, not by popularity: candidates are the alive posts of authors within the
+        // For You reach, drawn without replacement with weight exp(-beta |Xhat_i - X_post|) (x the
+        // reach decay acceptance). Taken before Trend so a post is never in two streams.
+        List<Post> forYouPersonal = new ArrayList<>();
+        if (fySlots > 0) {
+            selectForYou(user, agentSet, step, fySlots, seenRoots, forYouPersonal);
+            for (Post post : forYouPersonal) seenRoots.add(post.getRootPostId());
+        }
+
+        // ---- Trend (velocity-primary, popularity) stream ----
+        List<Post> forYou = new ArrayList<>(); // the Trend stream
         if (algoSlots > 0 && velocityRanked != null && !velocityRanked.isEmpty()) {
-            int h = p.feedHopH();
+            int h = p.trendHopH();
             ensureReachable(step, h, p.algoExcludeIds());
             // velocityRanked candidates are always originals (rootPostId == postId, see
             // AdminOptim.addRecentPost), so comparing against chrono's rootPostIds catches a
@@ -428,7 +582,8 @@ public class AdminOptim {
                 if (forYou.size() >= algoSlots) break;
                 int author = post.getPostUserId();
                 if (author == userId) continue;            // not your own post
-                if (blocked[author]) continue;             // respect blocks (self-limiting filter)
+                if (!post.isAlive(step, deadAfter)) continue; // forgotten posts are gone
+                if (user.hasSeen(post)) continue;             // each post is shown to an agent at most once
                 // 2026-07-26: bridging-role isolation -- author excluded from algorithmic surfacing
                 // specifically; organic/chrono reach to them (if the reader follows them) is untouched.
                 if (p.algoExcludeIds().contains(author)) continue;
@@ -442,6 +597,7 @@ public class AdminOptim {
                 if (pAccept <= 0.0) continue;
                 if (pAccept < 1.0 && randomGenerator.dynamics().nextDouble() >= pAccept) continue;
                 forYou.add(post);
+                seenRoots.add(post.getRootPostId()); // a reshare and its source never share a slot
             }
         }
 
@@ -452,7 +608,8 @@ public class AdminOptim {
         if (!user.getTarget()) {
             int cls = user.getOpinionClass();
             stepStats.feedClassAgentCount[cls]++;
-            stepStats.feedForYouCountSum[cls] += forYou.size();
+            stepStats.feedTrendCountSum[cls] += forYou.size();
+            stepStats.feedForYouCountSum[cls] += forYouPersonal.size();
             stepStats.feedChronoCountSum[cls] += chrono.size();
             int repostCount = 0, originalCount = 0;
             // 2026-08-06: author-hub-tier tally (StepStats.feedNeutCountSum/feedHubCountSum
@@ -466,7 +623,9 @@ public class AdminOptim {
                 if (authorTier >= 0) { hubCount++; if (authorTier == 2) neutCount++; }
                 stepStats.feedAuthorClassCountSum[cls][author.getOpinionClass()]++;
             }
-            for (Post post : forYou) {
+            List<Post> algoPosts = new ArrayList<>(forYou);
+            algoPosts.addAll(forYouPersonal);
+            for (Post post : algoPosts) {
                 if (post.isRelay()) repostCount++; else originalCount++;
                 Agent author = agentSet[post.getPostUserId()];
                 int authorTier = author.getHubTier();
@@ -487,14 +646,16 @@ public class AdminOptim {
         // is unambiguous.
         Set<Integer> forYouRoots = new HashSet<>();
         for (Post post : forYou) forYouRoots.add(post.getRootPostId());
-        user.setForYouRootIds(forYouRoots);
+        for (Post post : forYouPersonal) forYouRoots.add(post.getRootPostId());
+        user.setAlgoRootIds(forYouRoots);
 
         // ---- deliver: chronological + For-You, order-neutral for reading ----
         List<Post> feed = new ArrayList<>(chrono);
         feed.addAll(forYou);
+        feed.addAll(forYouPersonal);
         Collections.shuffle(feed, randomGenerator.dynamics());
         for (Post post : feed) {
-            user.addPostToFeed(post); // re-checks blockedUserList; block-on-For-You handled by unfollow()
+            user.addPostToFeed(post);
         }
     }
 

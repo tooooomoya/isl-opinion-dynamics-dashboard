@@ -67,8 +67,11 @@ DERIVED = {
 DERIVED_IN_PICKER = ("apparentPolarization", "repostShare")
 FAMILY_RE = re.compile(r"^(.+)_([0-4])$")
 
-STORES = {}          # seed -> SeedStore
+STORES = {}          # (run-set prefix, seed) -> SeedStore; never shared across browser selections
 LOCK = threading.Lock()
+POLL_STATUS = {}     # group -> latest status snapshot, shared only as a short read-through cache
+POLL_AT = {}         # group -> monotonic timestamp
+POLL_TTL = 0.25      # collapses one browser refresh's parallel API reads into one filesystem poll
 SERVE_LOGDIR = None  # set at startup
 SERVE_ONLY = None
 SERVE_GROUP = DEFAULT_GROUP  # currently-selected log-prefix "run set", switchable via /api/group
@@ -216,6 +219,15 @@ def pick_default_group(logdir: Path):
     return max(groups, key=key)
 
 
+def selected_group(prefix=None):
+    """Validate a client-selected run set without mutating server-global state."""
+    prefix = prefix or SERVE_GROUP
+    groups = log_groups(SERVE_LOGDIR)
+    if groups and prefix not in groups:
+        raise ValueError(f"unknown run set: {prefix!r}")
+    return prefix
+
+
 def set_group(prefix):
     """Switch the active run set. Rejects unknown prefixes so SERVE_GROUP always names a
     real, currently-discovered group."""
@@ -298,13 +310,37 @@ def result_dir(seed: int, path_hint: str = None):
     if path_hint:
         norm_hint = _normalize_hint(path_hint)
         filtered = [p for p in candidates if norm_hint in _normalize_hint(str(p))]
-        if filtered:
-            candidates = filtered
+        if not filtered:
+            # A requested condition must never silently turn into a different
+            # experiment simply because it happened to be newer on disk.
+            return None
+        candidates = filtered
+    elif len(candidates) > 1:
+        # There is no defensible way to identify a reused seed from an mtime.
+        # Callers surface this as unavailable instead of plotting another arm.
+        return None
     return max(candidates, key=lambda p: p.stat().st_mtime)
 
 
+def _parse_float(tok):
+    try:
+        return float(tok)
+    except ValueError:
+        return float("nan")
+
+
 class CsvTail:
-    """Incrementally tail-parse an all-numeric CSV with adaptive decimation."""
+    """Incrementally tail-parse an all-numeric CSV with adaptive decimation.
+
+    2026-09-22: rows/latest hold raw string tokens, not floats -- float() conversion happens
+    lazily in column(), only for the one column actually requested. A cold poll of a "done"
+    20000-step/~150-column results.csv used to float()-convert every cell of every row
+    unconditionally before deciding whether decimation would even keep it (~3M calls/seed just
+    for that file; ~63M across a 21-seed run set was observed taking ~100s). Splitting a line
+    into string tokens is cheap and unavoidable either way; the float() cost that scales with
+    total-columns-times-total-rows is what's now bounded by decimated-rows-times-columns-actually-
+    read instead -- typically a few thousand rows and a dozen-ish columns, not tens of thousands
+    times ~150."""
     def __init__(self, path: Path, max_rows: int = 4000):
         self.path = path
         self.max_rows = max_rows
@@ -313,10 +349,11 @@ class CsvTail:
     def reset(self):
         self.offset = 0
         self.header = None
-        self.rows = []
+        self.rows = []       # list of raw string-token lists (decimated subset, see poll())
         self.stride = 1
         self.row_i = 0
         self.ino = None
+        self.latest = None   # raw string-token list of the most recently seen complete row
 
     def poll(self):
         try:
@@ -336,32 +373,53 @@ class CsvTail:
         if nl < 0:
             return
         self.offset += nl + 1
-        for line in chunk[:nl].decode("utf-8", errors="replace").split("\n"):
-            line = line.strip()
+        lines = chunk[:nl].decode("utf-8", errors="replace").split("\n")
+        # 2026-09-22: a decimated-away, non-final row doesn't need comma-splitting at all -- only
+        # find out whether it's blank. A cold ingest of e.g. a 2.7M-row repost_cascades.csv (a
+        # real size observed on this project's data) means most rows are skipped by the eventual
+        # stride; splitting every one of them anyway before deciding was the actual remaining
+        # bottleneck once column-level float parsing was made lazy (see class docstring). Find the
+        # last non-blank line once up front (cheap truthiness checks, no splitting) so it's always
+        # fully parsed regardless of stride -- self.latest must reflect this chunk's true last row.
+        last_idx = -1
+        for j in range(len(lines) - 1, -1, -1):
+            if lines[j].strip():
+                last_idx = j
+                break
+        for li, raw in enumerate(lines):
+            line = raw.strip()
             if not line:
                 continue
             if self.header is None:
                 self.header = line.split(",")
                 continue
-            if self.row_i % self.stride == 0:
-                vals = []
-                for tok in line.split(","):
-                    try:
-                        vals.append(float(tok))
-                    except ValueError:
-                        vals.append(float("nan"))
-                if len(vals) == len(self.header):
-                    self.rows.append(vals)
+            keep = (self.row_i % self.stride == 0)
+            if not keep and li != last_idx:
+                self.row_i += 1
+                continue
+            toks = line.split(",")
+            if len(toks) != len(self.header):
+                self.row_i += 1
+                continue
+            self.latest = toks
+            if keep:
+                self.rows.append(toks)
             self.row_i += 1
             if len(self.rows) > self.max_rows:
+                latest = self.rows[-1]
                 self.rows = self.rows[::2]
+                if self.rows[-1] is not latest:
+                    self.rows[-1] = latest
                 self.stride *= 2
 
     def column(self, name):
         if self.header is None or name not in self.header:
             return None
         i = self.header.index(name)
-        return [r[i] for r in self.rows]
+        values = [_parse_float(r[i]) for r in self.rows]
+        if self.latest is not None and (not self.rows or self.rows[-1] is not self.latest):
+            values.append(_parse_float(self.latest[i]))
+        return values
 
 
 class SeedStore:
@@ -379,36 +437,57 @@ class SeedStore:
         self.lifespan = CsvTail(d / "posts" / "post_lifespan.csv", max_rows=8000)
 
     def poll(self):
+        """Refresh the CSVs every group-wide poll_all() cycle needs for every seed at once
+        (main: api_summary/api_series status+timeseries; mod: api_series' Q_sign/Q_sign_repost
+        aux). op/repost/lifespan are each read for exactly one seed at a time (opseed/netSeed in
+        the frontend, see dashboard.html) -- polling them here for every seed in a group would
+        mean parsing every seed's repost_cascades.csv (observed up to ~150MB/2.7M rows on this
+        project's data) on every poll, though at most one seed's worth is ever displayed. See
+        poll_single() below, called on demand by api_opinion/api_repost/api_post_lifespan
+        instead."""
         self.main.poll()
         self.mod.poll()
+
+    def poll_op(self):
         self.op.poll()
+
+    def poll_repost(self):
         self.repost.poll()
+
+    def poll_lifespan(self):
         self.lifespan.poll()
 
 
-def poll_all():
+def poll_all(group=None):
     """Refresh statuses and tail every store. Call under LOCK."""
-    statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY, SERVE_GROUP)
+    group = selected_group(group)
+    now = time.monotonic()
+    if group in POLL_STATUS and now - POLL_AT.get(group, 0) < POLL_TTL:
+        return POLL_STATUS[group]
+    statuses = active_seeds(SERVE_LOGDIR, SERVE_ONLY, group)
     total = len(statuses)
     # Scope every seed lookup to the active group's own tag (see group_path_hint) so a seed
     # number reused by another arm of the same sweep can't get silently picked instead.
-    hint = group_path_hint(SERVE_LOGDIR, SERVE_GROUP)
+    hint = group_path_hint(SERVE_LOGDIR, group)
     try:
         for i, seed in enumerate(statuses, 1):
             set_activity(f"loading seed {seed} ({i}/{total}) …")
             d = result_dir(seed, hint)
             if d is None:
-                STORES.pop(seed, None)
+                STORES.pop((group, seed), None)
                 continue
-            st = STORES.get(seed)
+            key = (group, seed)
+            st = STORES.get(key)
             if st is None or st.dir != d:
-                STORES[seed] = st = SeedStore(seed, d)
+                STORES[key] = st = SeedStore(seed, d)
             st.poll()
-        for seed in list(STORES):
-            if seed not in statuses:
-                del STORES[seed]
+        for key in list(STORES):
+            if key[0] == group and key[1] not in statuses:
+                del STORES[key]
     finally:
         clear_activity()
+    POLL_STATUS[group] = statuses
+    POLL_AT[group] = now
     return statuses
 
 
@@ -420,16 +499,20 @@ def decimate(arr, max_pts):
     if len(arr) <= max_pts:
         return arr
     k = math.ceil(len(arr) / max_pts)
-    return arr[::k]
+    out = arr[::k]
+    if out[-1] != arr[-1]:
+        out.append(arr[-1])
+    return out
 
 
-def api_summary():
+def api_summary(qs=None):
+    group = selected_group((qs or {}).get("group", [None])[0])
     with LOCK:
-        statuses = poll_all()
+        statuses = poll_all(group)
         cols = set()
         seeds = []
         for seed in sorted(statuses):
-            st = STORES.get(seed)
+            st = STORES.get((group, seed))
             step, tag, target = 0, "", DEFAULT_TARGET_STEPS
             if st is not None:
                 tag = st.dir.name.removeprefix(f"run_{seed}_")
@@ -464,7 +547,7 @@ def api_summary():
             if all(dep in cols for dep in deps):
                 cols.add(name)
 
-        return {"seeds": seeds, "columns": sorted(cols), "families": families}
+        return {"group": group, "seeds": seeds, "columns": sorted(cols), "families": families}
 
 
 def derived_column(st, name, idx):
@@ -490,10 +573,13 @@ def derived_column(st, name, idx):
 def api_series(qs):
     want = [c for c in qs.get("cols", [""])[0].split(",") if c]
     max_pts = int(qs.get("max", ["1200"])[0])
+    group = selected_group(qs.get("group", [None])[0])
     with LOCK:
-        poll_all()
+        poll_all(group)
         out = {}
-        for seed, st in sorted(STORES.items()):
+        for (store_group, seed), st in sorted(STORES.items()):
+            if store_group != group:
+                continue
             steps = st.main.column("step")
             if not steps:
                 continue
@@ -518,17 +604,19 @@ def api_series(qs):
                         entry.setdefault("aux", {})[aux_name] = {
                             "step": [int(v) for v in qstep], "values": [rnd(v) for v in qval]}
             out[str(seed)] = entry
-        return {"seeds": out}
+        return {"group": group, "seeds": out}
 
 
 def api_opinion(qs):
     seed = int(qs.get("seed", ["-1"])[0])
     max_pts = int(qs.get("max", ["800"])[0])
+    group = selected_group(qs.get("group", [None])[0])
     with LOCK:
-        poll_all()
-        st = STORES.get(seed)
+        poll_all(group)
+        st = STORES.get((group, seed))
         if st is None:
             return {"step": [], "bins": []}
+        st.poll_op()
         steps = st.op.column("step")
         if not steps:
             return {"step": [], "bins": []}
@@ -574,12 +662,14 @@ def api_repost(qs):
     """Repost behavior over time from posts/repost_cascades.csv."""
     seed = int(qs.get("seed", ["-1"])[0])
     bucket = max(1, int(qs.get("bucket", ["1000"])[0]))
+    group = selected_group(qs.get("group", [None])[0])
     with LOCK:
-        poll_all()
-        st = STORES.get(seed)
+        poll_all(group)
+        st = STORES.get((group, seed))
         empty = {"step": [], "meanDepth": [], "structVirality": [], "depthHist": {}, "n": 0}
         if st is None:
             return empty
+        st.poll_repost()
         steps = st.repost.column("step")
         depths = st.repost.column("depth")
         if not steps:
@@ -635,12 +725,14 @@ def api_post_lifespan(qs):
     """
     seed = int(qs.get("seed", ["-1"])[0])
     top_n = max(1, min(50, int(qs.get("top", ["15"])[0])))
+    group = selected_group(qs.get("group", [None])[0])
     empty = {"rows": [], "n": 0, "meanLifespan": None, "stillActiveFrac": None}
     with LOCK:
-        poll_all()
-        st = STORES.get(seed)
+        poll_all(group)
+        st = STORES.get((group, seed))
         if st is None:
             return empty
+        st.poll_lifespan()
         post_ids = st.lifespan.column("postId")
         if not post_ids:
             return empty
@@ -669,7 +761,8 @@ def api_post_lifespan(qs):
 def api_log(qs):
     seed = int(qs.get("seed", ["-1"])[0])
     lines = int(qs.get("lines", ["200"])[0])
-    f = log_path_for_seed(SERVE_LOGDIR, SERVE_GROUP, seed)
+    group = selected_group(qs.get("group", [None])[0])
+    f = log_path_for_seed(SERVE_LOGDIR, group, seed)
     if f is None or not f.exists():
         return f"(no log file for seed {seed})"
     return "\n".join(f.read_text(errors="replace").splitlines()[-lines:])

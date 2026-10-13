@@ -10,6 +10,7 @@ public class AssertionCheck {
     private int n;
     private int[] numOfError;
     private int maxStep;
+    private int[] initialOutDegree; // snapshot of out-degrees at construction time
 
     public AssertionCheck(Agent[] agentSet, Network network, int agentNum, int maxStep) {
         this.agentSet = agentSet;
@@ -19,18 +20,26 @@ public class AssertionCheck {
         this.maxStep = maxStep;
     }
 
+    /** Record the t=0 out-degrees that rewire must conserve. */
+    public void snapshotOutDegrees(AdminOptim admin) {
+        initialOutDegree = new int[n];
+        for (int i = 0; i < n; i++) initialOutDegree[i] = admin.followeeCount(i);
+    }
+
     public void assertionChecker(Agent[] agentSet, AdminOptim admin, int agentNum, int step) {
         // R22: the follow graph has a single owner (AdminOptim) now, so the old followList-vs-admin
         // consistency check is obsolete (there is no second copy to desync). Remaining invariants:
 
-        // A follow edge must never coexist with a block of the same target (unfollow blocks + drops).
+        // Out-degree is conserved by rewire: every agent keeps its initial followee count.
         for (int i = 0; i < n; i++) {
-            boolean[] blocked = agentSet[i].getBlockedUserList();
-            for (int j : admin.getFollowees(i)) {
-                if (blocked[j]) {
-                    System.out.println("AC Error: agent " + i + " follows blocked user " + j);
-                    numOfError[step]++;
-                }
+            if (initialOutDegree != null && admin.followeeCount(i) != initialOutDegree[i]) {
+                System.out.println("AC Error: agent " + i + " out-degree " + admin.followeeCount(i)
+                        + " != initial " + initialOutDegree[i]);
+                numOfError[step]++;
+            }
+            if (admin.follows(i, i)) {
+                System.out.println("AC Error: agent " + i + " follows itself");
+                numOfError[step]++;
             }
         }
 

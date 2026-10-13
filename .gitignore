@@ -1,17 +1,32 @@
-results/
+# ---- build output (compiled classes; run.sh and the sweep scripts recompile into bin*/) ----
 bin/
-.DS_Store
-venv/
+bin_*/
+*.class
+.javafiles*.txt
+
+# ---- run output: disposable and regenerable from seed + parameters ----
+# Commit the written-up conclusions in docs/report/*.md, not the raw output.
+results/
 logs/
 *.log
+docs/report/*.csv
+
+# ---- local environments and caches ----
+venv/
+node_modules/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# ---- editor / OS ----
+.DS_Store
+.idea/
+.vscode/
+
+# ---- images (generated plots and screenshots) ----
 *.png
 *.gif
-node_modules/
-.javafiles.txt
-__pycache__/
+
+# ---- local-only files ----
 docs/reference/
 dashboard/color_presets.local.json
-
-# raw per-run experiment output (BO evaluations, CCDF/topk dumps, ...) - disposable/regeneratable
-# from seed+params; commit the .md report with the written-up conclusions, not the raw CSV.
-docs/report/*.csv

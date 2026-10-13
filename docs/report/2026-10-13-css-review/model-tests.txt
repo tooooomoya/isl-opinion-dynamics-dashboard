@@ -1,0 +1,113 @@
+== ModelTests ==
+[config round-trip]
+  PASS  seed / net_seed
+  PASS  beta_h / dead_after / l_ref
+  PASS  Q-learning knobs
+  PASS  mu / network / n / steps
+  PASS  state-bin edges
+  PASS  defaults: mu = 0, uniform init
+[tag]
+  PASS  default tag is the base string
+  PASS  beta_h tagged only when non-default
+  PASS  multiple knobs tagged
+  PASS  distinct configs => distinct tags
+[post lifecycle]
+  PASS  original defaults
+  PASS  alive for exactly deadAfter steps after creation
+  PASS  a like refreshes the post's life
+  PASS  a reshare refreshes the source's life
+[reshare is a post authored by the resharer]
+  PASS  author of the copy is the resharer
+  PASS  X is the source's X, undistorted
+  PASS  lineage kept; creation step = reshare step
+  PASS  a like on the copy is the resharer's, not the source author's
+[similarity and identity fit]
+  PASS  sim = 1 - |dx|/2
+  PASS  empty feed => identity fit 0
+  PASS  identity fit = mean similarity over the feed
+[recognition]
+  PASS  recognition = ln(1+likes)/ln(1+L_ref)
+  PASS  recognition saturates at 1 above L_ref
+  PASS  after the post dies its likes stop counting
+  PASS  mixed recognition: one like is worth > 0.2
+  PASS  influencers still differ: 1000 likes rewards more than 100
+[Q update]
+  PASS  empty feed + no posts => state 0
+  PASS  identity fit 1, recognition 0 => state (high, low) = 6
+  PASS  Q(s,a) += eta*(r + gamma*max Q' - Q) = 0.5*(1 + 0 - 0)
+  PASS  only the action taken is updated
+[equal start => equiprobable actions]
+  PASS  with equal Q all four actions are chosen ~25% of the time
+[exploration floor]
+  PASS  other actions chosen ~ eps*(3/4) of the time despite a large Q gap
+  PASS  eps = 0 => pure softmax, no exploration beyond the Q gap
+  PASS  exploration never picks an unavailable action
+[action availability]
+  PASS  rewire=false => rewire is never chosen (static network)
+  PASS  empty feed => only post and rewire are available
+  PASS  channel NONE disables post and reshare
+[feed pick favours similar posts]
+  PASS  beta_h large => the close post is picked almost always
+  PASS  beta_h = 0 => uniform pick
+[follow queue]
+  PASS  front of the queue is the oldest followee
+  PASS  reacting to a followee moves it to the back
+  PASS  reacting to a non-followee changes nothing
+[rewire: candidates are the originators of feed posts not yet followed]
+  PASS  originator of a reshare is the root post's author
+  PASS  new followee is a not-yet-followed originator, weighted toward the similar one (never the resharer 5)
+  PASS  out-degree conserved
+  PASS  the oldest followee (front) was dropped and the new one appended
+  PASS  reverse edge updated
+  PASS  no candidate closer than the front followee => no rewire, follow list unchanged
+  PASS  no new originator in the feed => no-op, nothing dropped
+  PASS  empty feed => rewire is a no-op
+  PASS  no followees => no-op
+[Watts-Strogatz start]
+  PASS  ws is the default start network, out-degree 15
+start making Watts-Strogatz network
+  PASS  every agent starts with out-degree exactly 15, no self-loops
+  PASS  no initial hubs (max in-degree 19)
+[homophily start]
+  PASS  gamma=0.0: out-degree exactly 15, no self-loops
+  PASS  gamma=8.0: out-degree exactly 15, no self-loops
+  PASS  gamma = 0 is a uniform random graph (assortativity 0.009)
+  PASS  gamma = 8 wires similar agents together (assortativity 0.951)
+[directed BA start]
+  PASS  every agent follows exactly 15 others, none itself (attract=1.0)
+  PASS  every agent follows exactly 15 others, none itself (attract=1000000.0)
+  PASS  small attractiveness gives much bigger hubs than near-uniform attachment (341 vs 83)
+[death sweep]
+  PASS  unreacted post dies after L steps, liked one survives
+  PASS  liked post still alive 10 steps after its like (18 - 8 = 10 <= L)
+  PASS  it dies one step later (19 - 8 = 11 > L)
+[drift]
+  PASS  mu = 0 => X never moves
+  PASS  mu > 0 => x = (1-mu) x0 + mu * feed mean
+[uniform init]
+  PASS  all X within [-1,1]
+  PASS  U[-1,1]: mean ~ 0, mean |x| ~ 0.5
+[velocity ranking cache]
+  PASS  initial ranking: early burst leads
+  PASS  cached ranking within the refresh interval
+  PASS  after the interval the stalled burst is demoted below the rising post
+[chrono rootPostId dedup]
+  PASS  two reshares of one story: distinct postId, shared rootPostId
+  PASS  only one of the two same-root reshares is delivered
+[dead posts are never delivered]
+  PASS  a forgotten post is not delivered to the feed
+[For You: perspective-similarity stream]
+  PASS  trend_share + foryou_share > 1 is rejected
+  PASS  never shows the reader's own posts
+  PASS  foryou_hop = 1: a 2-hop author's post is never shown
+  PASS  foryou_hop = 2: the 2-hop author with an identical X is often shown (200/200)
+  PASS  two posts of one root never share the feed
+  PASS  a sharp beta picks the near-X post over the far-X ones
+  PASS  initial estimate is a random X in [-1,1]
+  PASS  like moves the estimate by rho_l toward the post's X
+  PASS  reshare moves the estimate by rho_r toward the post's X
+[neutral band: excludes neutral agents' edges from sign modularity]
+  PASS  only neutral-touching edges => Q = 0
+  PASS  adding a neutral agent's edges does not change Q
+ALL PASS
+Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8

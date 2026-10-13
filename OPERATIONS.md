@@ -161,3 +161,14 @@ rewrite remote history (e.g. after an interactive rebase or amending a pushed co
 - `docs/reference/` — reference PDFs for literature-anchored parameters; **gitignored**
   (copyright), stays local only.
 - `results/` — simulation output, gitignored.
+
+## Viewing a run in the dashboard (attention-economy branch)
+
+```bash
+# 1. run with network snapshots (log_gexf defaults to true) and a name the dashboard can pair with the results folder
+nohup ./run.sh --name myrun --seeds "0" --parallel 1 --heap 4g -- steps=20000 results_subdir=myrun > logs/myrun.out 2>&1 & disown
+# 2. serve the dashboard (read-only; stop with Ctrl-C), then open http://127.0.0.1:8765
+python3 dashboard/dashboard.py --serve --port 8765
+```
+In the page, choose the run set `myrun_seed_myrun` in the run-set picker. The Network tab needs `log_gexf=true`.
+Always give `--name X` and `results_subdir=X` the same X: the dashboard matches a run set to its results folder by that name.

@@ -1,0 +1,79 @@
+[
+  {
+    "network": "ws",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "dba",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "homophily",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "random",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "ba",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "hk",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "dms",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "cnn",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "lfr",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "dcsbm",
+    "seed": 0,
+    "exit": 0,
+    "timeout": false,
+    "assert_lines": []
+  },
+  {
+    "network": "cnn",
+    "seed": 123,
+    "exit": null,
+    "timeout": true,
+    "stdout": "start making network\n"
+  }
+]

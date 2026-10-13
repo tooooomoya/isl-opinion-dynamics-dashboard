@@ -1,0 +1,9 @@
+UNAVAILABLE_BOOTSTRAP action=2 updatedQ=91.0 expectedAvailableOnly=1.0
+EMPTY_FEED_BOOTSTRAP Qpost=90.0 expectedAvailableOnly=0.0
+REPEAT_LIKE sameAgentSamePost count=2 lastReactionStep=2
+NO_AVAILABLE java.lang.IllegalArgumentException: bound must be positive
+NO_AVAILABLE_EPS0 returned=0 (POST=0 but posting disabled)
+TAG_COLLISION interactionWindow100vs200=true
+TAG_COLLISION qTau1001vs1002=true
+FLOORED_FEED S=1 fyShare=.7 feedSize=0 (fySlots=floor(.7)=0)
+Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8

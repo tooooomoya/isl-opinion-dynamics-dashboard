@@ -55,14 +55,14 @@ public class RepostVisualize {
             graphModel.getNodeTable().addColumn("opinionClass", Integer.class);
         }
 
-        Column boundedConfidence = graphModel.getNodeTable().getColumn("boundedConfidence");
-        if (boundedConfidence == null) {
-            graphModel.getNodeTable().addColumn("boundedConfidence", Double.class);
+        Column identityFit = graphModel.getNodeTable().getColumn("identityFit");
+        if (identityFit == null) {
+            graphModel.getNodeTable().addColumn("identityFit", Double.class);
         }
 
-        Column postProb = graphModel.getNodeTable().getColumn("postProb");
-        if (postProb == null) {
-            graphModel.getNodeTable().addColumn("postProb", Double.class);
+        Column recognition = graphModel.getNodeTable().getColumn("recognition");
+        if (recognition == null) {
+            graphModel.getNodeTable().addColumn("recognition", Double.class);
         }
 
         Column accessProb = graphModel.getNodeTable().getColumn("accessProb");
@@ -96,8 +96,8 @@ public class RepostVisualize {
             node.setAttribute("opinion", agents[i].getOpinion());
             node.setAttribute("community", -1);
             node.setAttribute("opinionClass", agents[i].getOpinionClass());
-            node.setAttribute("boundedConfidence", agents[i].getBc());
-            node.setAttribute("postProb", agents[i].getPostProb());
+            node.setAttribute("identityFit", agents[i].getLastIdentityFit());
+            node.setAttribute("recognition", agents[i].getLastRecognition());
             node.setAttribute("accessProb", agents[i].getAccessProb());
             node.setAttribute("shiftedOpinion", agents[i].getOpinion() - agents[i].getIntrinsicOpinion());
             node.setAttribute("intrinsicOpinion", agents[i].getIntrinsicOpinion());
@@ -158,8 +158,8 @@ public class RepostVisualize {
             if (node != null) {
                 node.setAttribute("opinion", agents[i].getOpinion());
                 node.setAttribute("opinionClass", agents[i].getOpinionClass());
-                node.setAttribute("boundedConfidence", agents[i].getBc());
-                node.setAttribute("postProb", agents[i].getPostProb());
+                node.setAttribute("identityFit", agents[i].getLastIdentityFit());
+                node.setAttribute("recognition", agents[i].getLastRecognition());
                 node.setAttribute("accessProb", agents[i].getAccessProb());
                 node.setAttribute("shiftedOpinion", agents[i].getOpinion() - agents[i].getIntrinsicOpinion());
                 node.setAttribute("intrinsicOpinion", agents[i].getIntrinsicOpinion());

@@ -1,0 +1,106 @@
+[
+  {
+    "case": "silent",
+    "exit": 0,
+    "assert_lines": [
+      "the sum of error reported : 0"
+    ],
+    "exception": [],
+    "final_metrics": {
+      "visitCount": "24",
+      "originalPostCount": "24",
+      "meanRecognition": "0.0000",
+      "meanQ_post": "0.0000"
+    }
+  },
+  {
+    "case": "pinned",
+    "exit": 0,
+    "assert_lines": [
+      "AC Error: pinned hub 1 drifted from its assigned opinion",
+      "AC Error: pinned hub 23 drifted from its assigned opinion",
+      "the sum of error reported : 0"
+    ],
+    "exception": [],
+    "final_metrics": {
+      "visitCount": "22",
+      "originalPostCount": "8",
+      "meanRecognition": "0.0117",
+      "meanQ_post": "0.0069"
+    },
+    "pinned_agents": [
+      {
+        "agentId": "1",
+        "intrinsicOpinion": "1.0000",
+        "opinion": "0.8771",
+        "identityFit": "0.3854",
+        "recognition": "0.0000",
+        "followerCount": "17",
+        "followeeCount": "15",
+        "isTarget": "1",
+        "qPost": "0.0043",
+        "qLike": "0.0000",
+        "qReshare": "0.0000",
+        "qRewire": "0.0000"
+      },
+      {
+        "agentId": "23",
+        "intrinsicOpinion": "-1.0000",
+        "opinion": "-0.9104",
+        "identityFit": "0.5519",
+        "recognition": "0.0000",
+        "followerCount": "18",
+        "followeeCount": "15",
+        "isTarget": "1",
+        "qPost": "0.0061",
+        "qLike": "0.0000",
+        "qReshare": "0.0000",
+        "qRewire": "0.0000"
+      }
+    ]
+  },
+  {
+    "case": "small_ws",
+    "exit": 0,
+    "assert_lines": [
+      "AC Error: agent 0 follows itself",
+      "AC Error: agent 1 follows itself",
+      "AC Error: agent 2 follows itself",
+      "AC Error: agent 3 follows itself",
+      "AC Error: agent 4 follows itself",
+      "AC Error: agent 5 follows itself",
+      "AC Error: agent 6 follows itself",
+      "AC Error: agent 7 follows itself",
+      "the sum of error reported : 0"
+    ],
+    "exception": [],
+    "final_metrics": {
+      "visitCount": "1",
+      "originalPostCount": "0",
+      "meanRecognition": "0.0000",
+      "meanQ_post": "0.0000"
+    }
+  },
+  {
+    "case": "zero_lref",
+    "exit": 0,
+    "assert_lines": [
+      "the sum of error reported : 0"
+    ],
+    "exception": [],
+    "final_metrics": {
+      "visitCount": "24",
+      "originalPostCount": "5",
+      "meanRecognition": "NaN",
+      "meanQ_post": "NaN"
+    }
+  },
+  {
+    "case": "zero_window",
+    "exit": 1,
+    "assert_lines": [],
+    "exception": [
+      "Exception in thread \"main\" java.lang.ArithmeticException: / by zero"
+    ]
+  }
+]

@@ -3,7 +3,8 @@
 # Usage:
 #   ./run.sh                                   # defaults: seeds 0..29, parallel 10
 #   ./run.sh --seeds "0 1 2" --parallel 4
-#   ./run.sh --seeds "0 1" -- p_u=0.05 bc_dec=0.995   # tokens after -- go to the simulator
+#   ./run.sh --seeds "0 1" -- beta_h=5 q_tau=0.1       # tokens after -- go to the simulator
+#   ./run.sh --name myarm --seeds "0 1" -- alpha=0     # logs/myarm_seed<seed>_myarm.log (separate dashboard run set)
 #
 # Existing result folders are NEVER deleted by default; a run whose target folder already exists
 # aborts with a message (tag()-based folder names make collisions meaningful). To force a redo,
@@ -23,6 +24,7 @@ MAX_PARALLEL=10
 JAVA_HEAP="2g"
 LOGDIR="logs"
 CONFIG_TOKENS=""
+RUN_NAME=""   # --name NAME: log to logs/<NAME>_seed<seed>_<NAME>.log so each arm is its own dashboard run set
 
 # ---- arg parsing ----
 while [ $# -gt 0 ]; do
@@ -30,6 +32,7 @@ while [ $# -gt 0 ]; do
         --seeds)    TARGET_SEEDS="$2"; shift 2 ;;
         --parallel) MAX_PARALLEL="$2"; shift 2 ;;
         --heap)     JAVA_HEAP="$2"; shift 2 ;;
+        --name)     RUN_NAME="$2"; shift 2 ;;
         --)         shift; CONFIG_TOKENS="$*"; break ;;
         *) echo "Unknown option: $1 (use --seeds, --parallel, --heap, -- key=value...)"; exit 1 ;;
     esac
@@ -60,6 +63,7 @@ run_one() {
     local seed=$1
 
     local logfile="${LOGDIR}/run_${seed}.log"
+    if [ -n "$RUN_NAME" ]; then logfile="${LOGDIR}/${RUN_NAME}_seed${seed}_${RUN_NAME}.log"; fi
     echo "[START] seed=$seed $(date)" > "$logfile"
 
     java -Xmx${JAVA_HEAP} \
@@ -72,7 +76,7 @@ run_one() {
 }
 
 export -f run_one
-export LIBCP JAVA_HEAP LOGDIR CONFIG_TOKENS
+export LIBCP JAVA_HEAP LOGDIR CONFIG_TOKENS RUN_NAME
 
 for seed in $TARGET_SEEDS; do
     echo "$seed"

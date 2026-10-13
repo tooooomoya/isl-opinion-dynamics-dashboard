@@ -32,20 +32,25 @@ public final class NetworkFactory {
                 // Kwak et al. 2010 (m=15/A=4/pt=0.05) — see class docstring.
                 return new HolmeKimNetwork(n, cfg.hkM, cfg.hkA, cfg.hkPt);
             case "ws":
-                return new WattsStrogatzNetwork(n, 4, 0.1);
+                // K = 2 * wsOut: the generator adds edges to the next K/2 agents, so wsOut is the out-degree
+                return new WattsStrogatzNetwork(n, 2 * cfg.wsOut, cfg.wsBeta);
             case "dms":
                 return new DMSNetwork(n, 3, 2);
             case "cnn":
                 return new ConnectingNearestNeighborNetwork(n, 0.3);
             case "lfr":
                 return new LFRNetwork(n, 10, 50, 0.2, 2.5, 1.5, 10, 50);
+            case "homophily":
+                return new HomophilyNetwork(n, cfg.homOut, cfg.homGamma);
+            case "dba":
+                return new DirectedBANetwork(n, cfg.baOut, cfg.baAttract);
             case "random":
-                return new RandomNetwork(n, Const.CONNECTION_PROB_OF_RANDOM_NW);
+                return new RandomNetwork(n, cfg.randomP);
             case "read":
                 return new ReadNetwork(n, cfg.readPath);
             default:
                 throw new IllegalArgumentException("Unknown network type: '" + cfg.networkType
-                        + "' (expected dcsbm|ba|hk|ws|dms|cnn|lfr|random|read)");
+                        + "' (expected dcsbm|ba|hk|ws|dba|dms|cnn|lfr|random|homophily|read)");
         }
     }
 }

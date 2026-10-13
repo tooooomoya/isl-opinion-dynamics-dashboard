@@ -109,7 +109,7 @@ public class InterventionSetup {
     public static void writeConfigLog(ExperimentConfig cfg, List<HubRecord> records, String folderPath) {
         StringBuilder sb = new StringBuilder();
         sb.append("seed,net_seed,extreme,n_neutral,size_strategy,channel_cfg,pool_top_k,")
-          .append("couple_relay_dist,relay_dist_str,out_of_bc_repost_prob,bc_dec,init_op,")
+          .append("beta_h,dead_after,q_eta,mu,init_dist,")
           .append("hub_id,role,followers,hub_channel,assigned_opinion\n");
         for (HubRecord r : records) {
             sb.append(cfg.seed).append(',')
@@ -119,11 +119,11 @@ public class InterventionSetup {
               .append(cfg.sizeStrategy).append(',')
               .append(cfg.channel).append(',')
               .append(cfg.poolTopK).append(',')
-              .append(cfg.coupleRelayDistortion).append(',')
-              .append(String.format("%.2f", cfg.relayDistortionStrength)).append(',')
-              .append(String.format("%.3f", cfg.outOfBCRepostProb)).append(',')
-              .append(cfg.bcDecRate).append(',')
-              .append(cfg.initOpinionClip ? "clip" : "truncate").append(',')
+              .append(cfg.betaH).append(',')
+              .append(cfg.deadAfter).append(',')
+              .append(cfg.qEta).append(',')
+              .append(cfg.mu).append(',')
+              .append(cfg.initOpinionDist).append(',')
               .append(r.id).append(',')
               .append(r.role).append(',')
               .append(r.followers).append(',')

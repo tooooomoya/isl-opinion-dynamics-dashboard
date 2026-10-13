@@ -317,26 +317,17 @@ public class Writer {
     public void writeAgentSnapshot(agent.Agent[] agentSet, admin.AdminOptim admin, String outputDirPath, String label) {
         String filePath = outputDirPath + "/degrees/agent_snapshot_" + label + ".csv";
         try (PrintWriter pw = new PrintWriter(new FileWriter(filePath, false))) {
-            // 2026-08-04: avgComfortRate (Agent.getAverageComfortRate(), a trailing-100-step average
-            // already maintained internally by the agent for its own bc/postProb feedback loop)
-            // added for the L/M/P hub-tier pilot's hub-vs-non-hub comfort-rate split (existing
-            // cRateMean_i in metrics/results.csv mixes hub-tier and ordinary agents within a bin;
-            // this column lets analysis exclude the isTarget==1 hub-tier agents in post-hoc Python).
-            // (A parallel numOfPosts column + periodic mid-run snapshot were tried for a similar
-            // per-agent post-count split and reverted: Agent.numOfPosts is a static feed-capacity
-            // field set once at construction, not a post counter -- it does not vary and cannot
-            // answer that question. The non-hub post-rate split is instead computed directly from
-            // posts/post_result.csv, whose bin_i counts already exclude every target/hub agent's own
-            // posts by construction -- see the `!agent.getTarget()` gate around writer.setPostBins()
-            // above -- so only the population denominator needed correcting, in Python, no new
-            // per-agent instrumentation required.)
-            pw.println("agentId,intrinsicOpinion,opinion,bc,followerCount,followeeCount,isTarget,avgComfortRate");
+            // Per-agent snapshot. identityFit/recognition are the values at the agent's last visit;
+            // qPost..qRewire are the agent's learned action values averaged over its 9 states.
+            pw.println("agentId,intrinsicOpinion,opinion,identityFit,recognition,followerCount,followeeCount,isTarget,qPost,qLike,qReshare,qRewire");
             for (int i = 0; i < agentSet.length; i++) {
                 agent.Agent a = agentSet[i];
-                pw.printf("%d,%.4f,%.4f,%.4f,%d,%d,%d,%.4f%n",
-                        i, a.getIntrinsicOpinion(), a.getOpinion(), a.getBc(),
+                double[] qm = new double[agent.Agent.NUM_ACTIONS];
+                for (double[] row : a.getQ()) for (int k = 0; k < qm.length; k++) qm[k] += row[k] / agent.Agent.NUM_STATES;
+                pw.printf("%d,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f%n",
+                        i, a.getIntrinsicOpinion(), a.getOpinion(), a.getLastIdentityFit(), a.getLastRecognition(),
                         admin.getFollowers(i).size(), admin.followeeCount(i),
-                        a.getTarget() ? 1 : 0, a.getAverageComfortRate());
+                        a.getTarget() ? 1 : 0, qm[0], qm[1], qm[2], qm[3]);
             }
         } catch (IOException e) {
             e.printStackTrace();
