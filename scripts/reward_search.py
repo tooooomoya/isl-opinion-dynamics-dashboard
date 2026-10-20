@@ -44,9 +44,9 @@ BASE = {
     "q_tau": "0.1", "l_ref": "1000", "i_edge_lo": "0.63", "i_edge_hi": "0.71", "rewire": "false",
     "network": "hk", "dead_after": "200",
 }
-SCREENS = {
-    "chrono": {"trend_share": "0", "foryou_share": "0"},
-    "foryou": {"trend_share": "0", "foryou_share": "0.7", "foryou_hop": "1"},
+SCREENS = {  # 100 % algorithmic feeds, no chrono slots
+    "foryou100": {"trend_share": "0", "foryou_share": "1.0", "foryou_hop": "1"},
+    "trend100": {"trend_share": "1.0", "trend_hop": "1", "foryou_share": "0"},
 }
 ACTS = ["post", "like", "reshare"]
 COLQ = {"post": "qPost", "like": "qLike", "reshare": "qReshare", "rewire": "qRewire"}
@@ -262,8 +262,8 @@ def cfg_name(wf, wr, mix, lam):
 def stage1():
     jobs = []
     for scr, tk in SCREENS.items():
-        for wf in ["1", "0.5", "0.25"]:
-            for wr in ["1", "2"]:
+        for wf in ["1", "0.5", "0.1"]:
+            for wr in ["1", "2", "4"]:
                 for mix in ["0.5", "1"]:
                     for lam in ["2", "0.5"]:
                         t = dict(BASE); t.update(tk)

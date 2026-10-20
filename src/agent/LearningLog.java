@@ -31,6 +31,11 @@ public final class LearningLog {
         sumD[s][a] += delta; sumD2[s][a] += delta * delta; sumAbsD[s][a] += Math.abs(delta);
     }
 
+    /** Delayed credit g of one POST/RESHARE decision: added to that (s,a)'s reward total (one credit per decision, so meanR = immediate + credited). */
+    static void recordCredit(int s, int a, double g) {
+        sumR[s][a] += g;
+    }
+
     /** gap[a] = Q(s,a) - max over offered; p[a] = theoretical choice probability; only offered actions are counted. */
     static void recordChoice(boolean[] ok, double[] gap, double[] p, int pick) {
         int k = 0;

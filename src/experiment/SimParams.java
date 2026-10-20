@@ -36,13 +36,29 @@ public record SimParams(
         double recogMix,         // weight of the fast term in recognition
         double wFit,             // reward weight of identity fit:  r = wFit * I + wRec * L
         double wRec,             // reward weight of recognition
+        boolean creditPost,      // true: likes are credited to the action that made the post (delayed), not the stock
+        int creditHorizon,
+        boolean fitRelative,     // true: identity fit minus its expectation under a random feed (state and reward)       // steps after creation during which a post's likes count for its creating action
         // ---- Q-learning ----
         double qEta,
         double qGamma,
+        boolean bandit,           // true: single state and no bootstrapping (qGamma ignored)
         double qTau,
         double qInit,
         double qEps,              // exploration floor (uniform random action with this probability)
         boolean rewireOn,         // false = static follow network: rewire is not an available action
+        double costPost,          // reward cost paid for a post (subtracted from the reward its decision earns)
+        double costReshare,       // reward cost paid for a reshare (typically smaller than costPost)
+        boolean rewireGate,       // true: a rewire swaps only if the candidate is strictly closer than the oldest followee; false: it always swaps
+        double postNoise,         // sd of the Gaussian noise on the X expressed in an original post (0 = exact); > 0 also makes rewire judge agents by their posts
+        int notifyMax,            // > 0: reshares of my own posts join my candidate pool (hop-exempt); 0 = off
+        double reshareAlpha,      // share of the likes on a reshare credited to the original author (rest to the resharer)
+        double costRewire,        // reward cost paid for a rewire decision (whether or not the swap is executed)
+        double foryouHopLambda,   // For You hop term exp(-lambda (d-1)) multiplied into the similarity weight (< 0: legacy feed_decay machinery)
+        int foryouCandMax,        // For You: random sample of at most this many hop-filtered candidates per feed before weighting (0 = all)
+        boolean fitBaselineAnalytic, // relative fit: baseline 1 - (1 + x^2)/4 (random feed, X uniform on [-1,1]) instead of the empirical mean similarity
+        boolean likeGateNoop,     // like range gate: false = out-of-range posts are not candidates; true = a like whose drawn post is out of range does nothing (counted as gated)
+        double likeMaxDist,       // absolute like range: a post is likeable only if |x_i - x_post| <= this (>=2 = no limit)
         double iEdgeLo, double iEdgeHi,   // identity-fit state-bin edges
         double lEdgeLo, double lEdgeHi,   // recognition state-bin edges
         int assertInterval,
@@ -56,8 +72,8 @@ public record SimParams(
                 c.trendShare, c.trendHopH, c.foryouShare, c.foryouHopH, c.foryouBeta, c.foryouProfile, c.rhoLike, c.rhoReshare, c.feedDecayMode, c.feedDecayLambda, c.feedTimeDecayTau,
                 c.velMode, c.feedCapacity, c.accessProb, c.algoExcludeIds,
                 c.initOpinionDist, c.mu, c.neutralBandHalfWidth,
-                c.betaH, c.deadAfter, c.lRef, c.recogLambda, c.recogMix, c.wFit, c.wRec,
-                c.qEta, c.qGamma, c.qTau, c.qInit, c.qEps, c.rewireOn,
+                c.betaH, c.deadAfter, c.lRef, c.recogLambda, c.recogMix, c.wFit, c.wRec, c.credit.equals("post"), c.creditHorizon, c.fitMode.equals("relative"),
+                c.qEta, c.qGamma, c.learner.equals("bandit"), c.qTau, c.qInit, c.qEps, c.rewireOn, c.costPost, c.costReshare, c.rewireGate, c.postNoise, c.notifyMax, c.reshareAlpha, c.costRewire, c.foryouHopLambda, c.foryouCandMax, c.fitBaseline.equals("analytic"), c.likeGate.equals("noop"), c.likeMaxDist,
                 c.iEdgeLo, c.iEdgeHi, c.lEdgeLo, c.lEdgeHi,
                 Math.max(1, c.assertInterval),
                 c.resultFolder());

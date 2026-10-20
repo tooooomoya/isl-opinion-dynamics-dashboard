@@ -110,6 +110,17 @@ public class OpinionDynamics {
         this.gephi = cfg.logGexf ? new GraphVisualize(0.00, agentSet, network) : null;
         this.repostGephi = cfg.logGexf ? new RepostVisualize(agentSet) : null;
         this.admin = new AdminOptim(agentNum, network.getAdjacencyMatrix(), params);
+        if (params.fitRelative()) { // expected identity fit of a random feed = mean similarity to the whole population
+            for (Agent a : agentSet) {
+                if (params.fitBaselineAnalytic()) { // random feed, X uniform on [-1, 1]: E[sim] = 1 - (1 + x^2) / 4
+                    a.setFitBaseline(1.0 - (1.0 + a.getOpinion() * a.getOpinion()) / 4.0);
+                    continue;
+                }
+                double sum = 0.0;
+                for (Agent b : agentSet) if (b != a) sum += Agent.similarity(a.getOpinion(), b.getOpinion());
+                a.setFitBaseline(sum / Math.max(1, agentSet.length - 1));
+            }
+        }
         if (params.foryouShare() > 0.0 && params.foryouProfile()) {
             admin.initEstimates(randomGenerator.network()); // platform's initial estimate of every agent's X: random
         }
@@ -136,6 +147,7 @@ public class OpinionDynamics {
     private void setNetwork() {
         this.network = NetworkFactory.create(cfg, agentNum);
         this.network.makeNetwork(agentSet);
+        if (cfg.startDeg > 0) this.network.enforceEdgeCount(agentNum * cfg.startDeg, randomGenerator.network());
         System.out.println("finish making network");
     }
 
@@ -215,6 +227,7 @@ public class OpinionDynamics {
             if (!a.getTarget()) popCountByBin7[Agent.opinionToBin7(a.getIntrinsicOpinion())]++;
         }
 
+        writeEdges("edges_t0.csv");
         for (int step = 1; step <= t; step++) {
             if (step % 1000 == 0) System.out.println("step = " + step);
             resetStepStats();
@@ -237,6 +250,13 @@ public class OpinionDynamics {
             // forgotten posts die: remove every post that has gone deadAfter steps without a like
             // or reshare (their likes stop counting toward recognition at the author's next visit).
             admin.sweepDead(step);
+            for (Post dead : admin.drainEvicted()) {
+                if (dead.getPostedStep() <= t - CONV_WINDOW) continue;
+                int kind = dead.isRelay() ? 1 : 0;
+                lifeHist[kind][Math.min(HIST_MAX, step - dead.getPostedStep())]++;
+                likesHist[kind][Math.min(HIST_MAX, dead.getLikesReceived())]++;
+                resharesHist[kind][Math.min(HIST_MAX, dead.getReceivedReposts())]++;
+            }
             if (params.foryouShare() > 0.0) admin.rebuildAuthorIndex();
 
             List<Agent> shuffledAgents = new ArrayList<>(Arrays.asList(agentSet));
@@ -305,15 +325,21 @@ public class OpinionDynamics {
                     }
                     case Agent.LIKE -> {
                         Post src = agent.pickFromFeed(Agent.LIKE);
-                        agent.like(src, step, admin);
-                        admin.updateEstimate(agentId, src.getPostOpinion(), params.rhoLike());
-                        reactionsReceived[src.getPostUserId()]++;
-                        if (population) stepStats.likeCount++;
+                        if (agent.likeGatedFor(src)) { // like_gate = noop: the drawn post is out of the like range, the like does nothing
+                            agent.addGatedLike();
+                        } else {
+                            agent.like(src, step, admin);
+                            if (step > t - CONV_WINDOW) likeConv.increment(agentId, src.getPostUserId());
+                            admin.updateEstimate(agentId, src.getPostOpinion(), params.rhoLike());
+                            reactionsReceived[src.getPostUserId()]++;
+                            if (population) stepStats.likeCount++;
+                        }
                     }
                     case Agent.RESHARE -> {
                         Post src = agent.pickFromFeed(Agent.RESHARE);
                         Post copy = agent.reshare(src, step, admin, agent.receivedViaAlgo(src));
                         admin.updateEstimate(agentId, src.getPostOpinion(), params.rhoReshare());
+                        admin.notifyOriginal(copy.getRootAuthorId(), copy);
                         reactionsReceived[src.getPostUserId()]++;
                         stepStats.allRepostCount++;
                         if (population) {
@@ -322,6 +348,7 @@ public class OpinionDynamics {
                         }
                         int srcAuthor = src.getPostUserId();
                         repostNetwork.increment(agentId, srcAuthor);
+                        if (step > t - CONV_WINDOW) reshareConv.increment(agentId, srcAuthor);
                         repostNetworkCumulative.increment(agentId, srcAuthor);
                         repostNetworkWindow.increment(agentId, srcAuthor);
                         repostNetworkHomophily.increment(agentId, srcAuthor); // all reshares; no bc gate any more
@@ -330,6 +357,11 @@ public class OpinionDynamics {
                         admin.addRecentPost(copy);
                         for (int followerId : admin.getFollowers(agentId)) {
                             pendingDeliveries.add(new PendingDelivery(followerId, copy));
+                        }
+                        // notify_original: the original author also receives the copy in the chrono FIFO cache, like a followee's post
+                        int origAuthor = copy.getRootAuthorId();
+                        if (params.notifyMax() > 0 && origAuthor != agentId && !admin.getFollowers(agentId).contains(origAuthor)) {
+                            pendingDeliveries.add(new PendingDelivery(origAuthor, copy));
                         }
                     }
                     default -> { // Agent.REWIRE
@@ -384,7 +416,9 @@ public class OpinionDynamics {
                 writer.writePostBin7(postCountByBin7, popCountByBin7, folerPath, step);
             }
             if (step % STATE_LOG_INTERVAL == 0) writeStateLog(step);
+            curStep = step;
             exportStepMetrics();
+            if (step == t / 2) writeEdges("edges_mid.csv");
             if (step % cfg.interactionWindow == 0) repostNetworkWindow.clear();
         }
         writer.writeAgentSnapshot(agentSet, admin, folerPath, "final");
@@ -401,11 +435,12 @@ public class OpinionDynamics {
 
     // metrics/agent_actions.csv: per window and agent, how many times each action was chosen (agents with no visit omitted).
     private long[][] prevActionTotals;
+    private long[] prevGated;
     private void writeAgentActions(int step, Path dir) throws java.io.IOException {
-        if (prevActionTotals == null) prevActionTotals = new long[agentSet.length][Agent.NUM_ACTIONS];
+        if (prevActionTotals == null) { prevActionTotals = new long[agentSet.length][Agent.NUM_ACTIONS]; prevGated = new long[agentSet.length]; }
         Path f = dir.resolve("agent_actions.csv");
         StringBuilder sb = new StringBuilder();
-        if (!Files.exists(f)) sb.append("step,agentId,nPost,nLike,nReshare,nRewire\n");
+        if (!Files.exists(f)) sb.append("step,agentId,nPost,nLike,nReshare,nRewire,nLikeGated\n");
         for (Agent ag : agentSet) {
             long[] d = new long[Agent.NUM_ACTIONS];
             long any = 0;
@@ -416,16 +451,29 @@ public class OpinionDynamics {
                 prevActionTotals[ag.getId()][a] = tot;
                 any += d[a];
             }
+            long gated = ag.getLikeGated() - prevGated[ag.getId()];
+            prevGated[ag.getId()] = ag.getLikeGated();
             if (any == 0) continue;
             sb.append(step).append(',').append(ag.getId());
             for (int a = 0; a < Agent.NUM_ACTIONS; a++) sb.append(',').append(d[a]);
-            sb.append('\n');
+            sb.append(',').append(gated).append('\n');
         }
         Files.writeString(f, sb.toString(), java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
     }
 
     // End-of-run dump of every agent's Q table: degrees/q_table_final.csv, one row per (agent, state) with the four
     // Q values and how often that agent chose each action in that state (zero counts = Q still at its initial value).
+    /** Follow edges (follower,followee) as of now, to degrees/<fileName>. */
+    private void writeEdges(String fileName) {
+        try {
+            StringBuilder eb = new StringBuilder("follower,followee\n");
+            for (Agent ag : agentSet) for (int fe : admin.getFollowees(ag.getId())) eb.append(ag.getId()).append(',').append(fe).append('\n');
+            Files.writeString(Path.of(folerPath, "degrees", fileName), eb.toString());
+        } catch (java.io.IOException e) {
+            System.err.println("[edges] failed: " + e.getMessage());
+        }
+    }
+
     private void writeQTable() {
         try {
             StringBuilder sb = new StringBuilder("agentId,followerCount,state,qPost,qLike,qReshare,qRewire,nPost,nLike,nReshare,nRewire\n");
@@ -440,9 +488,17 @@ public class OpinionDynamics {
                 }
             }
             Files.writeString(Path.of(folerPath, "degrees", "q_table_final.csv"), sb.toString());
-            StringBuilder eb = new StringBuilder("follower,followee\n");
-            for (Agent ag : agentSet) for (int fe : admin.getFollowees(ag.getId())) eb.append(ag.getId()).append(',').append(fe).append('\n');
-            Files.writeString(Path.of(folerPath, "degrees", "edges_final.csv"), eb.toString());
+            writeEdges("edges_final.csv");
+            StringBuilder rc = new StringBuilder("type,actor,author,count\n");
+            for (var row : likeConv.rowEntries()) for (var e : row.getValue().entrySet()) rc.append("like,").append(row.getKey()).append(',').append(e.getKey()).append(',').append(e.getValue()).append('\n');
+            for (var row : reshareConv.rowEntries()) for (var e : row.getValue().entrySet()) rc.append("reshare,").append(row.getKey()).append(',').append(e.getKey()).append(',').append(e.getValue()).append('\n');
+            Files.writeString(Path.of(folerPath, "metrics", "reactions_conv.csv"), rc.toString());
+            StringBuilder ph = new StringBuilder("kind,value,life,likes,reshares\n");
+            for (int k = 0; k < 2; k++) for (int v = 0; v <= HIST_MAX; v++) {
+                if (lifeHist[k][v] + likesHist[k][v] + resharesHist[k][v] > 0)
+                    ph.append(k == 0 ? "orig" : "copy").append(',').append(v).append(',').append(lifeHist[k][v]).append(',').append(likesHist[k][v]).append(',').append(resharesHist[k][v]).append('\n');
+            }
+            Files.writeString(Path.of(folerPath, "metrics", "post_life_hist.csv"), ph.toString());
         } catch (java.io.IOException e) {
             System.err.println("[q table] failed: " + e.getMessage());
         }
@@ -539,6 +595,25 @@ public class OpinionDynamics {
     }
 
     // Assemble the per-step metrics row. Insertion order here IS the CSV column order.
+    // Network-wide metrics (assortativity, cross-cutting, disagreement) cost O(edges) each; with metrics_heavy_every = k they are recomputed
+    // every k steps and carried forward in between (the cheap per-step counters stay exact). k = 1 reproduces the old behaviour.
+    private int curStep = 0;
+
+    // Converged-window diagnostics (last CONV_WINDOW steps): who reacted to whom, and how long / how much posts live.
+    private static final int CONV_WINDOW = 5000, HIST_MAX = 3000;
+    private final SparseIntMatrix likeConv = new SparseIntMatrix();      // liker -> author of the liked post
+    private final SparseIntMatrix reshareConv = new SparseIntMatrix();   // resharer -> author of the reshared post
+    private final long[][] lifeHist = new long[2][HIST_MAX + 1];         // [original|reshare copy][lifetime in steps], posts created in the window
+    private final long[][] likesHist = new long[2][HIST_MAX + 1];        // likes received by a post over its life
+    private final long[][] resharesHist = new long[2][HIST_MAX + 1];     // reshares received by a post over its life
+    private final java.util.Map<String, Double> heavyCache = new java.util.HashMap<>();
+    private double heavy(String name, java.util.function.DoubleSupplier f) {
+        int k = cfg.metricsHeavyEvery;
+        Double cached = heavyCache.get(name);
+        if (k <= 1 || cached == null || curStep % k == 0) { double v = f.getAsDouble(); heavyCache.put(name, v); return v; }
+        return cached;
+    }
+
     private MetricsRow buildMetricsRow() {
         MetricsRow row = new MetricsRow();
         row.put("opinionVar", analyzer.computeVarianceOpinion(agentSet));
@@ -550,14 +625,14 @@ public class OpinionDynamics {
         row.put("rewire", stepStats.rewireCount);
         row.put("opinionAvg", analyzer.computeMeanOpinion(agentSet));
         row.put("shannonIndex", analyzer.computeShannonWienerIndex(agentSet));
-        row.put("disagreement", analyzer.computeDisagreement(agentSet, admin));
-        row.put("opinionAssortativity", analyzer.computeOpinionAssortativity(agentSet, admin));
-        row.put("crossCuttingFraction", analyzer.computeCrossCuttingFraction(agentSet, admin, params.neutralBandHalfWidth()));
+        row.put("disagreement", heavy("disagreement", () -> analyzer.computeDisagreement(agentSet, admin)));
+        row.put("opinionAssortativity", heavy("opinionAssortativity", () -> analyzer.computeOpinionAssortativity(agentSet, admin)));
+        row.put("crossCuttingFraction", heavy("crossCuttingFraction", () -> analyzer.computeCrossCuttingFraction(agentSet, admin, params.neutralBandHalfWidth())));
         row.put("opinionKurtosis", analyzer.computeOpinionKurtosis(agentSet));
-        row.put("interactionAssortativity", analyzer.computeInteractionAssortativity(agentSet, repostNetworkCumulative));
-        row.put("interactionCrossCuttingFraction", analyzer.computeInteractionCrossCuttingFraction(agentSet, repostNetworkCumulative, params.neutralBandHalfWidth()));
-        row.put("interactionAssortativityW", analyzer.computeInteractionAssortativity(agentSet, repostNetworkWindow));
-        row.put("interactionCrossCuttingFractionW", analyzer.computeInteractionCrossCuttingFraction(agentSet, repostNetworkWindow, params.neutralBandHalfWidth()));
+        row.put("interactionAssortativity", heavy("interactionAssortativity", () -> analyzer.computeInteractionAssortativity(agentSet, repostNetworkCumulative)));
+        row.put("interactionCrossCuttingFraction", heavy("interactionCrossCuttingFraction", () -> analyzer.computeInteractionCrossCuttingFraction(agentSet, repostNetworkCumulative, params.neutralBandHalfWidth())));
+        row.put("interactionAssortativityW", heavy("interactionAssortativityW", () -> analyzer.computeInteractionAssortativity(agentSet, repostNetworkWindow)));
+        row.put("interactionCrossCuttingFractionW", heavy("interactionCrossCuttingFractionW", () -> analyzer.computeInteractionCrossCuttingFraction(agentSet, repostNetworkWindow, params.neutralBandHalfWidth())));
         analyzer.computeFeedMetrics(agentSet);
         double[] feedMean = analyzer.getFeedMeanArray();
         double[] feedVar = analyzer.getFeedVarArray();

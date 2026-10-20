@@ -52,6 +52,9 @@ public class Agent {
     private int lastAction = -1;
     private double lastIdentityFit = 0.0;
     private double lastRecognition = 0.0;
+    // delayed credit: a post I made, with the (state, action) that made it, waiting for its horizon to close
+    private record PendingCredit(Post post, int state, int action) {}
+    private final java.util.ArrayDeque<PendingCredit> pendingCredits = new java.util.ArrayDeque<>();
     private final List<Post> ownPosts = new ArrayList<>(); // own originals + reshares, alive ones only after purge
 
     public Agent(int agentID, SimParams params) {
@@ -82,6 +85,11 @@ public class Agent {
 
     // ---------------- getters ----------------
     public int getId() { return id; }
+    private long likeGated = 0;   // like choices whose drawn post was out of the like range (like_gate = noop): nothing happened
+    public void addGatedLike() { likeGated++; }
+    public long getLikeGated() { return likeGated; }
+    /** True if the like range gate blocks a like of {@code post} (only used with like_gate = noop). */
+    public boolean likeGatedFor(Post post) { return p.likeGateNoop() && Math.abs(opinion - post.getPostOpinion()) > p.likeMaxDist(); }
     public double getOpinion() { return opinion; }
     public double getIntrinsicOpinion() { return intrinsicX; }
     public double getStubbornness() { return stubbornness; }
@@ -169,15 +177,23 @@ public class Agent {
      * are dropped from my list here (a dead post is never revived), so their likes stop counting.
      */
     public double recognition(int step) {
-        long likes = 0;
+        // Likes on a reshare are split: the resharer keeps (1 - alpha), the original's author gets alpha (alpha = 0: all to the resharer);
+        // a like on the copy by the original's own author is credited entirely to the resharer.
+        double a = p.reshareAlpha(), likes = 0.0;
         for (Iterator<Post> it = ownPosts.iterator(); it.hasNext(); ) {
             Post post = it.next();
             if (!post.isAlive(step, p.deadAfter())) it.remove();
-            else likes += post.getLikesReceived();
+            else if (post.isRelay()) likes += (1.0 - a) * (post.getLikesReceived() - post.getLikesByOriginator()) + post.getLikesByOriginator();
+            else likes += post.getLikesReceived() + a * post.getCopyLikes();
         }
+        return recogValue(likes);
+    }
+
+    /** The recognition scale applied to a like count. */
+    private double recogValue(double likes) {
         // fast term: first likes matter a lot (peripheral agents); slow term: keeps separating influencers
         double fast = 1.0 - Math.exp(-likes / Math.max(1e-9, p.recogLambda()));
-        double slow = Math.min(1.0, Math.log1p((double) likes) / Math.log1p(p.lRef()));
+        double slow = Math.min(1.0, Math.log1p(likes) / Math.log1p(p.lRef()));
         return p.recogMix() * fast + (1.0 - p.recogMix()) * slow;
     }
 
@@ -187,6 +203,7 @@ public class Agent {
 
     /** State index = 3 * identity-fit level + recognition level. */
     public int stateOf(double identityFit, double recognition) {
+        if (p.bandit()) return 0;
         return 3 * bin(identityFit, p.iEdgeLo(), p.iEdgeHi()) + bin(recognition, p.lEdgeLo(), p.lEdgeHi());
     }
 
@@ -197,11 +214,13 @@ public class Agent {
      * Returns the new state.
      */
     public int observeAndLearn(int step) {
-        double fit = identityFit();
+        double rawFit = identityFit();
+        double fit = p.fitRelative() ? rawFit - fitBaseline : rawFit; // relative: better or worse than a random feed would be
         double rec = recognition(step);
-        this.lastIdentityFit = fit;
+        this.lastIdentityFit = rawFit;     // metrics always report the raw fit
         this.lastRecognition = rec;
         int s = stateOf(fit, rec);
+        settleCredits(step);
         if (lastAction >= 0) {
             // bootstrap only from actions that can be taken at s' (an unavailable action's Q is never
             // updated, and under optimistic initialisation it would otherwise dominate the target)
@@ -209,15 +228,43 @@ public class Agent {
             double best = Double.NEGATIVE_INFINITY;
             for (int a = 0; a < NUM_ACTIONS; a++) if (ok[a]) best = Math.max(best, q[s][a]);
             if (best == Double.NEGATIVE_INFINITY) best = 0.0; // nothing can be done at s': no future value
-            double r = p.wFit() * fit + p.wRec() * rec;
-            double delta = r + p.qGamma() * best - q[lastState][lastAction];
+            double r = p.wFit() * fit + (p.creditPost() ? 0.0 : p.wRec() * rec)
+                    - (lastAction == POST ? p.costPost() : lastAction == RESHARE ? p.costReshare() : lastAction == REWIRE ? p.costRewire() : 0.0);
+            double delta = r + (p.bandit() ? 0.0 : p.qGamma()) * best - q[lastState][lastAction];
             LearningLog.recordTd(lastState, lastAction, r, delta);
             q[lastState][lastAction] += p.qEta() * delta;
         }
         return s;
     }
 
-    private boolean canLike(Post post) { return !likedPostIds.contains(post.getPostId()); }
+    /**
+     * Delayed credit (credit=post): once a post I made is older than the horizon, the recognition of the likes
+     * it collected in that window is paid to the (state, action) that made it. Every POST/RESHARE decision yields
+     * exactly one such update, so Q(s,a) converges to E[immediate reward + gamma V] + E[credited recognition].
+     */
+    private void settleCredits(int step) {
+        if (!p.creditPost()) return;
+        while (!pendingCredits.isEmpty() && step - pendingCredits.peekFirst().post().getPostedStep() > p.creditHorizon()) {
+            PendingCredit c = pendingCredits.pollFirst();
+            double g = p.wRec() * recogValue(c.post().getLikesInHorizon());
+            LearningLog.recordCredit(c.state(), c.action(), g);
+            q[c.state()][c.action()] += p.qEta() * g;
+        }
+    }
+
+    /** Called by the dynamics right after the post/reshare of this visit was made, to register its delayed credit. */
+    public void registerCredit(Post post) {
+        if (p.creditPost() && lastAction >= 0) pendingCredits.addLast(new PendingCredit(post, lastState, lastAction));
+    }
+
+    private double fitBaseline = 0.0;
+    /** Expected identity fit under a random feed: my mean similarity to every other agent (used when fit_mode=relative). */
+    public void setFitBaseline(double b) { this.fitBaseline = b; }
+    public double getFitBaseline() { return fitBaseline; }
+
+    private boolean canLike(Post post) {
+        return !likedPostIds.contains(post.getPostId()) && (p.likeGateNoop() || Math.abs(opinion - post.getPostOpinion()) <= p.likeMaxDist());
+    }
     private boolean canReshare(Post post) { return !resharedRoots.contains(post.getRootPostId()); }
 
     /**
@@ -334,11 +381,23 @@ public class Agent {
         return eligible.get(eligible.size() - 1);
     }
 
-    /** Post: a new original carrying my current X. */
+    private double postXSum = 0.0;
+    private int postXCount = 0;
+    /** Opinion others can infer from my original posts: the mean X I expressed so far (0 before my first post). */
+    public double observedOpinion() { return postXCount > 0 ? postXSum / postXCount : 0.0; }
+
+    /** Post: a new original carrying my current X (plus noise when post_noise > 0). */
     public Post makePost(int step) {
-        Post post = new Post(this.id, this.opinion, step);
+        double xPost = this.opinion;
+        if (p.postNoise() > 0.0) { // imperfect expression: the X shown in the post is noisy
+            xPost = Math.max(-1.0, Math.min(1.0, xPost + p.postNoise() * randomGenerator.dynamics().nextGaussian()));
+        }
+        postXSum += xPost;
+        postXCount++;
+        Post post = new Post(this.id, xPost, step);
         ownPosts.add(post);
         resharedRoots.add(post.getRootPostId()); // my own story: I never reshare it
+        registerCredit(post);
         return post;
     }
 
@@ -347,7 +406,7 @@ public class Agent {
      * Reacting to a post by someone I follow moves that followee to the back of my queue.
      */
     public void like(Post src, int step, AdminOptim admin) {
-        src.like(step);
+        src.like(step, p.creditHorizon(), this.id);
         likedPostIds.add(src.getPostId());
         admin.touchFollowee(this.id, src.getPostUserId());
     }
@@ -362,6 +421,7 @@ public class Agent {
         admin.touchFollowee(this.id, src.getPostUserId());
         Post copy = Post.reshareOf(src, this.id, step, viaAlgo);
         ownPosts.add(copy);
+        registerCredit(copy);
         return copy;
     }
 
@@ -390,7 +450,7 @@ public class Agent {
         int k = 0;
         for (int m : cand) {
             ids[k] = m;
-            w[k] = Math.exp(-p.betaH() * Math.abs(opinion - agents[m].getOpinion()));
+            w[k] = Math.exp(-p.betaH() * Math.abs(opinion - seenOpinion(agents[m])));
             total += w[k];
             k++;
         }
@@ -401,11 +461,14 @@ public class Agent {
             cum += w[k];
             if (r < cum) { chosen = ids[k]; break; }
         }
-        if (Math.abs(opinion - agents[chosen].getOpinion()) >= Math.abs(opinion - agents[front].getOpinion())) return -1;
+        if (p.rewireGate() && Math.abs(opinion - seenOpinion(agents[chosen])) >= Math.abs(opinion - seenOpinion(agents[front]))) return -1;
         admin.removeFollowEdge(this.id, front);
         admin.addFollowEdge(this.id, chosen);
         return chosen;
     }
+
+    /** What I know of another agent when rewiring: their true X, or (post_noise > 0) the mean X of their posts. */
+    private double seenOpinion(Agent other) { return p.postNoise() > 0.0 ? other.observedOpinion() : other.getOpinion(); }
 
     /** Value drift (off in the baseline mu = 0): x <- (1-mu) x0 + mu * mean(feed X). */
     public void updateValues() {

@@ -75,6 +75,30 @@ public abstract class Network {
 
     // abstract methods
 
+    /** Number of directed edges (i -> j, i != j). */
+    public int countEdges() {
+        int m = 0;
+        for (int i = 0; i < size; i++) for (int j = 0; j < size; j++) if (i != j && adjacencyMatrix[i][j] != 0.0) m++;
+        return m;
+    }
+
+    /**
+     * Make the number of directed edges exactly {@code target} (mean in-degree = mean out-degree = target / size): surplus edges are
+     * removed uniformly at random, missing ones are added between uniformly random non-adjacent pairs. Used to give start networks of
+     * different families the same mean degree.
+     */
+    public void enforceEdgeCount(int target, java.util.Random rng) {
+        int m = countEdges();
+        while (m > target) {
+            int i = rng.nextInt(size), j = rng.nextInt(size);
+            if (i != j && adjacencyMatrix[i][j] != 0.0) { adjacencyMatrix[i][j] = 0.0; m--; }
+        }
+        while (m < target) {
+            int i = rng.nextInt(size), j = rng.nextInt(size);
+            if (i != j && adjacencyMatrix[i][j] == 0.0) { adjacencyMatrix[i][j] = 1.0; m++; }
+        }
+    }
+
     public abstract void makeNetwork(Agent[] agentSet);
 
 }

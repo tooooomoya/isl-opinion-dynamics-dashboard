@@ -84,12 +84,37 @@ public class ExperimentConfig {
     public double recogMix = 0.5;
     public double wFit = 1.0;      // reward = wFit * identityFit + wRec * recognition (equal weights = the original reward)
     public double wRec = 1.0;
+    // credit = "stock": recognition (likes on all my surviving posts) is part of every visit's reward (original).
+    // credit = "post": the visit reward is wFit*I only; the likes a POST/RESHARE's own new post collects within
+    // creditHorizon steps are credited back to the (state, action) that made it, as a delayed update.
+    public String credit = "stock";
+    public int creditHorizon = 50;
+    // fit_mode = "raw": the identity fit is the mean similarity of the feed. fit_mode = "relative": the agent's expected fit
+    // under a random feed (mean similarity to all agents) is subtracted, for both the state and the reward.
+    public String fitMode = "raw";
 
     // ---- Q-learning (stateless action values over a 3x3 state; spec rev 7, section 10) ----
     public double qEta = 0.1;      // learning rate
     public double qGamma = 0.9;    // discount
+    // learner = "q": Q(s,a) over the 3x3 state with bootstrapping. learner = "bandit": one state, no bootstrapping (gamma=0):
+    // Q(a) += eta * (r - Q(a)), a plain stochastic multi-armed bandit over {post, like, reshare, rewire}.
+    public String learner = "q";
     public double qTau = 0.5;      // softmax temperature (exploration)
     public double qInit = 0.0;     // equal start for all (state, action) pairs
+    public double costPost = 0.0;    // reward cost of posting (cost_post)
+    public double costReshare = 0.0; // reward cost of resharing (cost_reshare)
+    public boolean rewireGate = true;  // rewire_gate: false = always swap the oldest followee for the drawn candidate (no similarity check)
+    public double postNoise = 0.0;     // post_noise: x_post = clip(x_i + N(0, post_noise^2), -1, 1); > 0 also switches rewire to observed (post-based) opinions
+    public int notifyMax = 0;          // notify_original (>0 = on): reshares of my own posts join my candidate pool, hop-exempt (0 = off)
+    public double reshareAlpha = 0.0; // likes on a reshare: alpha to the original's author, 1-alpha to the resharer (reshare_alpha)
+    public double costRewire = 0.0;  // reward cost of a rewire decision (cost_rewire)
+    public double foryouHopLambda = -1.0; // foryou_hop_lambda: For You score = similarity x exp(-lambda (hop-1)); < 0 = legacy feed_decay_* machinery
+    public int startDeg = 0;            // start_deg: force the start network to exactly n x start_deg directed edges (mean degree), 0 = as generated
+    public int metricsHeavyEvery = 1;   // metrics_heavy_every: recompute network-wide step metrics every k steps (carry forward in between)
+    public int foryouCandMax = 0;      // foryou_cand_max: cap on the For You candidate sample per feed (0 = no cap)
+    public String fitBaseline = "empirical"; // fit_baseline: empirical | analytic (relative fit only)
+    public String likeGate = "filter"; // like_gate: filter (out-of-range posts are not like candidates) | noop (the like is chosen, the drawn post is out of range => nothing happens, counted)
+    public double likeMaxDist = 2.0; // like only posts with |x_i - x_post| <= this (absolute range; 2 = unrestricted)
     public boolean rewireOn = true; // false = static network (rewire not available as an action)
     public double qEps = 0.05;     // exploration floor: with this probability pick uniformly among the available actions
     // state bin edges on [0,1] for identity fit (i*) and recognition (l*): low < lo <= mid < hi <= high.
@@ -169,10 +194,28 @@ public class ExperimentConfig {
                 case "recog_lambda" -> c.recogLambda = Double.parseDouble(v);
                 case "w_fit" -> c.wFit = Double.parseDouble(v);
                 case "w_rec" -> c.wRec = Double.parseDouble(v);
+                case "fit_mode" -> c.fitMode = v.toLowerCase();
+                case "credit" -> c.credit = v.toLowerCase();
+                case "credit_horizon" -> c.creditHorizon = Integer.parseInt(v);
                 case "recog_mix" -> c.recogMix = Double.parseDouble(v);
                 case "q_eta" -> c.qEta = Double.parseDouble(v);
                 case "q_gamma" -> c.qGamma = Double.parseDouble(v);
+                case "learner" -> c.learner = v.toLowerCase();
                 case "q_tau" -> c.qTau = Double.parseDouble(v);
+                case "cost_post" -> c.costPost = Double.parseDouble(v);
+                case "cost_reshare" -> c.costReshare = Double.parseDouble(v);
+                case "rewire_gate" -> c.rewireGate = Boolean.parseBoolean(v);
+                case "post_noise" -> c.postNoise = Double.parseDouble(v);
+                case "notify_original" -> c.notifyMax = Integer.parseInt(v);
+                case "reshare_alpha" -> c.reshareAlpha = Double.parseDouble(v);
+                case "cost_rewire" -> c.costRewire = Double.parseDouble(v);
+                case "foryou_hop_lambda" -> c.foryouHopLambda = Double.parseDouble(v);
+                case "start_deg" -> c.startDeg = Integer.parseInt(v);
+                case "metrics_heavy_every" -> c.metricsHeavyEvery = Integer.parseInt(v);
+                case "foryou_cand_max" -> c.foryouCandMax = Integer.parseInt(v);
+                case "fit_baseline" -> c.fitBaseline = v.toLowerCase();
+                case "like_gate" -> c.likeGate = v.toLowerCase();
+                case "like_max_dist" -> c.likeMaxDist = Double.parseDouble(v);
                 case "q_init" -> c.qInit = Double.parseDouble(v);
                 case "foryou_share" -> c.foryouShare = Double.parseDouble(v);
                 case "foryou_hop" -> c.foryouHopH = Integer.parseInt(v);
@@ -234,7 +277,11 @@ public class ExperimentConfig {
     /** Per-run output folder. */
     public String resultFolder() {
         String prefix = resultsSubdir.isBlank() ? "" : resultsSubdir + "/";
-        return "results/" + prefix + "run_" + seed + "_" + tag() + "/";
+        String t = tag();
+        if (t.length() > 190) { // keep the folder name under the 255-char filesystem limit: truncate + hash of the full tag
+            t = t.substring(0, 170) + "~" + String.format("%08x", t.hashCode());
+        }
+        return "results/" + prefix + "run_" + seed + "_" + t + "/";
     }
 
     /** Compact, filesystem-safe tag: a field is tagged iff it differs from DEFAULTS. */
@@ -267,8 +314,22 @@ public class ExperimentConfig {
         if (recogLambda != DEFAULTS.recogLambda) t += "_rlam-" + String.format("%.2f", recogLambda);
         if (wFit != DEFAULTS.wFit) t += "_wfit-" + String.format("%.2f", wFit);
         if (wRec != DEFAULTS.wRec) t += "_wrec-" + String.format("%.2f", wRec);
+        if (!fitMode.equals(DEFAULTS.fitMode)) t += "_fit-" + fitMode;
+        if (!credit.equals(DEFAULTS.credit)) t += "_credit-" + credit + "-" + creditHorizon;
         if (recogMix != DEFAULTS.recogMix) t += "_rmix-" + String.format("%.2f", recogMix);
         if (qEta != DEFAULTS.qEta) t += "_qeta-" + String.format("%.4f", qEta);
+        if (rewireGate != DEFAULTS.rewireGate) t += "_gate-" + rewireGate;
+        if (postNoise != DEFAULTS.postNoise) t += "_pn-" + String.format("%.2f", postNoise);
+        if (notifyMax != DEFAULTS.notifyMax) t += "_nt-" + notifyMax;
+        if (reshareAlpha != DEFAULTS.reshareAlpha) t += "_ra-" + String.format("%.2f", reshareAlpha);
+        if (costPost != DEFAULTS.costPost || costReshare != DEFAULTS.costReshare || costRewire != DEFAULTS.costRewire) t += "_cost-" + String.format("%.2f", costPost) + "-" + String.format("%.2f", costReshare) + "-" + String.format("%.2f", costRewire);
+        if (foryouHopLambda != DEFAULTS.foryouHopLambda) t += "_hl-" + String.format("%.2f", foryouHopLambda);
+        if (startDeg != DEFAULTS.startDeg) t += "_sd-" + startDeg;
+        if (foryouCandMax != DEFAULTS.foryouCandMax) t += "_cm-" + foryouCandMax;
+        if (!fitBaseline.equals(DEFAULTS.fitBaseline)) t += "_fb-" + fitBaseline;
+        if (!likeGate.equals(DEFAULTS.likeGate)) t += "_lg-" + likeGate;
+        if (likeMaxDist != DEFAULTS.likeMaxDist) t += "_lmd-" + String.format("%.2f", likeMaxDist);
+        if (!learner.equals(DEFAULTS.learner)) t += "_learner-" + learner;
         if (qGamma != DEFAULTS.qGamma) t += "_qgam-" + String.format("%.2f", qGamma);
         if (qTau != DEFAULTS.qTau) t += "_qtau-" + String.format("%.3f", qTau);
         if (qInit != DEFAULTS.qInit) t += "_qinit-" + String.format("%.2f", qInit);

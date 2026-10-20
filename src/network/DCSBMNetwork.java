@@ -114,12 +114,13 @@ public class DCSBMNetwork extends Network {
         thetaIn   = sampleThetaIn(n);
         thetaOut  = sampleThetaOut(n);
         normalizeThetaIn(n);
+        double calib = calibrateScale(n, (double) targetAvgDegree * n); // expected number of edges = n x target mean degree
 
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < n; j++) {
                 if (i == j) continue;
                 double b = (community[i] == community[j]) ? pIn : pOut;
-                double p = Math.min(thetaOut[i] * thetaIn[j] * b, 1.0);
+                double p = Math.min(calib * thetaOut[i] * thetaIn[j] * b, 1.0);
                 if (randomGenerator.network().nextDouble() < p) setEdge(i, j, 1.0);
             }
         }
@@ -127,6 +128,27 @@ public class DCSBMNetwork extends Network {
         double realAvgIn = 0;
         for (int d : computeInDegrees()) realAvgIn += d;
         System.out.printf("DC-SBM done: realised avg in-degree = %.2f%n", realAvgIn / n);
+    }
+
+    /** Expected number of edges when every edge probability is multiplied by c (after the cap at 1). */
+    private double expectedEdges(int n, double c) {
+        double e = 0.0;
+        for (int i = 0; i < n; i++) for (int j = 0; j < n; j++) {
+            if (i == j) continue;
+            double b = (community[i] == community[j]) ? pIn : pOut;
+            e += Math.min(c * thetaOut[i] * thetaIn[j] * b, 1.0);
+        }
+        return e;
+    }
+
+    /** Bisection for the global factor c on all edge probabilities so that the expected edge count equals {@code target}. */
+    private double calibrateScale(int n, double target) {
+        double lo = 1e-3, hi = 1e3;
+        for (int it = 0; it < 50; it++) {
+            double mid = Math.sqrt(lo * hi);
+            if (expectedEdges(n, mid) < target) lo = mid; else hi = mid;
+        }
+        return Math.sqrt(lo * hi);
     }
 
     // -----------------------------------------------------------------------

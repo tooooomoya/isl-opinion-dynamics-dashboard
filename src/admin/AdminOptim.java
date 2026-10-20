@@ -41,6 +41,33 @@ public class AdminOptim {
     private long lifespanSum = 0;         // sum of (lastRepostStep - postedStep) over reposted, evicted posts
     private int lifespanCount = 0;        // denominator for the above (posts with >=1 repost)
     private int stillActiveAtEvictionCount = 0; // of those, last repost was in the final 10% of the window
+    // reshares of an agent's own posts, waiting to be shown to that agent (notify_original > 0); newest last
+    private final java.util.ArrayDeque<Post>[] notifications;
+    private static final int NOTIFY_BACKLOG = 50;
+
+    /** A reshare {@code copy} of the post authored by {@code authorId} (the root author) is queued for that author's next feed. */
+    public void notifyOriginal(int authorId, Post copy) {
+        if (p.notifyMax() <= 0 || authorId == copy.getPostUserId()) return;
+        java.util.ArrayDeque<Post> q = notifications[authorId];
+        q.addLast(copy);
+        while (q.size() > NOTIFY_BACKLOG) q.pollFirst();
+    }
+
+    /**
+     * The user's extra candidate pool: alive, unseen reshares of the user's own posts. It is added to the pool every stream
+     * draws from (and is exempt from the hop filter); slots and ranking rules are unchanged. Seen or dead entries are dropped.
+     */
+    private List<Post> extraPool(Agent user, int step) {
+        List<Post> out = new ArrayList<>();
+        if (p.notifyMax() <= 0) return out;
+        java.util.Iterator<Post> it = notifications[user.getId()].iterator();
+        while (it.hasNext()) {
+            Post post = it.next();
+            if (!post.isAlive(step, p.deadAfter()) || user.hasSeen(post)) it.remove(); else out.add(post);
+        }
+        return out;
+    }
+
     private int evictedRepostedCount = 0; // denominator for the above (same as lifespanCount, kept separate for clarity)
 
 
@@ -51,6 +78,8 @@ public class AdminOptim {
         this.followees = new HashSet[n];
         this.followers = new HashSet[n];
         this.followerNumArray = new int[n];
+        this.notifications = new java.util.ArrayDeque[n];
+        for (int i = 0; i < n; i++) notifications[i] = new java.util.ArrayDeque<>();
         for (int i = 0; i < n; i++) {
             followees[i] = new LinkedHashSet<>(); // insertion order = the follow queue (front = oldest)
             followers[i] = new HashSet<>();
@@ -169,6 +198,16 @@ public class AdminOptim {
      * Death sweep: a post is dead once {@code step - lastReactionStep > deadAfter}. Dead posts leave
      * the pool for good (a dead post is never seen or reshared again). Call once per step.
      */
+    private final List<Post> evictedBuf = new ArrayList<>();
+
+    /** Posts evicted by the last sweepDead (every dead post, reacted-to or not); drained by the caller once per step. */
+    public List<Post> drainEvicted() {
+        if (evictedBuf.isEmpty()) return List.of();
+        List<Post> out = new ArrayList<>(evictedBuf);
+        evictedBuf.clear();
+        return out;
+    }
+
     public void sweepDead(int step) {
         int L = p.deadAfter();
         Iterator<Post> it = recentPosts.iterator();
@@ -176,6 +215,7 @@ public class AdminOptim {
             Post post = it.next();
             if (!post.isAlive(step, L)) {
                 recordLifespan(post, step);
+                evictedBuf.add(post);
                 it.remove();
                 diedPostCount++;
             }
@@ -375,6 +415,49 @@ public class AdminOptim {
     }
 
     /** Distance-decay acceptance factor for a candidate d hops away (d >= 1); 1.0 in "hard" mode. */
+    /** The hop term of the For You score: exp(-foryou_hop_lambda (d-1)); with the default (<0) the legacy feed_decay machinery. */
+    private double hopTerm(int d) {
+        if (hopTab == null) {
+            double lam = p.foryouHopLambda();
+            hopTab = new double[128];
+            for (int k = 1; k < 128; k++) hopTab[k] = lam < 0.0 ? decayFactor(k) : Math.exp(-lam * (k - 1));
+        }
+        return hopTab[Math.min(d, 127)];
+    }
+
+    /** Hop distances (out-edges, depth <= h) from every reader, as flat byte arrays; excluded agents are neither reached nor traversed. */
+    private void computeReachBytes(int h) {
+        int[][] adj = new int[n][];
+        for (int u = 0; u < n; u++) {
+            adj[u] = new int[followees[u].size()];
+            int k = 0;
+            for (int v : followees[u]) adj[u][k++] = v;
+        }
+        byte[][] dist = new byte[n][n];
+        int[] cnt = new int[n];
+        int[] queue = new int[n];
+        int hMax = Math.min(h, 126);
+        for (int src = 0; src < n; src++) {
+            byte[] d = dist[src];
+            int head = 0, tail = 0;
+            queue[tail++] = src;
+            d[src] = 127; // visited marker, cleared below
+            for (int depth = 0; depth < hMax && head < tail; depth++) {
+                int levelEnd = tail;
+                while (head < levelEnd) {
+                    int u = queue[head++];
+                    for (int v : adj[u]) {
+                        if (!exclArr[v] && d[v] == 0) { d[v] = (byte) (depth + 1); queue[tail++] = v; }
+                    }
+                }
+            }
+            d[src] = 0;
+            cnt[src] = tail - 1;
+        }
+        fyDist = dist;
+        fyReachCount = cnt;
+    }
+
     private double decayFactor(int d) {
         double lambda = p.feedDecayLambda();
         return switch (p.feedDecayMode()) {
@@ -409,7 +492,10 @@ public class AdminOptim {
     // of the posts the agent likes or reshares). For You ranks candidates by closeness to Xhat_i.
 
     private double[] xhat;                                   // platform's estimate of each agent's X
-    private Map<Integer, Integer>[] fyReachDist;             // For You hop-distance cache (own reach)
+    private byte[][] fyDist;                                 // For You hop distances: fyDist[reader][author] = d >= 1 within reach, 0 = unreachable / self
+    private int[] fyReachCount;                              // number of authors within each reader's For You reach
+    private boolean[] exclArr;                               // algoExcludeIds as a flat lookup
+    private double[] hopTab;                                 // hopTerm(d) for d = 0..127
     private int fyReachStep = -1, fyReachH = Integer.MIN_VALUE;
     private List<Post>[] postsByAuthor;                      // alive posts per author, rebuilt once per step
     private double[] fyW = new double[1024];                 // scratch buffers for one candidate scan
@@ -458,31 +544,54 @@ public class AdminOptim {
      * within the For You reach (all authors when foryou_hop <= 0). Never the reader's own posts, posts already shown to the reader before, posts
      * whose root is already in the feed ({@code seenRoots}), or two posts of one root.
      */
-    private void selectForYou(Agent user, Agent[] agentSet, int step, int slots, Set<Integer> seenRoots, List<Post> out) {
+    private void selectForYou(Agent user, Agent[] agentSet, int step, int slots, Set<Integer> seenRoots, List<Post> out, List<Post> extras) {
         if (postsByAuthor == null) return;
         int userId = user.getId();
         int h = p.foryouHopH();
         double xr = (p.foryouProfile() && xhat != null) ? xhat[userId] : agentSet[userId].getOpinion();
         double beta = p.foryouBeta();
+        if (exclArr == null) {
+            exclArr = new boolean[n];
+            for (int id : p.algoExcludeIds()) exclArr[id] = true;
+        }
         if (h > 0) {
-            boolean stale = fyReachDist == null || fyReachH != h || step - fyReachStep >= Const.REACH_REFRESH_INTERVAL;
+            boolean stale = fyDist == null || fyReachH != h || step - fyReachStep >= Const.REACH_REFRESH_INTERVAL;
             if (stale) {
-                fyReachDist = computeReachable(h, p.algoExcludeIds());
+                computeReachBytes(h);
                 fyReachStep = step;
                 fyReachH = h;
             }
         }
         int m = 0;
-        if (h > 0) {
-            for (Map.Entry<Integer, Integer> e : fyReachDist[userId].entrySet()) {
-                int author = e.getKey();
-                if (p.algoExcludeIds().contains(author)) continue;
-                m = scanAuthor(user, postsByAuthor[author], decayFactor(e.getValue()), xr, beta, step, seenRoots, m);
+        fyN = 0;
+        int cap = p.foryouCandMax();
+        byte[] reach = h > 0 ? fyDist[userId] : null;
+        // Large reach (most authors reachable) + a cap: draw the candidate sample directly from the array of live posts by
+        // rejection (alive, unseen, author within reach), so the cost is about the cap, not the number of live posts.
+        boolean sampled = cap > 0 && (h <= 0 || fyReachCount[userId] * 4 >= n);
+        if (sampled) {
+            m = sampleCandidates(user, userId, step, seenRoots, reach, cap);
+        } else if (h > 0) {
+            for (int author = 0; author < n; author++) {
+                if (reach[author] == 0 || exclArr[author]) continue;
+                m = scanAuthor(user, postsByAuthor[author], hopTerm(reach[author]), step, seenRoots, m, true);
             }
         } else {
             for (int author = 0; author < n; author++) {
-                if (author == userId || p.algoExcludeIds().contains(author)) continue;
-                m = scanAuthor(user, postsByAuthor[author], 1.0, xr, beta, step, seenRoots, m);
+                if (author == userId || exclArr[author]) continue;
+                m = scanAuthor(user, postsByAuthor[author], 1.0, step, seenRoots, m, true);
+            }
+        }
+        // score = similarity x hop term, for the candidates that survived the (optional) cap
+        for (int j = 0; j < m; j++) fyW[j] = Math.exp(-beta * Math.abs(xr - fyP[j].getPostOpinion())) * fyD[j];
+        if (!extras.isEmpty()) { // reshares of the user's own posts: same weight rule, no hop decay, never capped; skip ones already scanned via their author
+            int before = m;
+            m = scanAuthor(user, extras, 1.0, step, seenRoots, m, false);
+            for (int j = m - 1; j >= before; j--) {
+                boolean dup = false;
+                for (int k = 0; k < before; k++) if (fyP[k] == fyP[j]) { dup = true; break; }
+                if (dup) { fyP[j] = fyP[m - 1]; fyD[j] = fyD[m - 1]; m--; }
+                else fyW[j] = Math.exp(-beta * Math.abs(xr - fyP[j].getPostOpinion()));
             }
         }
         // weighted draws without replacement (inverse CDF over the scratch weights)
@@ -507,18 +616,73 @@ public class AdminOptim {
         }
     }
 
-    private int scanAuthor(Agent user, List<Post> posts, double decay, double xr, double beta, int step, Set<Integer> seenRoots, int m) {
+    /**
+     * Uniform random sample (rejection) of up to {@code cap} valid For You candidates from the live-post array: a drawn post is
+     * kept if it is alive, not the reader's own, unseen, its root is not already in the feed, and its author is within reach
+     * (all authors when {@code reach} is null). Stops after 30 x cap draws. Fills fyP / fyD (hop term of the author's distance).
+     */
+    private int sampleCandidates(Agent user, int userId, int step, Set<Integer> seenRoots, byte[] reach, int cap) {
+        int total = recentPosts.size();
+        if (total == 0) return 0;
         int deadAfter = p.deadAfter();
-        for (Post post : posts) {
-            if (!post.isAlive(step, deadAfter)) continue;
-            if (seenRoots.contains(post.getRootPostId()) || user.hasSeen(post)) continue;
+        java.util.Random rng = randomGenerator.dynamics();
+        Set<Integer> picked = new HashSet<>();
+        int m = 0;
+        for (int tries = 0, maxTries = 30 * cap; tries < maxTries && m < cap; tries++) {
+            Post post = recentPosts.get(rng.nextInt(total));
+            int author = post.getPostUserId();
+            if (author == userId || exclArr[author]) continue;
+            if (!post.isAlive(step, deadAfter) || user.hasSeen(post) || seenRoots.contains(post.getRootPostId())) continue;
+            double hop = 1.0;
+            if (reach != null) {
+                int d = reach[author];
+                if (d == 0) continue;
+                hop = hopTerm(d);
+            }
+            if (!picked.add(post.getPostId())) continue;
             if (m == fyW.length) {
                 fyW = java.util.Arrays.copyOf(fyW, m * 2);
                 fyP = java.util.Arrays.copyOf(fyP, m * 2);
+                fyD = java.util.Arrays.copyOf(fyD, m * 2);
             }
-            fyW[m] = Math.exp(-beta * Math.abs(xr - post.getPostOpinion())) * decay;
             fyP[m] = post;
+            fyD[m] = hop;
+            fyW[m] = 0.0;
             m++;
+        }
+        return m;
+    }
+
+    private int fyN;                                         // valid candidates seen in the current scan (for reservoir sampling)
+    private double[] fyD = new double[1024];                 // hop-decay factor per scratch candidate
+
+    /**
+     * Append the valid candidates of {@code posts} (alive, unseen, root not already in the feed) to the scratch arrays.
+     * When {@code capped} and foryou_cand_max > 0, the scratch holds a uniform random sample (reservoir) of at most that many
+     * candidates out of everything the hop filter let through; weights are computed afterwards, only for the survivors.
+     */
+    private int scanAuthor(Agent user, List<Post> posts, double decay, int step, Set<Integer> seenRoots, int m, boolean capped) {
+        int deadAfter = p.deadAfter();
+        int cap = capped ? p.foryouCandMax() : 0;
+        for (Post post : posts) {
+            if (!post.isAlive(step, deadAfter)) continue;
+            if (seenRoots.contains(post.getRootPostId()) || user.hasSeen(post)) continue;
+            if (capped) fyN++;
+            int slot;
+            if (cap > 0 && m >= cap) {
+                slot = randomGenerator.dynamics().nextInt(fyN);
+                if (slot >= cap) continue;
+            } else {
+                if (m == fyW.length) {
+                    fyW = java.util.Arrays.copyOf(fyW, m * 2);
+                    fyP = java.util.Arrays.copyOf(fyP, m * 2);
+                    fyD = java.util.Arrays.copyOf(fyD, m * 2);
+                }
+                slot = m++;
+            }
+            fyP[slot] = post;
+            fyD[slot] = decay;
+            fyW[slot] = 0.0;
         }
         return m;
     }
@@ -535,6 +699,10 @@ public class AdminOptim {
         Agent user = agentSet[userId];
         int deadAfter = p.deadAfter();
 
+        // reshares of the user's own posts join every stream's candidate pool (hop-exempt); slots are unchanged
+        List<Post> extras = extraPool(user, step);
+        Set<Integer> extraIds = new HashSet<>();
+        for (Post post : extras) extraIds.add(post.getPostId());
         int capacity = p.feedCapacity();
         int algoSlots = (int) Math.floor(p.trendShare() * capacity);         // Trend slots
         int fySlots = (int) Math.floor(p.foryouShare() * capacity);          // For You slots
@@ -553,6 +721,7 @@ public class AdminOptim {
         for (Post post : user.getPostCash().getAllPosts()) {
             if (post.isAlive(step, deadAfter) && !user.hasSeen(post)) chronoCandidates.add(post);
         }
+        // (notified copies reach chrono through the author's postCash, delivered like any followee post; extras serve For You only)
         Collections.shuffle(chronoCandidates, randomGenerator.dynamics());
         Set<Integer> seenRoots = new HashSet<>();
         for (Post post : chronoCandidates) {
@@ -566,7 +735,7 @@ public class AdminOptim {
         // reach decay acceptance). Taken before Trend so a post is never in two streams.
         List<Post> forYouPersonal = new ArrayList<>();
         if (fySlots > 0) {
-            selectForYou(user, agentSet, step, fySlots, seenRoots, forYouPersonal);
+            selectForYou(user, agentSet, step, fySlots, seenRoots, forYouPersonal, extras);
             for (Post post : forYouPersonal) seenRoots.add(post.getRootPostId());
         }
 
@@ -593,7 +762,7 @@ public class AdminOptim {
                 // are still preferred first (order untouched), but farther candidates are less
                 // likely to fill a slot rather than flatly excluded. Skips the RNG draw at p=1.0
                 // (h<=0 or "hard" mode within range) to avoid burning draws in the common case.
-                double pAccept = acceptProbability(userId, author, h);
+                double pAccept = extraIds.contains(post.getPostId()) ? 1.0 : acceptProbability(userId, author, h);
                 if (pAccept <= 0.0) continue;
                 if (pAccept < 1.0 && randomGenerator.dynamics().nextDouble() >= pAccept) continue;
                 forYou.add(post);

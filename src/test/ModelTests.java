@@ -44,6 +44,7 @@ public class ModelTests {
         testReshareCreditsResharer();
         testSimilarityAndIdentityFit();
         testRecognition();
+        testReshareAlphaSplit();
         testQUpdate();
         testEqualStartEquiprobable();
         testExplorationFloor();
@@ -52,11 +53,14 @@ public class ModelTests {
         testOneReactionPerPost();
         testQTargetUsesAvailableActions();
         testRewardWeights();
+        testRelativeFit();
         testFollowQueue();
         testRewire();
         testWattsStrogatzStart();
         testHomophilyStart();
         testDirectedBAStart();
+        testStartDegreeRegulation();
+        testLikeGate();
         testDeathSweep();
         testDriftOffByDefault();
         testUniformInit();
@@ -65,6 +69,10 @@ public class ModelTests {
         testDeadPostsLeaveFeed();
         testForYou();
         testEachPostShownOnce();
+        testNotifyOriginal();
+        testPostNoise();
+        testForYouCandidateCap();
+        testForYouHopTerm();
         testNeutralBandExcludesEdgesEntirely();
 
         System.out.println(failures == 0 ? "ALL PASS" : (failures + " FAILURE(S)"));
@@ -160,6 +168,31 @@ public class ModelTests {
         for (int i = 0; i < 900; i++) bp.like(3);
         double r1000 = b.recognition(4);
         check(r1000 > r100 + 0.15 && r1000 <= 1.0, "influencers still differ: 1000 likes rewards more than 100");
+    }
+
+    private static void testReshareAlphaSplit() {
+        System.out.println("[likes on a reshare split between author and resharer]");
+        SimParams p = params("l_ref=99", "dead_after=50", "recog_mix=0", "reshare_alpha=0.25");
+        Agent author = new Agent(0, p), relayer = new Agent(1, p);
+        Post src = author.makePost(0);
+        Post copy = Post.reshareOf(src, 1, 1, false);
+        relayer.getOwnPosts().add(copy);
+        for (int i = 0; i < 8; i++) copy.like(2);
+        check(copy.getLikesReceived() == 8 && src.getCopyLikes() == 8.0, "the copy's likes are also counted on the original");
+        double aExp = Math.log1p(0.25 * 8) / Math.log(100.0), rExp = Math.log1p(0.75 * 8) / Math.log(100.0);
+        check(Math.abs(author.recognition(3) - aExp) < 1e-12, "original's author gets alpha of the copy's likes");
+        check(Math.abs(relayer.recognition(3) - rExp) < 1e-12, "resharer keeps 1 - alpha of its own copy's likes");
+        Post c3 = Post.reshareOf(src, 5, 1, false);
+        c3.like(2, Integer.MAX_VALUE, 0); // the original's own author likes the copy: no self-credit
+        check(src.getCopyLikes() == 8.0 && c3.getLikesReceived() == 1, "the original author's own like on a copy is not credited back to the author");
+        Agent r5 = new Agent(5, p); r5.getOwnPosts().add(c3);
+        double full = Math.log1p(1.0) / Math.log(100.0);
+        check(Math.abs(r5.recognition(3) - full) < 1e-12, "the original author's like on a copy is credited fully (weight 1) to the resharer");
+        Agent plain = new Agent(2, params("l_ref=99", "dead_after=50", "recog_mix=0"));
+        Post s2 = plain.makePost(0);
+        Post c2 = Post.reshareOf(s2, 3, 1, false);
+        c2.like(2);
+        check(plain.recognition(3) == 0.0, "alpha = 0 (default): nothing flows to the original's author");
     }
 
     private static void testQUpdate() {
@@ -268,6 +301,20 @@ public class ModelTests {
                 "reward = w_fit * identity fit + w_rec * recognition");
     }
 
+    private static void testRelativeFit() {
+        System.out.println("[relative identity fit]");
+        SimParams p = params("n=3", "q_eps=1.0", "q_eta=1.0", "q_gamma=0.0", "rewire=false", "w_fit=1", "w_rec=0", "fit_mode=relative");
+        Agent a = new Agent(0, p);
+        a.setOpinion(0.0);
+        a.setFitBaseline(0.3);
+        a.chooseAction(0);
+        a.addPostToFeed(new Post(1, 0.0, 0));                  // identical value: raw fit 1
+        a.observeAndLearn(1);
+        double best = Math.max(a.getQ()[0][Agent.POST], Math.max(a.getQ()[0][Agent.LIKE], a.getQ()[0][Agent.RESHARE]));
+        check(Math.abs(best - 0.7) < 1e-9, "reward uses raw fit minus the random-feed baseline (1 - 0.3)");
+        check(Math.abs(a.getLastIdentityFit() - 1.0) < 1e-9, "the reported identity fit stays raw");
+    }
+
     private static void testActionAvailability() {
         System.out.println("[action availability]");
         Agent st = new Agent(0, params("rewire=false", "q_eps=0.5"));
@@ -361,6 +408,15 @@ public class ModelTests {
         ag[1].setOpinion(0.9);
         check(ag[0].rewire(admin3, ag) == -1 && admin3.follows(0, 1) && !admin3.follows(0, 3) && admin3.followeeCount(0) == 2,
                 "no candidate closer than the front followee => no rewire, follow list unchanged");
+        // without the gate the same situation swaps anyway (the front followee is dropped, a candidate is appended)
+        SimParams ng = params("n=7", "beta_h=50", "rewire_gate=false");
+        Agent[] ng_ag = new Agent[7];
+        for (int i = 0; i < 7; i++) ng_ag[i] = new Agent(i, ng);
+        ng_ag[0].setOpinion(0.9); ng_ag[1].setOpinion(0.9); ng_ag[3].setOpinion(0.9); ng_ag[4].setOpinion(-0.9);
+        ng_ag[0].addPostToFeed(new Post(3, 0.9, 0));
+        AdminOptim admin4 = graph(ng, 7, new int[][]{{0, 1}, {0, 2}});
+        check(ng_ag[0].rewire(admin4, ng_ag) == 3 && !admin4.follows(0, 1) && admin4.follows(0, 3) && admin4.followeeCount(0) == 2,
+                "rewire_gate=false: the candidate replaces the oldest followee even though that followee is as close");
         ag[1].setOpinion(0.0);
         // feed with only followed / own originators => no candidate => no-op, nothing dropped
         AdminOptim admin2 = graph(p, 7, new int[][]{{0, 1}, {0, 2}});
@@ -635,6 +691,172 @@ public class ModelTests {
         }
         check(!repeated, "no post reaches the same agent's feed twice (Trend, For You and chrono)");
         check(total == all.size(), "every post is eventually shown once, then the pool is exhausted (" + total + " of " + all.size() + ")");
+    }
+
+    private static void testNotifyOriginal() {
+        System.out.println("[reshares of my own post join my candidate pool (notify_original)]");
+        // chrono: the author does not follow the resharers, so without the extra pool the copies could never reach the feed
+        for (String mode : new String[]{"chrono", "foryou", "trend"}) {
+            randomGenerator.init(8, 8);
+            String[] mix = mode.equals("chrono") ? new String[]{"trend_share=0", "foryou_share=0"}
+                    : mode.equals("foryou") ? new String[]{"trend_share=0", "foryou_share=1", "foryou_hop=1", "fy_beta=0"}
+                    : new String[]{"trend_share=1", "foryou_share=0", "trend_hop=1"};
+            java.util.List<String> t = new java.util.ArrayList<>(java.util.List.of("n=6", "feed_capacity=10", "notify_original=1"));
+            t.addAll(java.util.List.of(mix));
+            SimParams p = params(t.toArray(new String[0]));
+            AdminOptim admin = graph(p, 6, new int[][]{{0, 1}});
+            Agent[] ag = new Agent[6];
+            for (int i = 0; i < 6; i++) ag[i] = new Agent(i, p);
+            Post mine = ag[0].makePost(0);
+            Post c1 = Post.reshareOf(mine, 3, 1, false), c2 = Post.reshareOf(mine, 4, 1, false);
+            admin.addRecentPost(mine); admin.addRecentPost(c1); admin.addRecentPost(c2);
+            admin.notifyOriginal(0, c1);
+            if (mode.equals("chrono")) { // chrono ignores the notify queue; OpinionDynamics delivers the copy to the author's postCash
+                ag[0].resetFeed();
+                admin.AdminFeedback(0, ag, 2, admin.rankByVelocity(2), new StepStats());
+                check(ag[0].getFeed().isEmpty(), "chrono: the notify queue itself no longer feeds chrono");
+                ag[0].addToPostCash(c1);
+            }
+            admin.rebuildAuthorIndex();
+            ag[0].resetFeed();
+            admin.AdminFeedback(0, ag, 2, admin.rankByVelocity(2), new StepStats());
+            check(ag[0].getFeed().contains(c1), mode + ": a reshare of my post (author out of hop reach) reaches my feed");
+            check(!ag[0].getFeed().contains(c2), mode + ": un-notified copy of the same story does not");
+            ag[0].resetFeed();
+            admin.AdminFeedback(0, ag, 3, admin.rankByVelocity(3), new StepStats());
+            check(!ag[0].getFeed().contains(c1), mode + ": delivered once only");
+        }
+        randomGenerator.init(8, 9);
+        SimParams off = params("n=6", "trend_share=0", "foryou_share=0");
+        AdminOptim admin2 = graph(off, 6, new int[][]{{0, 1}});
+        Agent[] bg = new Agent[6];
+        for (int i = 0; i < 6; i++) bg[i] = new Agent(i, off);
+        Post own = bg[0].makePost(0);
+        admin2.notifyOriginal(0, Post.reshareOf(own, 2, 1, false));
+        bg[0].resetFeed();
+        admin2.AdminFeedback(0, bg, 2, admin2.rankByVelocity(2), new StepStats());
+        check(bg[0].getFeed().isEmpty(), "off by default");
+    }
+
+    private static void testPostNoise() {
+        System.out.println("[post noise: imperfect expression of X]");
+        randomGenerator.init(11, 11);
+        Agent exact = new Agent(0, params("post_noise=0"));
+        exact.setOpinion(0.4);
+        check(exact.makePost(0).getPostOpinion() == 0.4 && exact.observedOpinion() == 0.4, "no noise: the post carries X exactly");
+        SimParams p = params("post_noise=0.3");
+        Agent a = new Agent(1, p);
+        a.setOpinion(0.9);
+        double sum = 0; boolean differs = false, inRange = true;
+        for (int i = 0; i < 4000; i++) {
+            double x = a.makePost(i).getPostOpinion();
+            sum += x; differs |= x != 0.9; inRange &= x >= -1.0 && x <= 1.0;
+        }
+        check(differs && inRange, "noisy posts differ from X and stay in [-1, 1]");
+        Agent b = new Agent(2, p);
+        b.setOpinion(0.0);
+        for (int i = 0; i < 4000; i++) b.makePost(i);
+        check(Math.abs(b.observedOpinion()) < 0.03, "at X = 0 the mean of many posts recovers X (observed " + b.observedOpinion() + ")");
+        Agent c = new Agent(3, p);
+        check(c.observedOpinion() == 0.0, "before any post an agent is observed as neutral (0)");
+    }
+
+    private static void testForYouCandidateCap() {
+        System.out.println("[For You candidate cap]");
+        for (int cap : new int[]{0, 3}) {
+            randomGenerator.init(12, 12);
+            SimParams p = params("n=12", "trend_share=0", "foryou_share=1", "foryou_hop=0", "feed_capacity=10", "foryou_cand_max=" + cap);
+            AdminOptim admin = graph(p, 12, new int[][]{{0, 1}});
+            Agent[] ag = new Agent[12];
+            for (int i = 0; i < 12; i++) ag[i] = new Agent(i, p);
+            java.util.Set<Post> pool = new java.util.HashSet<>();
+            for (int a = 1; a <= 10; a++) { Post q = new Post(a, 0.05 * a, 0); pool.add(q); admin.addRecentPost(q); }
+            admin.rebuildAuthorIndex();
+            ag[0].resetFeed();
+            admin.AdminFeedback(0, ag, 1, admin.rankByVelocity(1), new StepStats());
+            int expect = cap == 0 ? 10 : cap;
+            check(ag[0].getFeed().size() == expect && pool.containsAll(ag[0].getFeed()),
+                    "foryou_cand_max=" + cap + ": " + expect + " posts delivered, all from the candidate pool (got " + ag[0].getFeed().size() + ")");
+        }
+        // the cap keeps a uniform sample: over many feeds every pool post appears about equally often
+        randomGenerator.init(12, 13);
+        SimParams p = params("n=12", "trend_share=0", "foryou_share=1", "foryou_hop=0", "feed_capacity=10", "foryou_cand_max=2", "fy_beta=0");
+        int[] hits = new int[10];
+        for (int rep = 0; rep < 2000; rep++) {
+            AdminOptim admin = graph(p, 12, new int[][]{{0, 1}});
+            Agent[] ag = new Agent[12];
+            for (int i = 0; i < 12; i++) ag[i] = new Agent(i, p);
+            Post[] pool = new Post[10];
+            for (int a = 1; a <= 10; a++) { pool[a - 1] = new Post(a, 0.0, 0); admin.addRecentPost(pool[a - 1]); }
+            admin.rebuildAuthorIndex();
+            ag[0].resetFeed();
+            admin.AdminFeedback(0, ag, 1, admin.rankByVelocity(1), new StepStats());
+            for (Post q : ag[0].getFeed()) for (int k = 0; k < 10; k++) if (q == pool[k]) hits[k]++;
+        }
+        int min = Integer.MAX_VALUE, max = 0;
+        for (int h : hits) { min = Math.min(min, h); max = Math.max(max, h); }
+        check(min > 300 && max < 500, "the capped candidate sample is uniform (each of 10 posts in about 400 of 2000 feeds: " + min + ".." + max + ")");
+        check(params("fit_mode=relative", "fit_baseline=analytic").fitBaselineAnalytic() && !params().fitBaselineAnalytic(), "fit_baseline=analytic parsed, off by default");
+    }
+
+    private static void testForYouHopTerm() {
+        System.out.println("[For You score = similarity x hop term]");
+        randomGenerator.init(14, 14);
+        // path 0 -> 1 -> 2 -> 3: authors 1, 2, 3 sit at hop 1, 2, 3 from reader 0; equal X, one post each
+        for (String cap : new String[]{"foryou_cand_max=50", "foryou_cand_max=0"}) {
+            SimParams p = params("n=6", "trend_share=0", "foryou_share=1", "foryou_hop=5", "feed_capacity=1", "fy_beta=0", "foryou_hop_lambda=0.7", cap);
+            int[] hits = new int[4];
+            for (int rep = 0; rep < 6000; rep++) {
+                AdminOptim admin = graph(p, 6, new int[][]{{0, 1}, {1, 2}, {2, 3}});
+                Agent[] ag = new Agent[6];
+                for (int i = 0; i < 6; i++) ag[i] = new Agent(i, p);
+                for (int a = 1; a <= 3; a++) admin.addRecentPost(new Post(a, 0.0, 0));
+                admin.rebuildAuthorIndex();
+                ag[0].resetFeed();
+                admin.AdminFeedback(0, ag, 1, admin.rankByVelocity(1), new StepStats());
+                for (Post q : ag[0].getFeed()) hits[q.getPostUserId()]++;
+            }
+            double r13 = hits[1] / (double) hits[3];   // expected exp(0.7 * 2) = 4.06
+            double r12 = hits[1] / (double) hits[2];   // expected exp(0.7) = 2.01
+            check(r13 > 3.4 && r13 < 4.8 && r12 > 1.7 && r12 < 2.4,
+                    cap + ": selection frequency falls with hop like exp(-lambda (d-1)) (1:2 = " + String.format("%.2f", r12) + ", 1:3 = " + String.format("%.2f", r13) + ")");
+        }
+    }
+
+    private static void testStartDegreeRegulation() {
+        System.out.println("[start networks share the same mean degree]");
+        for (String net : new String[]{"random", "dcsbm", "hk"}) {
+            randomGenerator.init(21, 21);
+            ExperimentConfig c = ExperimentConfig.fromArgs(new String[]{"n=300", "network=" + net, "sbm_deg=12", "start_deg=12"});
+            network.Network nw = network.NetworkFactory.create(c, 300);
+            Agent[] ag = new Agent[300];
+            SimParams p = SimParams.from(c);
+            for (int i = 0; i < 300; i++) ag[i] = new Agent(i, p);
+            nw.makeNetwork(ag);
+            nw.enforceEdgeCount(300 * c.startDeg, randomGenerator.network());
+            boolean loops = false;
+            for (int i = 0; i < 300; i++) loops |= nw.getEdge(i, i) != 0.0;
+            check(nw.countEdges() == 300 * 12 && !loops, net + ": exactly n x 12 directed edges, no self-loops (" + nw.countEdges() + ")");
+        }
+    }
+
+    private static void testLikeGate() {
+        System.out.println("[like range gate: filter vs noop]");
+        randomGenerator.init(31, 31);
+        SimParams filter = params("like_max_dist=0.3", "like_gate=filter"), noop = params("like_max_dist=0.3", "like_gate=noop");
+        for (SimParams p : new SimParams[]{filter, noop}) {
+            Agent a = new Agent(0, p);
+            a.setOpinion(0.9);
+            a.addPostToFeed(new Post(1, -0.9, 0));   // far away: |dx| = 1.8 > 0.3
+            Post picked = a.pickFromFeed(Agent.LIKE);
+            boolean isFilter = !p.likeGateNoop();
+            check(isFilter ? picked == null : (picked != null && a.likeGatedFor(picked)),
+                    isFilter ? "filter: an out-of-range post is not a like candidate" : "noop: the out-of-range post is drawn and the like is gated (does nothing)");
+        }
+        Agent near = new Agent(1, noop);
+        near.setOpinion(0.9);
+        near.addPostToFeed(new Post(2, 0.8, 0));
+        check(!near.likeGatedFor(near.pickFromFeed(Agent.LIKE)), "noop: an in-range post is not gated");
     }
 
     // Sign-based camp metrics ignore agents inside the neutral band (analysis code, unchanged).
