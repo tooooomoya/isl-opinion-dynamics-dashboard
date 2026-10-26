@@ -21,11 +21,14 @@ public record SimParams(
         double feedDecayLambda,  // decay steepness; 0 = no decay in any mode
         double feedTimeDecayTau, // optional exp(-age/tau) dampener on velocity score; 0=off
         String velMode,          // cumulative|windowed
+        boolean trendCountLikes, // Trend velocity counts likes as well as reshares
+        boolean trendTieRandom,  // equal Trend scores are ordered at random (false: creation order, oldest first)
         int feedCapacity,        // S: max candidate posts delivered per visit
         double accessProb,       // per-step probability an agent visits
         java.util.Set<Integer> algoExcludeIds,
         // ---- values ----
         String initOpinionDist,  // uniform|gaussian
+        double initSd,           // sd of the gaussian start (truncated to [-1,1])
         double mu,               // drift weight toward the feed mean (0 = X fixed)
         double neutralBandHalfWidth,
         // ---- attention / death ----
@@ -52,7 +55,6 @@ public record SimParams(
         boolean rewireGate,       // true: a rewire swaps only if the candidate is strictly closer than the oldest followee; false: it always swaps
         double postNoise,         // sd of the Gaussian noise on the X expressed in an original post (0 = exact); > 0 also makes rewire judge agents by their posts
         int notifyMax,            // > 0: reshares of my own posts join my candidate pool (hop-exempt); 0 = off
-        double reshareAlpha,      // share of the likes on a reshare credited to the original author (rest to the resharer)
         double costRewire,        // reward cost paid for a rewire decision (whether or not the swap is executed)
         double foryouHopLambda,   // For You hop term exp(-lambda (d-1)) multiplied into the similarity weight (< 0: legacy feed_decay machinery)
         int foryouCandMax,        // For You: random sample of at most this many hop-filtered candidates per feed before weighting (0 = all)
@@ -70,10 +72,10 @@ public record SimParams(
         return new SimParams(
                 c.n,
                 c.trendShare, c.trendHopH, c.foryouShare, c.foryouHopH, c.foryouBeta, c.foryouProfile, c.rhoLike, c.rhoReshare, c.feedDecayMode, c.feedDecayLambda, c.feedTimeDecayTau,
-                c.velMode, c.feedCapacity, c.accessProb, c.algoExcludeIds,
-                c.initOpinionDist, c.mu, c.neutralBandHalfWidth,
+                c.velMode, c.trendCount.equals("both"), c.trendTie.equals("random"), c.feedCapacity, c.accessProb, c.algoExcludeIds,
+                c.initOpinionDist, c.initSd, c.mu, c.neutralBandHalfWidth,
                 c.betaH, c.deadAfter, c.lRef, c.recogLambda, c.recogMix, c.wFit, c.wRec, c.credit.equals("post"), c.creditHorizon, c.fitMode.equals("relative"),
-                c.qEta, c.qGamma, c.learner.equals("bandit"), c.qTau, c.qInit, c.qEps, c.rewireOn, c.costPost, c.costReshare, c.rewireGate, c.postNoise, c.notifyMax, c.reshareAlpha, c.costRewire, c.foryouHopLambda, c.foryouCandMax, c.fitBaseline.equals("analytic"), c.likeGate.equals("noop"), c.likeMaxDist,
+                c.qEta, c.qGamma, c.learner.equals("bandit"), c.qTau, c.qInit, c.qEps, c.rewireOn, c.costPost, c.costReshare, c.rewireGate, c.postNoise, c.notifyMax, c.costRewire, c.foryouHopLambda, c.foryouCandMax, c.fitBaseline.equals("analytic"), c.likeGate.equals("noop"), c.likeMaxDist,
                 c.iEdgeLo, c.iEdgeHi, c.lEdgeLo, c.lEdgeHi,
                 Math.max(1, c.assertInterval),
                 c.resultFolder());

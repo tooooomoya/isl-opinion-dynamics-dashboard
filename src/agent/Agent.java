@@ -63,7 +63,7 @@ public class Agent {
         if (p.initOpinionDist().equals("gaussian")) {
             double x;
             do {
-                x = randomGenerator.dynamics().nextGaussian() * Const.INITIAL_OPINION_STD;
+                x = randomGenerator.dynamics().nextGaussian() * p.initSd();
             } while (Math.abs(x) > 1.0);
             this.intrinsicX = x;
         } else { // uniform: X ~ U[-1, 1]
@@ -177,14 +177,12 @@ public class Agent {
      * are dropped from my list here (a dead post is never revived), so their likes stop counting.
      */
     public double recognition(int step) {
-        // Likes on a reshare are split: the resharer keeps (1 - alpha), the original's author gets alpha (alpha = 0: all to the resharer);
-        // a like on the copy by the original's own author is credited entirely to the resharer.
-        double a = p.reshareAlpha(), likes = 0.0;
+        // A like on a reshare is credited to the resharer only (the original's author gets nothing from it).
+        double likes = 0.0;
         for (Iterator<Post> it = ownPosts.iterator(); it.hasNext(); ) {
             Post post = it.next();
             if (!post.isAlive(step, p.deadAfter())) it.remove();
-            else if (post.isRelay()) likes += (1.0 - a) * (post.getLikesReceived() - post.getLikesByOriginator()) + post.getLikesByOriginator();
-            else likes += post.getLikesReceived() + a * post.getCopyLikes();
+            else likes += post.getLikesReceived();
         }
         return recogValue(likes);
     }

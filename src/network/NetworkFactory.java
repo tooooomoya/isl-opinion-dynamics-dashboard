@@ -31,6 +31,9 @@ public final class NetworkFactory {
                 // params on CLI (hk_m/hk_a/hk_pt); defaults calibrated 2026-07-16 against
                 // Kwak et al. 2010 (m=15/A=4/pt=0.05) — see class docstring.
                 return new HolmeKimNetwork(n, cfg.hkM, cfg.hkA, cfg.hkPt);
+            case "hkshuf":
+                // degree-matched control: HK graph, then double edge swaps (same in/out degrees, random wiring)
+                return new HolmeKimShuffledNetwork(n, cfg.hkM, cfg.hkA, cfg.hkPt);
             case "ws":
                 // K = 2 * wsOut: the generator adds edges to the next K/2 agents, so wsOut is the out-degree
                 return new WattsStrogatzNetwork(n, 2 * cfg.wsOut, cfg.wsBeta);
@@ -50,7 +53,7 @@ public final class NetworkFactory {
                 return new ReadNetwork(n, cfg.readPath);
             default:
                 throw new IllegalArgumentException("Unknown network type: '" + cfg.networkType
-                        + "' (expected dcsbm|ba|hk|ws|dba|dms|cnn|lfr|random|homophily|read)");
+                        + "' (expected dcsbm|ba|hk|hkshuf|ws|dba|dms|cnn|lfr|random|homophily|read)");
         }
     }
 }

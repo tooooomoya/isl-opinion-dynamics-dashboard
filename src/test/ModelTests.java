@@ -44,7 +44,7 @@ public class ModelTests {
         testReshareCreditsResharer();
         testSimilarityAndIdentityFit();
         testRecognition();
-        testReshareAlphaSplit();
+        testReshareCreditAndLife();
         testQUpdate();
         testEqualStartEquiprobable();
         testExplorationFloor();
@@ -65,6 +65,7 @@ public class ModelTests {
         testDriftOffByDefault();
         testUniformInit();
         testVelocityRankingCache();
+        testTrendCountAndTie();
         testChronoRootDedup();
         testDeadPostsLeaveFeed();
         testForYou();
@@ -170,29 +171,18 @@ public class ModelTests {
         check(r1000 > r100 + 0.15 && r1000 <= 1.0, "influencers still differ: 1000 likes rewards more than 100");
     }
 
-    private static void testReshareAlphaSplit() {
-        System.out.println("[likes on a reshare split between author and resharer]");
-        SimParams p = params("l_ref=99", "dead_after=50", "recog_mix=0", "reshare_alpha=0.25");
+    private static void testReshareCreditAndLife() {
+        System.out.println("[likes on a reshare: credit to the resharer only, the original's life is refreshed]");
+        SimParams p = params("l_ref=99", "dead_after=50", "recog_mix=0");
         Agent author = new Agent(0, p), relayer = new Agent(1, p);
         Post src = author.makePost(0);
         Post copy = Post.reshareOf(src, 1, 1, false);
         relayer.getOwnPosts().add(copy);
-        for (int i = 0; i < 8; i++) copy.like(2);
-        check(copy.getLikesReceived() == 8 && src.getCopyLikes() == 8.0, "the copy's likes are also counted on the original");
-        double aExp = Math.log1p(0.25 * 8) / Math.log(100.0), rExp = Math.log1p(0.75 * 8) / Math.log(100.0);
-        check(Math.abs(author.recognition(3) - aExp) < 1e-12, "original's author gets alpha of the copy's likes");
-        check(Math.abs(relayer.recognition(3) - rExp) < 1e-12, "resharer keeps 1 - alpha of its own copy's likes");
-        Post c3 = Post.reshareOf(src, 5, 1, false);
-        c3.like(2, Integer.MAX_VALUE, 0); // the original's own author likes the copy: no self-credit
-        check(src.getCopyLikes() == 8.0 && c3.getLikesReceived() == 1, "the original author's own like on a copy is not credited back to the author");
-        Agent r5 = new Agent(5, p); r5.getOwnPosts().add(c3);
-        double full = Math.log1p(1.0) / Math.log(100.0);
-        check(Math.abs(r5.recognition(3) - full) < 1e-12, "the original author's like on a copy is credited fully (weight 1) to the resharer");
-        Agent plain = new Agent(2, params("l_ref=99", "dead_after=50", "recog_mix=0"));
-        Post s2 = plain.makePost(0);
-        Post c2 = Post.reshareOf(s2, 3, 1, false);
-        c2.like(2);
-        check(plain.recognition(3) == 0.0, "alpha = 0 (default): nothing flows to the original's author");
+        for (int i = 0; i < 8; i++) copy.like(30);
+        check(copy.getLikesReceived() == 8 && src.getLikesReceived() == 0, "the copy's likes stay on the copy");
+        check(author.recognition(40) == 0.0, "the original's author gets no credit from likes on a reshare");
+        check(Math.abs(relayer.recognition(40) - Math.log1p(8) / Math.log(100.0)) < 1e-12, "the resharer gets all of them");
+        check(src.isAlive(60, 50) && !src.isAlive(81, 50), "a like on the copy refreshes the original's life like a like on itself");
     }
 
     private static void testQUpdate() {
@@ -575,6 +565,35 @@ public class ModelTests {
         List<Post> r5 = admin.rankByVelocity(5);
         check(r5 != r0 && r5.get(0).getPostId() == currentlyRising.getPostId(),
                 "after the interval the stalled burst is demoted below the rising post");
+    }
+
+    // Trend velocity: likes count like reshares (trend_count=both), and equal scores are ordered at random (trend_tie=random)
+    // instead of oldest-first.
+    private static void testTrendCountAndTie() {
+        System.out.println("[trend count and tie-break]");
+        SimParams legacy = params("access_prob=0.2", "vel_mode=windowed", "n=5");
+        AdminOptim a0 = new AdminOptim(5, new double[5][5], legacy);
+        Post liked = new Post(0, 0.1, 0), reshared = new Post(1, -0.1, 0);
+        a0.addRecentPost(liked); a0.addRecentPost(reshared);
+        for (int i = 0; i < 4; i++) liked.like(1);
+        reshared.receiveRepost(1);
+        check(a0.rankByVelocity(5).get(0) == reshared, "legacy: likes do not count (a reshared post beats a liked one)");
+        SimParams both = params("access_prob=0.2", "vel_mode=windowed", "n=5", "trend_count=both");
+        AdminOptim a1 = new AdminOptim(5, new double[5][5], both);
+        Post liked1 = new Post(0, 0.1, 0), reshared1 = new Post(1, -0.1, 0);
+        a1.addRecentPost(liked1); a1.addRecentPost(reshared1);
+        for (int i = 0; i < 4; i++) liked1.like(1);
+        reshared1.receiveRepost(1);
+        check(a1.rankByVelocity(5).get(0) == liked1, "trend_count=both: 4 likes outrank 1 reshare");
+        // ties: 20 posts with no reaction; legacy keeps creation order, random reshuffles (first place not always the oldest)
+        SimParams oldest = params("access_prob=1", "n=5"), rnd = params("access_prob=1", "n=5", "trend_tie=random");
+        AdminOptim t0 = new AdminOptim(5, new double[5][5], oldest), t1 = new AdminOptim(5, new double[5][5], rnd);
+        List<Post> pool = new java.util.ArrayList<>();
+        for (int i = 0; i < 20; i++) { Post q = new Post(0, 0.0, i); pool.add(q); t0.addRecentPost(q); t1.addRecentPost(q); }
+        check(t0.rankByVelocity(30).get(0) == pool.get(0), "trend_tie=oldest: zero-score ties keep creation order");
+        int oldestFirst = 0;
+        for (int step = 31; step < 231; step++) if (t1.rankByVelocity(step).get(0) == pool.get(0)) oldestFirst++;
+        check(oldestFirst > 0 && oldestFirst < 40, "trend_tie=random: the oldest post leads only ~1/20 of the time (" + oldestFirst + "/200)");
     }
 
     // Chrono selection dedups reshares of the same story by rootPostId.

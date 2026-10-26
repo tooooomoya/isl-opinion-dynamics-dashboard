@@ -23,7 +23,7 @@ EXCESS = MODE.startswith("std:")
 NETNAME = {"hk": "HOLME-KIM", "random": "RANDOM", "sbm": "SBM"}.get(MODE.split(":")[1] if EXCESS else "", "")
 STDNET = MODE.split(":")[1] if EXCESS else None
 MODE = "noise" if MODE.startswith("noise") else ("std" if EXCESS else MODE)
-PFX, REWTXT = {"std": (f"stdh_{STDNET}", f"{NETNAME} start network, standing config + For You hop term (λ=0.5); identity fit = excess over random expectation"), "on": ("fc", "rewire ON, cost ON (post 0.5 / reshare 0.25 / rewire 1.0)"), "off": ("fcoff", "rewire OFF (static network), cost ON (post 0.5 / reshare 0.25)"),
+PFX, REWTXT = {"std": (f"baseline_{STDNET}", f"{NETNAME} start network, standing config + For You hop term (λ=0.5); identity fit = excess over random expectation"), "on": ("fc", "rewire ON, cost ON (post 0.5 / reshare 0.25 / rewire 1.0)"), "off": ("fcoff", "rewire OFF (static network), cost ON (post 0.5 / reshare 0.25)"),
                "nogate": ("fcng", "rewire ON without the similarity gate, cost ON (post 0.5 / reshare 0.25 / rewire 1.0)"),
                "nogate:random": ("fcng_random", "RANDOM start network, standing config (no gate, cost on)"),
                "nogate:sbm": ("fcng_sbm", "SBM start network (K=4, mean degree 15), standing config (no gate, cost on)"),

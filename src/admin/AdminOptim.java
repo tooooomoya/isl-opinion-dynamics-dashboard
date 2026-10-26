@@ -283,9 +283,14 @@ public class AdminOptim {
     // Known tradeoff, accepted: this also removes the throttle on the EXTREME hubs (the largest
     // accounts in the network), so it may entrench them further, not just help the neutral one —
     // watch for this in the re-run.
+    /** Reactions that feed the Trend velocity: reshares, plus likes when trend_count=both. */
+    private int trendCount(Post post) {
+        return post.getReceivedReposts() + (p.trendCountLikes() ? post.getLikesReceived() : 0);
+    }
+
     private double velocityScore(Post post, int step) {
         int age = step - post.getPostedStep();
-        return post.getReceivedReposts() / (age + 1.0) * timeDecayFactor(age);
+        return trendCount(post) / (age + 1.0) * timeDecayFactor(age);
     }
 
     // 2026-07-29: optional extra recency dampener (SimParams.feedTimeDecayTau), off by default (tau
@@ -309,7 +314,7 @@ public class AdminOptim {
         int[] snap = velSnapshot.get(post.getPostId());
         int lastLikes = (snap == null) ? 0 : snap[0];
         int lastStep = (snap == null) ? post.getPostedStep() : snap[1];
-        int gained = post.getReceivedReposts() - lastLikes;
+        int gained = trendCount(post) - lastLikes;
         int dt = Math.max(1, step - lastStep);
         return gained / (double) dt * timeDecayFactor(step - post.getPostedStep());
     }
@@ -337,6 +342,7 @@ public class AdminOptim {
             return cachedRanked;
         }
         List<Post> ranked = new ArrayList<>(recentPosts);
+        if (p.trendTieRandom()) Collections.shuffle(ranked, randomGenerator.dynamics()); // the sort below is stable, so equal scores stay in this random order
         boolean windowed = p.velMode().equals("windowed");
         // Precompute scores once (safe with the comparator; and windowed updates snapshots after).
         Map<Integer, Double> score = new HashMap<>();
@@ -346,7 +352,7 @@ public class AdminOptim {
         }
         if (windowed) {
             for (Post post : ranked) {
-                velSnapshot.put(post.getPostId(), new int[]{post.getReceivedReposts(), step});
+                velSnapshot.put(post.getPostId(), new int[]{trendCount(post), step});
             }
             velSnapshot.keySet().retainAll(score.keySet()); // drop snapshots for expired posts
         }

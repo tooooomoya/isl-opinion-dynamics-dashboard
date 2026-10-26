@@ -1,6 +1,7 @@
 package experiment;
 
 import agent.Agent;
+import constants.Const;
 
 /**
  * Configuration for a single simulation run of the attention-economy model (branch
@@ -65,11 +66,14 @@ public class ExperimentConfig {
     public double feedDecayLambda = 0.11;
     public String velMode = "windowed";  // cumulative|windowed
     public double feedTimeDecayTau = 30.0;
+    public String trendCount = "reshare"; // trend_count: reshare = Trend velocity counts reshares only (legacy) | both = likes + reshares of the post
+    public String trendTie = "oldest";    // trend_tie: oldest = equal scores keep creation order (legacy, oldest first) | random = ties broken at random
     public int feedCapacity = 10;        // candidate posts delivered per visit
     public double accessProb = 0.1;      // chance an agent visits at a step; sets time between decisions
 
     // ---- Values ----
     public String initOpinionDist = "uniform"; // uniform|gaussian ; X in [-1,1], d = 1
+    public double initSd = Const.INITIAL_OPINION_STD; // init_sd: sd of the gaussian start (truncated to [-1,1] by redraw)
     public double mu = 0.0;                    // drift weight toward the feed mean; 0 = X fixed (baseline)
     public double neutralBandHalfWidth = 0.2;  // analysis-only: sign-camp metrics exclude |x| below this
 
@@ -106,7 +110,6 @@ public class ExperimentConfig {
     public boolean rewireGate = true;  // rewire_gate: false = always swap the oldest followee for the drawn candidate (no similarity check)
     public double postNoise = 0.0;     // post_noise: x_post = clip(x_i + N(0, post_noise^2), -1, 1); > 0 also switches rewire to observed (post-based) opinions
     public int notifyMax = 0;          // notify_original (>0 = on): reshares of my own posts join my candidate pool, hop-exempt (0 = off)
-    public double reshareAlpha = 0.0; // likes on a reshare: alpha to the original's author, 1-alpha to the resharer (reshare_alpha)
     public double costRewire = 0.0;  // reward cost of a rewire decision (cost_rewire)
     public double foryouHopLambda = -1.0; // foryou_hop_lambda: For You score = similarity x exp(-lambda (hop-1)); < 0 = legacy feed_decay_* machinery
     public int startDeg = 0;            // start_deg: force the start network to exactly n x start_deg directed edges (mean degree), 0 = as generated
@@ -183,9 +186,12 @@ public class ExperimentConfig {
                 case "feed_decay_lambda" -> c.feedDecayLambda = Double.parseDouble(v);
                 case "feed_time_decay_tau" -> c.feedTimeDecayTau = Double.parseDouble(v);
                 case "vel_mode" -> c.velMode = v.toLowerCase();
+                case "trend_count" -> c.trendCount = v.toLowerCase();
+                case "trend_tie" -> c.trendTie = v.toLowerCase();
                 case "feed_capacity" -> c.feedCapacity = Integer.parseInt(v);
                 case "access_prob" -> c.accessProb = Double.parseDouble(v);
                 case "init_dist" -> c.initOpinionDist = v.toLowerCase();
+                case "init_sd" -> c.initSd = Double.parseDouble(v);
                 case "mu" -> c.mu = Double.parseDouble(v);
                 case "neutral_band" -> c.neutralBandHalfWidth = Double.parseDouble(v);
                 case "beta_h" -> c.betaH = Double.parseDouble(v);
@@ -207,7 +213,6 @@ public class ExperimentConfig {
                 case "rewire_gate" -> c.rewireGate = Boolean.parseBoolean(v);
                 case "post_noise" -> c.postNoise = Double.parseDouble(v);
                 case "notify_original" -> c.notifyMax = Integer.parseInt(v);
-                case "reshare_alpha" -> c.reshareAlpha = Double.parseDouble(v);
                 case "cost_rewire" -> c.costRewire = Double.parseDouble(v);
                 case "foryou_hop_lambda" -> c.foryouHopLambda = Double.parseDouble(v);
                 case "start_deg" -> c.startDeg = Integer.parseInt(v);
@@ -307,6 +312,7 @@ public class ExperimentConfig {
         }
         if (feedTimeDecayTau != DEFAULTS.feedTimeDecayTau) t += "_tdtau-" + String.format("%.1f", feedTimeDecayTau);
         if (!initOpinionDist.equals(DEFAULTS.initOpinionDist)) t += "_initdist-" + initOpinionDist;
+        if (initSd != DEFAULTS.initSd) t += "_initsd-" + String.format("%.2f", initSd);
         if (mu != DEFAULTS.mu) t += "_mu-" + String.format("%.4f", mu);
         if (betaH != DEFAULTS.betaH) t += "_bh-" + String.format("%.2f", betaH);
         if (deadAfter != DEFAULTS.deadAfter) t += "_L-" + deadAfter;
@@ -321,7 +327,6 @@ public class ExperimentConfig {
         if (rewireGate != DEFAULTS.rewireGate) t += "_gate-" + rewireGate;
         if (postNoise != DEFAULTS.postNoise) t += "_pn-" + String.format("%.2f", postNoise);
         if (notifyMax != DEFAULTS.notifyMax) t += "_nt-" + notifyMax;
-        if (reshareAlpha != DEFAULTS.reshareAlpha) t += "_ra-" + String.format("%.2f", reshareAlpha);
         if (costPost != DEFAULTS.costPost || costReshare != DEFAULTS.costReshare || costRewire != DEFAULTS.costRewire) t += "_cost-" + String.format("%.2f", costPost) + "-" + String.format("%.2f", costReshare) + "-" + String.format("%.2f", costRewire);
         if (foryouHopLambda != DEFAULTS.foryouHopLambda) t += "_hl-" + String.format("%.2f", foryouHopLambda);
         if (startDeg != DEFAULTS.startDeg) t += "_sd-" + startDeg;
@@ -357,6 +362,8 @@ public class ExperimentConfig {
         if (hkA != DEFAULTS.hkA) t += "_hka-" + hkA;
         if (hkPt != DEFAULTS.hkPt) t += "_hkpt-" + String.format("%.2f", hkPt);
         if (!velMode.equals(DEFAULTS.velMode)) t += "_vm-" + velMode;
+        if (!trendCount.equals(DEFAULTS.trendCount)) t += "_tcount-" + trendCount;
+        if (!trendTie.equals(DEFAULTS.trendTie)) t += "_ttie-" + trendTie;
         if (n != DEFAULTS.n) t += "_n-" + n;
         if (steps != DEFAULTS.steps) t += "_st-" + steps;
         if (feedCapacity != DEFAULTS.feedCapacity) t += "_fc-" + feedCapacity;

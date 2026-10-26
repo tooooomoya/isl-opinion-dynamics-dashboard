@@ -17,8 +17,6 @@ public class Post {
     private int lastRepostStep;        // step of the latest reshare (lifespan diagnostics)
     private int likesReceived;         // likes of THIS post (recognition for its author)
     private int lastReactionStep;      // step of the latest like or reshare; creation step if none
-    private double copyLikes;          // likes received by reshares of THIS original (shared with its author via reshare_alpha)
-    private int likesByOriginator;    // likes of THIS copy that came from the original's own author (all credited to the resharer)
     private final Post root;           // root original (this post itself for an original)
     private int likesInHorizon;        // likes received within the credit horizon after creation (delayed-credit reward)
     private final int postId;
@@ -79,10 +77,6 @@ public class Post {
     public int getReceivedReposts() { return receivedReposts; }
     public int getLikesReceived() { return likesReceived; }
     public int getLikesInHorizon() { return likesInHorizon; }
-    /** Likes of this copy given by the original's own author (0 for an original). */
-    public int getLikesByOriginator() { return likesByOriginator; }
-    /** Likes received by reshares of this original (0 for a reshare). */
-    public double getCopyLikes() { return copyLikes; }
     public int getLastReactionStep() { return lastReactionStep; }
     public int getPostId() { return postId; }
     public int getLastRepostStep() { return lastRepostStep; }
@@ -107,12 +101,13 @@ public class Post {
     /** As {@link #like(int)}, also counting the like toward the creation-window total if within {@code creditHorizon} steps. */
     public void like(int step, int creditHorizon) { like(step, creditHorizon, -1); }
 
-    /** As above; a like by the original's own author goes entirely to the resharer and never to the author's share (no self-credit). */
+    /**
+     * As above. A like on a reshare is credited to the resharer only; the original gets no credit, just its life refreshed
+     * as if it had been liked itself (likerId is unused, kept for the call sites).
+     */
     public void like(int step, int creditHorizon, int likerId) {
         likesReceived++;
-        if (root != this) {
-            if (likerId == root.postUserId) likesByOriginator++; else root.copyLikes++;
-        }
+        if (root != this) root.lastReactionStep = step;
         if (step - postedStep <= creditHorizon) likesInHorizon++;
         lastReactionStep = step;
     }

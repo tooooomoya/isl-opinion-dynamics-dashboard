@@ -319,15 +319,15 @@ public class Writer {
         try (PrintWriter pw = new PrintWriter(new FileWriter(filePath, false))) {
             // Per-agent snapshot. identityFit/recognition are the values at the agent's last visit;
             // qPost..qRewire are the agent's learned action values averaged over its 9 states.
-            pw.println("agentId,intrinsicOpinion,opinion,identityFit,recognition,followerCount,followeeCount,isTarget,qPost,qLike,qReshare,qRewire");
+            pw.println("agentId,intrinsicOpinion,opinion,identityFit,recognition,followerCount,followeeCount,isTarget,qPost,qLike,qReshare,qRewire,xhat");
             for (int i = 0; i < agentSet.length; i++) {
                 agent.Agent a = agentSet[i];
                 double[] qm = new double[agent.Agent.NUM_ACTIONS];
                 for (double[] row : a.getQ()) for (int k = 0; k < qm.length; k++) qm[k] += row[k] / agent.Agent.NUM_STATES;
-                pw.printf("%d,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f%n",
+                pw.printf("%d,%.4f,%.4f,%.4f,%.4f,%d,%d,%d,%.4f,%.4f,%.4f,%.4f,%.4f%n",
                         i, a.getIntrinsicOpinion(), a.getOpinion(), a.getLastIdentityFit(), a.getLastRecognition(),
                         admin.getFollowers(i).size(), admin.followeeCount(i),
-                        a.getTarget() ? 1 : 0, qm[0], qm[1], qm[2], qm[3]);
+                        a.getTarget() ? 1 : 0, qm[0], qm[1], qm[2], qm[3], admin.getEstimate(i));
             }
         } catch (IOException e) {
             e.printStackTrace();
