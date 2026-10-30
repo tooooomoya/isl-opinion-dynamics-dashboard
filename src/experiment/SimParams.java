@@ -27,7 +27,7 @@ public record SimParams(
         double accessProb,       // per-step probability an agent visits
         java.util.Set<Integer> algoExcludeIds,
         // ---- values ----
-        String initOpinionDist,  // uniform|gaussian
+        String initOpinionDist,  // uniform|gaussian|empirical (unique-person survey weights)
         double initSd,           // sd of the gaussian start (truncated to [-1,1])
         double mu,               // drift weight toward the feed mean (0 = X fixed)
         double neutralBandHalfWidth,

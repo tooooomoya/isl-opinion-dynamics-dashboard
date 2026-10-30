@@ -1,0 +1,22 @@
+{
+  "nodes": 18470,
+  "cluster_sizes": {
+    "right": 7115,
+    "left": 11355
+  },
+  "event_weighted_directed": {
+    "edges": 61157,
+    "modularity_published_partition": 0.47787446636482844,
+    "cross_cluster_fraction": 0.020341089327468698
+  },
+  "unique_directed": {
+    "edges": 48365,
+    "modularity_published_partition": 0.47551016663163115,
+    "cross_cluster_fraction": 0.023053861263310216
+  },
+  "unique_undirected": {
+    "edges": 48053,
+    "modularity_published_partition": 0.4753748002121123,
+    "cross_cluster_fraction": 0.023182735729298853
+  }
+}

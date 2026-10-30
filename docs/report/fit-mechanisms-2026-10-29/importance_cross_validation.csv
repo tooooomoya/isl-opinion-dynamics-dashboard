@@ -1,0 +1,10 @@
+network,outcome,n_settings,target,out_of_fold_rmse,constant_rmse,skill_vs_constant
+hkshuf,original_activity_loss,98,log1p(mean five-seed component loss),0.5690716048616625,0.5548060304259868,-0.0520865925518994
+hkshuf,all_activity_loss,98,log1p(mean five-seed component loss),0.47364921613904154,0.5029109782560016,0.11298408196608234
+hkshuf,network_loss,98,log1p(mean five-seed component loss),0.7922400391552059,1.2784333902789877,0.6159768860688408
+random,original_activity_loss,92,log1p(mean five-seed component loss),0.6691221438669102,0.6835854061447656,0.04186823093907466
+random,all_activity_loss,92,log1p(mean five-seed component loss),0.6392867469542939,0.6799757753559101,0.11609717788227758
+random,network_loss,92,log1p(mean five-seed component loss),0.822306789970485,1.3407874058003915,0.6238613956025111
+dcsbm,original_activity_loss,92,log1p(mean five-seed component loss),0.6276390582470335,0.651339004061432,0.071449020082346
+dcsbm,all_activity_loss,92,log1p(mean five-seed component loss),0.6363708224210364,0.6331989462427214,-0.010043669903627261
+dcsbm,network_loss,92,log1p(mean five-seed component loss),0.8678021527974287,1.255249540007514,0.5220512781413021

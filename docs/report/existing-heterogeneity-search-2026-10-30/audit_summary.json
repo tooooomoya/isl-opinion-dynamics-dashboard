@@ -1,0 +1,34 @@
+{
+  "empirical_equal_bin_gini": 0.684936634894914,
+  "inventory": [
+    {
+      "source": "calibration_raw_reduced_20261029",
+      "eligible_completed_jobs": 1035,
+      "excluded_failed_or_nonuniform": 0
+    },
+    {
+      "source": "calibration_multinetwork_20261028",
+      "eligible_completed_jobs": 2026,
+      "excluded_failed_or_nonuniform": 0
+    },
+    {
+      "source": "calibration_uniform_20261028",
+      "eligible_completed_jobs": 624,
+      "excluded_failed_or_nonuniform": 0
+    }
+  ],
+  "inspected_jobs": 3685,
+  "errors": [],
+  "eligible_conditions_at_least_five_valid_seeds": 614,
+  "raw_search_conditions": 191,
+  "raw_search_within_gini_range": [
+    0.014936596338790398,
+    0.715116429820122
+  ],
+  "raw_search_original_gini_range": [
+    0.02120877785834508,
+    0.8074230077242976
+  ],
+  "raw_search_conditions_within_gini_above_half": 7,
+  "note": "Read-only diagnostic; old objectives remain untouched. Raw and relative studies are separate. Calendar/model windows are not equated; no new scalar loss defined."
+}

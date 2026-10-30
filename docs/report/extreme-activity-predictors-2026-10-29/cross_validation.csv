@@ -1,0 +1,7 @@
+network,outcome,n_settings,out_of_fold_skill_vs_constant,rmse_log_ratio
+hkshuf,log_extreme_neutral,98,-0.07324718796369134,0.433138773475968
+hkshuf,log_extreme_inner,98,-0.11527140667490521,0.4378674849718669
+random,log_extreme_neutral,95,-0.06307169530910817,0.4835996340272697
+random,log_extreme_inner,95,0.06716209785276972,0.452052411557148
+dcsbm,log_extreme_neutral,95,0.17495726321983807,0.43436073049418544
+dcsbm,log_extreme_inner,95,0.23395308804490522,0.4051496405827664

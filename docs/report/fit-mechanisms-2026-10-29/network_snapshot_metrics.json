@@ -1,0 +1,31 @@
+{
+  "seed": 271000,
+  "job_key": "22d449b1e5d7bf3d",
+  "graphs": {
+    "initial_follow": {
+      "ties": 46000,
+      "weight_sum": 46000,
+      "q_sign": -0.002717739130434854
+    },
+    "final_follow": {
+      "ties": 46000,
+      "weight_sum": 46000,
+      "q_sign": 0.424610956521739
+    },
+    "root_repost": {
+      "ties": 74054,
+      "weight_sum": 92390,
+      "q_sign": 0.3996624107692017
+    }
+  },
+  "detected_repost": {
+    "q": 0.39963031952964934,
+    "cross": 0.09885268968503085,
+    "edges": 74054,
+    "events": 92390,
+    "component_fraction": 1.0,
+    "two_communities": true,
+    "q_sign": 0.3996624107692017,
+    "sign_agreement": 0.994
+  }
+}

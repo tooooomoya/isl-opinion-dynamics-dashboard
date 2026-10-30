@@ -1,5 +1,30 @@
 # Empirical reference data
 
+## Source audit correction (2026-10-27)
+
+The CSV below has **765 rows but 762 unique handles**. The upstream label CSV has
+three identical duplicate rows (`tw_user_2007`, `tw_user_3041`, `tw_user_5197`),
+which were propagated into this summary. The authors' `01-ActivityModel.ipynb`
+explicitly uses `drop_duplicates(subset=["handle"], keep="first")`. Follow that
+operation before deriving targets. The historical constants reproduce the
+duplicated rows and should not be used as corrected calibration targets.
+
+Corrected bin populations: `[160, 130, 85, 207, 46, 71, 63]`.
+Corrected full-window means: `[4328.725, 2703.169, 1503.682, 2094.329,
+691.065, 1156.761, 3779.921]` (total posts per unique respondent, rounded).
+
+The public upstream counting notebook counts supplied tweet IDs without an
+original-only filter. The raw collection feeding it is not public, so original /
+retweet / reply inclusion cannot be fully established from the available code.
+Do not label this empirical target “original posts” without further evidence.
+The sample is also selected for observed news-sharing behavior across both
+periods; it is not a representative sample of all Twitter accounts.
+
+See `docs/report/2026-10-27-calibration-source-audit-and-search-design.md` and
+`scripts/audit_calibration_sources.py` for sources and reproduction. The original
+summary CSV is preserved for traceability; corrected temporal targets and
+bootstrap intervals are in `docs/report/empirical-target-audit-2026-10-27/`.
+
 ## buntain_snegovaya_2025_activity_by_handle.csv
 
 Individual-level (per-handle) posting activity, joined with self-reported ideology.

@@ -53,6 +53,7 @@ public class ModelTests {
         testOneReactionPerPost();
         testQTargetUsesAvailableActions();
         testRewardWeights();
+        testRawFitHasCommonBaseline();
         testRelativeFit();
         testFollowQueue();
         testRewire();
@@ -64,6 +65,8 @@ public class ModelTests {
         testDeathSweep();
         testDriftOffByDefault();
         testUniformInit();
+        testEmpiricalInit();
+        testCalibrationWindows();
         testVelocityRankingCache();
         testTrendCountAndTie();
         testChronoRootDedup();
@@ -78,6 +81,40 @@ public class ModelTests {
 
         System.out.println(failures == 0 ? "ALL PASS" : (failures + " FAILURE(S)"));
         if (failures > 0) System.exit(1);
+    }
+
+    private static void testEmpiricalInit() {
+        System.out.println("[deduplicated empirical ideology initialization]");
+        randomGenerator.init(1827, 1827);
+        int[] bins = new int[7];
+        SimParams p = params("init_dist=empirical");
+        for (int i = 0; i < 20000; i++) bins[Agent.opinionToBin7(new Agent(0, p).getIntrinsicOpinion())]++;
+        int[] target = constants.Const.EMPIRICAL_UNIQUE_OPINION_BIN_COUNTS;
+        for (int i = 0; i < 7; i++) check(Math.abs(bins[i] / 20000.0 - target[i] / 762.0) < 0.015,
+                "empirical bin " + i + " uses unique-person weights");
+    }
+
+    private static void testCalibrationWindows() {
+        System.out.println("[exact calibration windows and reshare attribution]");
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("calibration-test-");
+            Agent[] agents = {new Agent(0, params()), new Agent(1, params()), new Agent(2, params())};
+            analysis.CalibrationLog log = new analysis.CalibrationLog(3);
+            log.original(0); log.visit(0); log.reshare(1, 0, 0); log.reshare(2, 1, 0);
+            log.flush(5000, agents, dir);
+            String root = java.nio.file.Files.readString(dir.resolve("calibration_root_5000.csv"));
+            String immediate = java.nio.file.Files.readString(dir.resolve("calibration_immediate_5000.csv"));
+            check(root.contains("0,2,1") && immediate.contains("1,2,1"), "copy chains preserve separate root and immediate graphs");
+            log.flush(10000, agents, dir);
+            String activity = java.nio.file.Files.readString(dir.resolve("calibration_activity.csv"));
+            check(activity.lines().count() == 7 && activity.contains("5000,10000,0,"), "zero-activity agents and exact window boundaries logged");
+            check(java.nio.file.Files.readString(dir.resolve("calibration_root_10000.csv")).lines().count() == 1,
+                    "events reset at the window boundary");
+            try (var paths = java.nio.file.Files.list(dir)) {
+                for (var path : paths.toList()) java.nio.file.Files.delete(path);
+            }
+            java.nio.file.Files.delete(dir);
+        } catch (java.io.IOException e) { throw new java.io.UncheckedIOException(e); }
     }
 
     private static void testConfigRoundTrip() {
@@ -105,6 +142,8 @@ public class ModelTests {
         check(a.tag().contains("_bh-") && !def.tag().contains("_bh-"), "beta_h tagged only when non-default");
         check(b.tag().contains("_L-20") && b.tag().contains("_qeta-"), "multiple knobs tagged");
         check(!a.tag().equals(b.tag()) && !a.tag().equals(def.tag()), "distinct configs => distinct tags");
+        ExperimentConfig sampled = ExperimentConfig.fromArgs(new String[]{"metrics_every=100", "calibration_log=true"});
+        check(sampled.tag().contains("_me-100_calib"), "optional measurement settings have distinct result tags");
     }
 
     private static void testPostLifecycle() {
@@ -289,6 +328,22 @@ public class ModelTests {
         a.observeAndLearn(1);                                    // no own posts: recognition 0 -> r = 0.5 * 1 + 2 * 0
         check(Math.abs(a.getQ()[0][Agent.POST] - 0.5) < 1e-9 || Math.abs(a.getQ()[0][Agent.LIKE] - 0.5) < 1e-9 || Math.abs(a.getQ()[0][Agent.RESHARE] - 0.5) < 1e-9,
                 "reward = w_fit * identity fit + w_rec * recognition");
+    }
+
+    private static void testRawFitHasCommonBaseline() {
+        System.out.println("[raw identity fit has a common baseline]");
+        SimParams p = params("learner=bandit", "q_eta=1", "q_init=0", "q_eps=0",
+                "rewire=false", "w_fit=1", "w_rec=0", "fit_mode=raw");
+        for (double x : new double[]{-1.0, 0.0, 1.0}) {
+            Agent a = new Agent(0, p);
+            a.setOpinion(x);
+            a.setFitBaseline(0.75 - 0.25 * x * x); // deliberately different; raw mode must ignore it
+            a.chooseAction(0); // empty feed and no rewiring: only Post is available
+            a.addPostToFeed(new Post(1, x, 0));
+            a.observeAndLearn(1);
+            check(Math.abs(a.getQ()[0][Agent.POST] - 1.0) < 1e-12,
+                    "identical feed similarity earns identical raw reward at opinion " + x);
+        }
     }
 
     private static void testRelativeFit() {

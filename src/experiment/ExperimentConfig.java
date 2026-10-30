@@ -72,7 +72,7 @@ public class ExperimentConfig {
     public double accessProb = 0.1;      // chance an agent visits at a step; sets time between decisions
 
     // ---- Values ----
-    public String initOpinionDist = "uniform"; // uniform|gaussian ; X in [-1,1], d = 1
+    public String initOpinionDist = "uniform"; // uniform|gaussian|empirical ; X in [-1,1], d = 1
     public double initSd = Const.INITIAL_OPINION_STD; // init_sd: sd of the gaussian start (truncated to [-1,1] by redraw)
     public double mu = 0.0;                    // drift weight toward the feed mean; 0 = X fixed (baseline)
     public double neutralBandHalfWidth = 0.2;  // analysis-only: sign-camp metrics exclude |x| below this
@@ -95,7 +95,7 @@ public class ExperimentConfig {
     public int creditHorizon = 50;
     // fit_mode = "raw": the identity fit is the mean similarity of the feed. fit_mode = "relative": the agent's expected fit
     // under a random feed (mean similarity to all agents) is subtracted, for both the state and the reward.
-    public String fitMode = "raw";
+    public String fitMode = "raw"; // main specification: raw mean similarity, common zero baseline at every opinion
 
     // ---- Q-learning (stateless action values over a 3x3 state; spec rev 7, section 10) ----
     public double qEta = 0.1;      // learning rate
@@ -114,6 +114,9 @@ public class ExperimentConfig {
     public double foryouHopLambda = -1.0; // foryou_hop_lambda: For You score = similarity x exp(-lambda (hop-1)); < 0 = legacy feed_decay_* machinery
     public int startDeg = 0;            // start_deg: force the start network to exactly n x start_deg directed edges (mean degree), 0 = as generated
     public int metricsHeavyEvery = 1;   // metrics_heavy_every: recompute network-wide step metrics every k steps (carry forward in between)
+    public int metricsEvery = 1;        // metrics_every: sample ordinary step metrics (event counters remain exact in calibration logs)
+    public boolean calibrationLog = false; // exact 5000-step activity and root/immediate reshare graphs
+    public String runId = "";          // optional short result tag; launcher must preserve the complete configuration
     public int foryouCandMax = 0;      // foryou_cand_max: cap on the For You candidate sample per feed (0 = no cap)
     public String fitBaseline = "empirical"; // fit_baseline: empirical | analytic (relative fit only)
     public String likeGate = "filter"; // like_gate: filter (out-of-range posts are not like candidates) | noop (the like is chosen, the drawn post is out of range => nothing happens, counted)
@@ -217,6 +220,12 @@ public class ExperimentConfig {
                 case "foryou_hop_lambda" -> c.foryouHopLambda = Double.parseDouble(v);
                 case "start_deg" -> c.startDeg = Integer.parseInt(v);
                 case "metrics_heavy_every" -> c.metricsHeavyEvery = Integer.parseInt(v);
+                case "metrics_every" -> c.metricsEvery = Math.max(1, Integer.parseInt(v));
+                case "calibration_log" -> c.calibrationLog = Boolean.parseBoolean(v);
+                case "run_id" -> {
+                    if (!v.matches("[A-Za-z0-9_-]{1,80}")) throw new IllegalArgumentException("Invalid run_id");
+                    c.runId = v;
+                }
                 case "foryou_cand_max" -> c.foryouCandMax = Integer.parseInt(v);
                 case "fit_baseline" -> c.fitBaseline = v.toLowerCase();
                 case "like_gate" -> c.likeGate = v.toLowerCase();
@@ -291,6 +300,7 @@ public class ExperimentConfig {
 
     /** Compact, filesystem-safe tag: a field is tagged iff it differs from DEFAULTS. */
     public String tag() {
+        if (!runId.isEmpty()) return "id-" + runId;
         String t = "ext-" + extreme + "_nneutral-" + nNeutral + "_size-" + sizeStrategy + "_ch-" + channel;
         if (trendShare != DEFAULTS.trendShare || trendHopH != DEFAULTS.trendHopH
                 || !feedDecayMode.equals(DEFAULTS.feedDecayMode) || feedDecayLambda != DEFAULTS.feedDecayLambda) {
@@ -369,6 +379,8 @@ public class ExperimentConfig {
         if (feedCapacity != DEFAULTS.feedCapacity) t += "_fc-" + feedCapacity;
         if (neutralBandHalfWidth != DEFAULTS.neutralBandHalfWidth) t += "_neutband-" + String.format("%.3f", neutralBandHalfWidth);
         if (accessProb != DEFAULTS.accessProb) t += "_ap-" + String.format("%.4f", accessProb);
+        if (metricsEvery != DEFAULTS.metricsEvery) t += "_me-" + metricsEvery;
+        if (calibrationLog != DEFAULTS.calibrationLog) t += "_calib";
         return t;
     }
 }

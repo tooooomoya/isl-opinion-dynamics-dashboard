@@ -1,0 +1,41 @@
+[
+  {
+    "label": "HK-shuffled",
+    "dead_after": 382,
+    "fit_mode": "raw",
+    "representative_seed": 272000,
+    "runs": [
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/hkshuf/runs/6895bae2f4b83616/run_272000_id-6895bae2f4b83616",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/hkshuf/runs/2d89d1f0ad82e296/run_272001_id-2d89d1f0ad82e296",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/hkshuf/runs/0d6d39f08f2c2013/run_272002_id-0d6d39f08f2c2013",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/hkshuf/runs/b848f4180ba0f0b4/run_272003_id-b848f4180ba0f0b4",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/hkshuf/runs/b2603e3337eba69a/run_272004_id-b2603e3337eba69a"
+    ]
+  },
+  {
+    "label": "Random (ER)",
+    "dead_after": 382,
+    "fit_mode": "raw",
+    "representative_seed": 272000,
+    "runs": [
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/random/runs/581e6e8e2be909b1/run_272000_id-581e6e8e2be909b1",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/random/runs/2f6c1f2cb8777483/run_272001_id-2f6c1f2cb8777483",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/random/runs/ba99f37491a52f80/run_272002_id-ba99f37491a52f80",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/random/runs/91f0dbc21394eda8/run_272003_id-91f0dbc21394eda8",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/random/runs/1a4c26180f4f7f68/run_272004_id-1a4c26180f4f7f68"
+    ]
+  },
+  {
+    "label": "DC-SBM",
+    "dead_after": 382,
+    "fit_mode": "raw",
+    "representative_seed": 272000,
+    "runs": [
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/dcsbm/runs/17bcae9da8141b92/run_272000_id-17bcae9da8141b92",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/dcsbm/runs/ae0c178bbba82612/run_272001_id-ae0c178bbba82612",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/dcsbm/runs/719b39bd68c6ab9c/run_272002_id-719b39bd68c6ab9c",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/dcsbm/runs/be58b2dcf333b493/run_272003_id-be58b2dcf333b493",
+      "/Users/tomoyatakeda/Documents/polarized-vocal-minority-model/results/calibration_raw_reduced_20261029/dcsbm/runs/3a65c7ce83451fc8/run_272004_id-3a65c7ce83451fc8"
+    ]
+  }
+]

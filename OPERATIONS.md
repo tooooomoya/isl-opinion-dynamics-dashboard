@@ -172,3 +172,112 @@ python3 dashboard/dashboard.py --serve --port 8765
 ```
 In the page, choose the run set `myrun_seed_myrun` in the run-set picker. The Network tab needs `log_gexf=true`.
 Always give `--name X` and `results_subdir=X` the same X: the dashboard matches a run set to its results folder by that name.
+
+## Bayesian calibration of the attention-economy model
+
+Design, observation definitions, target-data audit, and current progress:
+`docs/report/2026-10-27-calibration-run.md`. Extra analysis packages:
+`venv/bin/pip install -r scripts/requirements-calibration.txt`.
+
+```bash
+mkdir -p logs/calibration
+nohup venv/bin/python -u scripts/bayesian_calibration.py --phase full --workers 20 --timeout 7200 > logs/calibration/full.out 2>&1 &
+disown
+
+venv/bin/python scripts/analyze_bayesian_calibration.py --surrogate-audit
+```
+
+The default run lives in `results/calibration_20261027/`. Repeating the driver
+command resumes its **frozen simulator snapshot** and completed seed results;
+it adopts still-running exact-configuration JVMs where possible. Earlier timeout
+attempts remain in `attempts/`, and failed evaluations are excluded from surrogate
+training. Up to four outstanding pilot points may overlap refinement; all pilot outcomes
+are required before confirmation.
+
+After changing scientific model code or measurement definitions, use a **new**
+`--output results/calibration_<new_id>` rather than warm-starting from an incompatible
+run. Every job keeps full tokens, seed, raw output and component errors. No fitted
+parameter point is automatically adopted as a default. Driver logs and per-job
+JSON files are authoritative for completion, not merely a process exit code.
+
+### Uniform-initialization emergence study (2026-10-28)
+
+Prospective specification: `docs/report/2026-10-28-uniform-calibration-run.md`.
+This study uses uniform fixed opinions and three equal-side activity ratios
+relative to neutral. It has its own output directory and frozen measurement
+identity; it does not rescore or reuse the empirical-initialization observations.
+
+```bash
+# Check logs/calibration_uniform_20261028/pipeline.pid before launching a duplicate.
+venv/bin/python -u scripts/run_uniform_calibration.py --workers 24
+
+# Interim report (safe while simulations run):
+venv/bin/python scripts/analyze_bayesian_calibration.py \
+  --run results/calibration_uniform_20261028 \
+  --output docs/report/bayesian-calibration-uniform-2026-10-28
+```
+
+The pipeline runs calibration, exports figures/tables, and runs held-out network
+null diagnostics. Inspect `pipeline_status.json` and `PIPELINE_COMPLETE.json` in
+the run directory. A simulation-only `COMPLETE.json` does not imply the later
+analysis/null stages have completed. Per-stage logs are under
+`logs/calibration_uniform_20261028/`. Changes to measurement code, targets, or
+baseline tokens require a new output directory; uniform-study resume checks
+their identity.
+
+Future calibration policy (user update, 2026-10-28): **5 seeds per parameter
+setting in both initial search and Bayesian refinement; 10 fresh confirmation
+seeds**. New driver runs default to 40,000 steps for both search and confirmation,
+so screening and confirmation do not change horizons. Seed counts and horizons
+are persisted in `execution_design.json`; resumption preserves them and rejects
+conflicting requests. Existing October 28 outputs keep the executed 2/3/20 seeds
+and 20k/40k horizons. Start a new output directory to use the new policy:
+
+```bash
+venv/bin/python -u scripts/bayesian_calibration.py --study uniform-v3 \
+  --output results/calibration_uniform_next --workers 24 \
+  --search-seeds 5 --confirm-seeds 10 --search-steps 40000 --confirm-steps 40000
+```
+
+### Multi-network restart (HK-shuffled / random / DC-SBM)
+
+Active replacement study and exact budget:
+`docs/report/2026-10-28-multinetwork-calibration-restart.md`.
+
+```bash
+venv/bin/python -u scripts/run_multinetwork_calibration.py --workers 24
+```
+
+This runs three **independent** fits with eight workers each (24 total), five
+search seeds, ten confirmation seeds, and 40k steps in both phases. Outputs are
+under `results/calibration_multinetwork_20261028/{hkshuf,random,dcsbm}/`; reports
+and logs have corresponding family subdirectories. The parent holds a process
+lock and records its PID in `logs/calibration_multinetwork_20261028/pipeline.pid`.
+Inspect `status_<network>.json` for each family. The old single-network run is
+preserved; it is not reused as training data in the replacement.
+
+For a single independent family use the driver `--network hkshuf|random|dcsbm`
+and a new explicit `--output`. A run refuses a different fitting network on
+resume. Random p and DC-SBM target mean degree are coordinated with `start_deg`.
+
+## Raw identity-fit calibration (2026-10-29)
+
+Main standing configuration now uses `fit_mode=raw` (mean feed similarity, common zero baseline). Standing output names are `standard_raw_*` / `baseline_raw_*`; previous relative-fit outputs are historical. The relative-fit multi-network sweep was stopped by the user; do not resume it as the main study.
+
+The smaller replacement is prepared but has not been launched:
+
+```bash
+venv/bin/python -u scripts/run_multinetwork_calibration.py --compact-raw
+```
+
+This uses a separate `uniform-raw-v4` study with uniform opinions, three networks, 48 pilot + 16 BO settings per network, five search seeds, two finalists with ten fresh seeds, matched 20k search/confirmation horizons, and five paired 40k horizon checks for the winner. Total default worker count is 12; outputs go to `results/calibration_raw_20261029/`. See `docs/report/2026-10-29-raw-identity-fit-and-compact-search.md` for assumptions, unchanged empirical targets, and the reduced budget.
+
+### Approved reduced replacement
+
+The user approved a 13-parameter version, superseding the unlaunched 25-parameter raw plan:
+
+```bash
+venv/bin/python -u scripts/run_multinetwork_calibration.py --reduced-raw
+```
+
+Study `uniform-raw-reduced-v5` records 13 active priors and 12 fixed inputs, including equal Chronological/For You/Trend feed shares. Results and logs use `calibration_raw_reduced_20261029/`. See `docs/report/2026-10-29-reduced-raw-calibration.md`. Resume with the exact same command and saved design; do not mix output directories with earlier studies.

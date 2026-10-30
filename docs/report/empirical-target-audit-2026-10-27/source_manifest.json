@@ -1,0 +1,60 @@
+{
+  "counts.parquet": {
+    "url": "https://osf.io/download/68ee6a97ce3457183271da64/",
+    "sha256": "df1f75507e560279f8268cfadf559faa7fa79b8422916cbe58c5a56a9095f035",
+    "bytes": 1000956
+  },
+  "libcon.csv": {
+    "url": "https://osf.io/download/rp2tq/",
+    "sha256": "3686dfb20389e8783bd8d9d2df22cd1d1d8fe19b9f2d456ed7b291a82e173c1c",
+    "bytes": 44801
+  },
+  "paired.csv": {
+    "url": "https://osf.io/download/68ee6a9f760d11ddd12e792b/",
+    "sha256": "71e2d8f27a82077df012c01ae12557839b90cd93b60af899659e6a9b6a3af142",
+    "bytes": 32408
+  },
+  "survey_ideology.ipynb": {
+    "url": "https://osf.io/download/293da/",
+    "sha256": "dfa3d7c57edbb0362a20b3312f4cbf0a8d4d6f3ee40c71aa475f08e8470de37b",
+    "bytes": 8021
+  },
+  "twitter_merge.ipynb": {
+    "url": "https://osf.io/download/4a23q/",
+    "sha256": "b779c98aa7d17e10de5e2ca0a619d1ec219f7c08b095c585b1237d44a5f95232",
+    "bytes": 25841
+  },
+  "activity_model.ipynb": {
+    "url": "https://osf.io/download/68ee6a57cafd9791162e7a0e/",
+    "sha256": "0478f66da19f46551f2ac3cbf7978972e2874d6a65b3af7308d42a1931f6cd9e",
+    "bytes": 3079520
+  },
+  "osf_README.md": {
+    "url": "https://osf.io/download/vymzx/",
+    "sha256": "64f0c6a5d78daf2d0101d5c98c06402912e0adba8ab87cd86ed091c90a058ef5",
+    "bytes": 2114
+  },
+  "conover.zip": {
+    "url": "https://zenodo.org/records/4589065/files/icwsm_polarization.zip?download=1",
+    "sha256": "4e5cec5562362f28dbceb171210f520103c31a81420caf686c2939d246101494",
+    "bytes": 11476546
+  },
+  "buntain.xml": {
+    "url": "https://www.ebi.ac.uk/europepmc/webservices/rest/PMC12624514/fullTextXML",
+    "sha256": "f971b589809974c9c73afe0f3261f7cdfc43d0ba4b53ae38414b6cb23fe8f60b",
+    "bytes": 136268
+  },
+  "activity_audit": {
+    "raw_label_rows": 765,
+    "unique_people": 762,
+    "duplicate_rows_removed": 3,
+    "daily_counts_shape": [
+      762,
+      737
+    ],
+    "missing_count_cells": 0,
+    "total_posts_unique_people": 1957401.0,
+    "local_summary_rows": 765,
+    "local_summary_duplicate_handles": 3
+  }
+}

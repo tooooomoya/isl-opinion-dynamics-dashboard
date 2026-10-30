@@ -1,0 +1,67 @@
+{
+  "created_local": "2026-10-29T12:48:54",
+  "matched_pairs": 252,
+  "identical_java_sources": true,
+  "matched_median_40k_over_20k_ratio": 1.8532469095775619,
+  "matched_p90_ratio": 2.2070756983037687,
+  "previous_total_steps": 16400000,
+  "new_max_total_steps": 132720000,
+  "planned_step_multiplier": 8.092682926829267,
+  "phase_runtime_summary": [
+    {
+      "run": "previous_uniform",
+      "phase": "pilot",
+      "n": 256,
+      "median_log_wall_seconds": 208.20570063591003,
+      "p90_log_wall_seconds": 882.4114700555801,
+      "mean_log_wall_seconds": 345.04094522167,
+      "mean_recorded_seconds": 347.3030862696469
+    },
+    {
+      "run": "previous_uniform",
+      "phase": "bo",
+      "n": 192,
+      "median_log_wall_seconds": 247.87985229492188,
+      "p90_log_wall_seconds": 532.741754078865,
+      "mean_log_wall_seconds": 327.0854312032461,
+      "mean_recorded_seconds": 328.87971261143684
+    },
+    {
+      "run": "new_hkshuf",
+      "phase": "pilot",
+      "n": 636,
+      "median_log_wall_seconds": 382.5056302547455,
+      "p90_log_wall_seconds": 1743.6650416851044,
+      "mean_log_wall_seconds": 673.6983785707996,
+      "mean_recorded_seconds": 675.2323183053694
+    },
+    {
+      "run": "new_hkshuf",
+      "phase": "bo",
+      "n": 38,
+      "median_log_wall_seconds": 869.753320813179,
+      "p90_log_wall_seconds": 3328.8594205856325,
+      "mean_log_wall_seconds": 1419.194004711352,
+      "mean_recorded_seconds": 2573.1249223320106
+    },
+    {
+      "run": "new_random",
+      "phase": "pilot",
+      "n": 561,
+      "median_log_wall_seconds": 420.8776559829712,
+      "p90_log_wall_seconds": 2475.3126492500305,
+      "mean_log_wall_seconds": 939.6727696995047,
+      "mean_recorded_seconds": 950.4192539498131
+    },
+    {
+      "run": "new_dcsbm",
+      "phase": "pilot",
+      "n": 560,
+      "median_log_wall_seconds": 428.22021210193634,
+      "p90_log_wall_seconds": 2448.010959362984,
+      "mean_log_wall_seconds": 900.4686082426991,
+      "mean_recorded_seconds": 945.2023355709655
+    }
+  ],
+  "method": "Log final modification time minus config start modification time; excludes resource retries in matched-pair analysis. Completed successes only; not a controlled 16-vs-24-worker benchmark."
+}

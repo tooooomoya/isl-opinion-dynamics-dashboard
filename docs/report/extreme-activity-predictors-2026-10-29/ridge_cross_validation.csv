@@ -1,0 +1,7 @@
+network,outcome,skill_vs_constant,selected_alphas
+hkshuf,log_extreme_neutral,0.053357088529552565,"[100, 100, 100, 100]"
+hkshuf,log_extreme_inner,0.016257631179184884,"[100, 100, 1000, 100]"
+random,log_extreme_neutral,0.08410323710024747,"[100, 100, 100, 1000]"
+random,log_extreme_inner,0.04833092403622141,"[100, 100, 100, 1000]"
+dcsbm,log_extreme_neutral,0.0905060230120851,"[100, 100, 100, 100]"
+dcsbm,log_extreme_inner,0.07819255425011085,"[100, 100, 100, 100]"

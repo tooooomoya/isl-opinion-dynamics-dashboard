@@ -4,7 +4,7 @@ Sections: A/B action mix, B2 identity fit (excess over random expectation) and r
 classes (accumulated over the last 5,000 steps), AE attention economy (post lifetime, reactions received per agent, attention breadth),
 C follow network (initial, mid-run, final) and R repost network of the converged window (edges filtered by weight), D-F network statistics.
 Usage: python3 scripts/plot_std.py OUT.png hk|random|sbm [prefix]"""
-import sys, glob
+import sys, glob, os, json
 import numpy as np, pandas as pd
 import networkx as nx
 import matplotlib; matplotlib.use("Agg")
@@ -22,9 +22,16 @@ FCOL = {"chrono": "#555555", "foryou": "#d62728", "trend": "#1f77b4"}
 CLASS_LABELS = ["−1…−0.6", "−0.6…−0.2", "−0.2…0.2", "0.2…0.6", "0.6…1"]
 CLASS_COL = ["#2c5aa0", "#8fb4e3", "#bdbdbd", "#f0a38a", "#c0392b"]
 CONV = 5000
+CFGNAME = "standing config, REWIRING OFF," if PFX.startswith("norewire") else "standing config"
+# Optional override (calibration candidates as columns): PLOT_COLS = json file [{"label":..., "dead_after":...} x3] for the 3 column slots; PLOT_TITLE = figure title.
+COLS = json.load(open(os.environ["PLOT_COLS"])) if os.environ.get("PLOT_COLS") else None
+if COLS: FEEDS = [(f, c["label"]) for (f, _), c in zip(FEEDS, COLS)]
+EXPLICIT_RUNS = bool(COLS and all("runs" in c for c in COLS))
+COLUMN_META = dict(zip([f for f, _ in FEEDS], COLS or []))
+DEAD = 50   # dead_after of the standing config (since 2026-10-27; 200 before): a post with no reaction lives DEAD + 1 steps
 
 
-EMPIRICAL_FIT = not PFX.startswith("baseline")   # non-uniform start (gauss_*): expected fit of a random feed = mean similarity to the whole population
+EMPIRICAL_FIT = PFX.startswith("gauss")   # non-uniform start (gauss_*): expected fit of a random feed = mean similarity to the whole population
 
 
 def expected_fit(x, pop=None):
@@ -40,7 +47,8 @@ def klass(x):
 
 def load(fid):
     runs = []
-    for d in sorted(glob.glob(f"results/rsearch/{PFX}_{fid}/run_*")):
+    directories = COLUMN_META[fid]["runs"] if EXPLICIT_RUNS else sorted(glob.glob(f"results/rsearch/{PFX}_{fid}/run_*"))
+    for d in directories:
         r = {"dir": d}
         a = pd.read_csv(d + "/metrics/agent_actions.csv")
         r["steps"] = a.step.max()
@@ -120,7 +128,7 @@ fig = plt.figure(figsize=(16, 76))
 ATTALL = {}
 gs = GridSpec(20, 3, figure=fig, height_ratios=[1.15, 1, 1, 1, 1.15, 1.15, 1.9, 1.25, 1.25, 1.25, 1.25, 1.45, 0.5, 1.45, 1.45, 2.4, 3.6, 3.6, 3.6, 2.5],
               hspace=0.42, wspace=0.38, left=0.16, right=0.98, top=0.972, bottom=0.01)
-fig.text(0.01, 0.992, f"Feed algorithm comparison  |  {NETNAME} start network, standing config + For You hop term (λ=0.5), {NSEED} seeds, converged window = last {CONV:,} steps",
+fig.text(0.01, 0.992, os.environ.get("PLOT_TITLE") or f"Feed algorithm comparison  |  {NETNAME} start network, {CFGNAME} + For You hop term (λ=0.5), {NSEED} seeds, converged window = last {CONV:,} steps",
          fontsize=14, ha="left")
 
 LEG_H = [plt.Rectangle((0, 0), 1, 1, color=c) for c in COL] + [plt.Rectangle((0, 0), 1, 1, facecolor=COL[1], alpha=0.55, hatch="////", edgecolor="white")]
@@ -131,6 +139,8 @@ def rowlegend(ax, y):   # colour legend at the top right of each A / B row so an
 HEAD = dict(fontsize=11, weight="bold")
 for j, (f, lab) in enumerate(FEEDS):
     R = D[f]
+    RAW_FIT = bool(COLS and COLS[j].get("fit_mode") == "raw")
+    if COLS: DEAD = COLS[j]["dead_after"]   # grace period differs per calibration candidate
     # A ------------------------------------------------------------------------------------------------
     ax = fig.add_subplot(gs[0, j]); rows = [mix(R, (lo, hi)) for lo, hi, _ in FB]
     bars(ax, [x[0] for x in rows], [f"{l}\n{x[1]:.1f}% of pop. (final)" for (_, _, l), x in zip(FB, rows)]); ax.set_title(lab, fontsize=12)
@@ -145,18 +155,18 @@ for j, (f, lab) in enumerate(FEEDS):
         if j == 2: rowlegend(ax, 1.02)
         if i == 2: ax.set_xlabel("Action share (%)", fontsize=8)
     # B2 -----------------------------------------------------------------------------------------------
-    for row, (col, ttl) in enumerate([("identityFit", "Identity fit − expected"), ("recognition", "Recognition")]):
+    for row, (col, ttl) in enumerate([("identityFit", "Raw identity fit" if RAW_FIT else "Identity fit − expected"), ("recognition", "Recognition")]):
         ax = fig.add_subplot(gs[4 + row, j]); data = []
         for lo, hi, _ in FB:
             vs = []
             for r in R:
                 q = r["s"][(r["s"].followerCount >= lo) & (r["s"].followerCount <= hi)]
-                vs.append(q[col].values - expected_fit(q.intrinsicOpinion.values, r["s"].intrinsicOpinion.values) if col == "identityFit" else q[col].values)
+                vs.append(q[col].values - expected_fit(q.intrinsicOpinion.values, r["s"].intrinsicOpinion.values) if col == "identityFit" and not RAW_FIT else q[col].values)
             data.append(np.concatenate(vs))
         bp = ax.boxplot(data, showfliers=False, patch_artist=True, widths=0.6, medianprops={"color": "black"})
         for b in bp["boxes"]: b.set_facecolor(FCOL[f]); b.set_alpha(.45)
         ax.set_xticks(range(1, 6)); ax.set_xticklabels([l.replace(" followers", "") for _, _, l in FB], fontsize=7)
-        if col == "identityFit": ax.set_ylim(-0.6, 0.6); ax.axhline(0, color="black", lw=0.6, ls="--")
+        if col == "identityFit" and not RAW_FIT: ax.set_ylim(-0.6, 0.6); ax.axhline(0, color="black", lw=0.6, ls="--")
         else: ax.set_ylim(0, 1)
         ax.tick_params(axis="y", labelsize=7)
         if j == 0:
@@ -188,7 +198,7 @@ for j, (f, lab) in enumerate(FEEDS):
     ax = fig.add_subplot(gs[7, j])
     for kind, ls in (("orig", "-"), ("copy", "--")):
         for r in R:
-            h = r["ph"][r["ph"].kind == kind]; v = h.value.values - 201; c = h.life.values.astype(float)   # a post lives 201 steps with no reaction; subtract that
+            h = r["ph"][r["ph"].kind == kind]; v = h.value.values - (DEAD + 1); c = h.life.values.astype(float)   # a post lives DEAD + 1 steps with no reaction; subtract that
             if c.sum() == 0: continue
             ccdf = 1 - (np.cumsum(c) - c) / c.sum(); sel = v >= 1
             xs, ys = v[sel], ccdf[sel]
@@ -196,25 +206,28 @@ for j, (f, lab) in enumerate(FEEDS):
             if xs[0] > 1: xs = np.concatenate([[1], xs]); ys = np.concatenate([[ys[0]], ys])   # P(extra life >= t) is flat from t = 1 up to the first observed value
             ax.loglog(xs, ys, color=FCOL[f], ls=ls, alpha=.8, lw=1, drawstyle="steps-pre")
     ax.plot([], [], color="black", ls="-", label="original posts"); ax.plot([], [], color="black", ls="--", label="reshared copies"); ax.legend(fontsize=7)
-    ax.set_xlabel("extra life t = lifetime − 201 (steps a post survives thanks to likes / reshares)", fontsize=8); ax.tick_params(labelsize=7)
-    z = np.mean([r["ph"][(r["ph"].kind == "orig") & (r["ph"].value <= 201)].life.sum() / max(1, r["ph"][r["ph"].kind == "orig"].life.sum()) for r in R])
+    ax.set_xlabel(f"extra life t = lifetime − {DEAD + 1} (steps a post survives thanks to likes / reshares)", fontsize=8); ax.tick_params(labelsize=7)
+    z = np.mean([r["ph"][(r["ph"].kind == "orig") & (r["ph"].value <= DEAD + 1)].life.sum() / max(1, r["ph"][r["ph"].kind == "orig"].life.sum()) for r in R])
     ax.text(0.03, 0.05, f"{z*100:.0f}% of original posts never got a reaction (extra life 0)", transform=ax.transAxes, fontsize=7)
     if j == 0:
         ax.set_ylabel("P(extra life ≥ t)", fontsize=8)
-        ax.text(-0.3, 1.12, "AE1  Post lifetime beyond the grace period (posts created in the converged window; a post dies once 200 steps pass without a like or reshare)", transform=ax.transAxes, **HEAD)
+        ax.text(-0.3, 1.12, f"AE1  Post lifetime beyond the grace period (posts created in the converged window; a post dies once dead_after steps pass without a like or reshare{'; dead_after differs per column' if COLS else ''})", transform=ax.transAxes, **HEAD)
     # AE2 reactions received per agent -----------------------------------------------------------------------
     ax = fig.add_subplot(gs[8, j])
     for typ, ls, nm in (("reshare", "-", "reshares received"), ("like", ":", "likes received")):
         for r in R:
             c = r["rc"][r["rc"].type == typ].groupby("author")["count"].sum().reindex(range(len(r["s"])), fill_value=0).values
-            c = np.sort(c[c > 0])[::-1]
-            if len(c): ax.loglog(c, np.arange(1, len(c) + 1) / len(r["s"]), color=FCOL[f], ls=ls, alpha=.8, lw=1)
+            u, n = np.unique(c[c > 0], return_counts=True)   # CCDF P(reactions received >= x) over all agents (agents with 0 stay in the denominator)
+            if len(u):
+                ys = (n.sum() - np.cumsum(n) + n) / len(r["s"]); xs = u
+                if xs[0] > 1: xs = np.concatenate([[1], xs]); ys = np.concatenate([[ys[0]], ys])   # flat from x = 1 up to the first observed value
+                ax.loglog(xs, ys, color=FCOL[f], ls=ls, alpha=.8, lw=1, drawstyle="steps-pre")
     ax.plot([], [], color="black", ls="-", label="reshares received"); ax.plot([], [], color="black", ls=":", label="likes received"); ax.legend(fontsize=7)
     zero = np.mean([(r["rc"][r["rc"].type == "reshare"].groupby("author")["count"].sum().reindex(range(len(r["s"])), fill_value=0) == 0).mean() for r in R])
     ax.text(0.03, 0.05, f"{zero*100:.0f}% of agents received no reshare", transform=ax.transAxes, fontsize=7)
     ax.set_xlabel("reactions received by an agent (last 5,000 steps)", fontsize=8); ax.tick_params(labelsize=7)
     if j == 0:
-        ax.set_ylabel("share of agents with ≥ x", fontsize=8)
+        ax.set_ylabel("P(reactions received ≥ x)", fontsize=8)
         ax.text(-0.3, 1.12, "AE2  Reactions received per agent (a post by the agent that was reshared / liked)", transform=ax.transAxes, **HEAD)
     # AE3/AE4 attention breadth ---------------------------------------------------------------------------
     att = [attention_stats(r) for r in R]
@@ -288,16 +301,24 @@ for a in [a for a in fig.axes if a.get_subplotspec().rowspan.start == 11 and a.a
 # C: networks -----------------------------------------------------------------------------------------------
 r0 = D["chrono"][0]; nodes = list(r0["s"].index); xmap = r0["s"].intrinsicOpinion.to_dict()
 G0 = graph_of(r0["e0"], nodes); pos0 = nx.spring_layout(G0, seed=1, iterations=80, k=0.12)
-ax = fig.add_subplot(gs[15, 0]); draw(ax, G0, pos0, xmap, indegree(r0["e0"])); ax.set_title("Initial network", fontsize=18, pad=10)
-axn = fig.add_subplot(gs[15, 1]); axn.axis("off")
-axn.text(0, 1.0, "C  Follow network: initial, mid-run (step T/2) and final (seed 0; colour = X, size = followers)", fontsize=11, weight="bold", va="top")
-axn.text(0, 0.8, f"seed 0; initial network identical across feeds\nedges at t0: {len(r0['e0']):,}\nin-degree Gini at t0: {gini(r0['s0'].followerCount):.2f}\nlayout: spring layout of the initial network;\nlater panels continue from the previous positions\n(per feed), so movement of nodes shows rewiring.", fontsize=9, va="top")
+initial_positions = {}
+if EXPLICIT_RUNS:
+    for j, (f, lab) in enumerate(FEEDS):
+        r = D[f][0]
+        initial_positions[f] = pos0 if j == 0 else nx.spring_layout(graph_of(r["e0"], nodes), seed=1, iterations=80, k=0.12)
+        ax = fig.add_subplot(gs[15, j]); draw(ax, graph_of(r["e0"], nodes), initial_positions[f], r["s0"].intrinsicOpinion.to_dict(), indegree(r["e0"]))
+        ax.set_title(f'{lab}: initial (seed {COLS[j]["representative_seed"]})', fontsize=13, pad=10)
+else:
+    ax = fig.add_subplot(gs[15, 0]); draw(ax, G0, pos0, xmap, indegree(r0["e0"])); ax.set_title("Initial network", fontsize=18, pad=10)
+    axn = fig.add_subplot(gs[15, 1]); axn.axis("off")
+    axn.text(0, 1.0, "C  Follow network: initial, mid-run (step T/2) and final (seed 0; colour = X, size = followers)", fontsize=11, weight="bold", va="top")
+    axn.text(0, 0.8, f"seed 0; initial network identical across feeds\nedges at t0: {len(r0['e0']):,}\nin-degree Gini at t0: {gini(r0['s0'].followerCount):.2f}\nlayout: spring layout of the initial network;\nlater panels continue from the previous positions\n(per feed), so movement of nodes shows rewiring.", fontsize=9, va="top")
 for j, (f, lab) in enumerate(FEEDS):
     r = D[f][0]; xm = r["s"].intrinsicOpinion.to_dict()
-    Gm = graph_of(r["em"], nodes); posm = nx.spring_layout(Gm, pos=pos0, seed=1, iterations=40, k=0.12)
+    Gm = graph_of(r["em"], nodes); posm = nx.spring_layout(Gm, pos=initial_positions.get(f, pos0), seed=1, iterations=40, k=0.12)
     Gf = graph_of(r["ef"], nodes); posf = nx.spring_layout(Gf, pos=posm, seed=1, iterations=40, k=0.12)
-    ax = fig.add_subplot(gs[16, j]); draw(ax, Gm, posm, xm, indegree(r["em"])); ax.set_title(f"{lab}: mid-run", fontsize=18, pad=10)
-    ax = fig.add_subplot(gs[17, j]); draw(ax, Gf, posf, xm, indegree(r["ef"])); ax.set_title(f"{lab}: final", fontsize=18, pad=10)
+    ax = fig.add_subplot(gs[16, j]); draw(ax, Gm, posm, xm, indegree(r["em"])); ax.set_title(f"{lab}: mid-run ({int(r['steps']//2):,})" if EXPLICIT_RUNS else f"{lab}: mid-run", fontsize=13 if EXPLICIT_RUNS else 18, pad=10)
+    ax = fig.add_subplot(gs[17, j]); draw(ax, Gf, posf, xm, indegree(r["ef"])); ax.set_title(f"{lab}: final ({int(r['steps']):,})" if EXPLICIT_RUNS else f"{lab}: final", fontsize=13 if EXPLICIT_RUNS else 18, pad=10)
     # R: repost network of the converged window, filtered by weight
     rs_ = r["rc"][r["rc"].type == "reshare"]
     w = rs_.groupby(["actor", "author"])["count"].sum().reset_index()
@@ -331,7 +352,7 @@ for f, lab in FEEDS:
         xi = r["s"].intrinsicOpinion; d2 = ((xi.loc[r["ef"].follower].values - xi.loc[r["ef"].followee].values) ** 2).mean()
         return d2, d2 / (2 * xi.var(ddof=0))
     dg = np.mean([_edge_sq(r) for r in D[f]], axis=0)
-    table.append([lab.replace(" 100%", ""), f"{asr:.2f}", f"{dg[0]:.2f}", f"{dg[1]:.2f}", f"{dx.mean():.2f}", f"{np.mean([r['s'].followerCount.max() for r in D[f]]):.0f}", f"{np.mean([gini(r['s'].followerCount) for r in D[f]]):.2f}",
+    table.append([lab.split(":")[0] if COLS else lab.replace(" 100%", ""), f"{asr:.2f}", f"{dg[0]:.2f}", f"{dg[1]:.2f}", f"{dx.mean():.2f}", f"{np.mean([r['s'].followerCount.max() for r in D[f]]):.0f}", f"{np.mean([gini(r['s'].followerCount) for r in D[f]]):.2f}",
                   f"{np.mean([(r['s'].followerCount - r['s0'].followerCount.loc[r['s'].index]).abs().mean() for r in D[f]]):.1f}"])
 ax1.set_xlabel("rank / N", fontsize=8); ax1.set_ylabel("followers (in-degree)", fontsize=8); ax1.legend(fontsize=7); ax1.set_title("D  In-degree by rank (bold = seed mean)", fontsize=10)
 ax2.set_xlabel("|X_follower − X_followee| over follow edges", fontsize=8); ax2.set_ylabel("density", fontsize=8); ax2.legend(fontsize=7); ax2.set_title("E  Follow-edge opinion distance", fontsize=10)
@@ -350,4 +371,17 @@ for row, both in ((7, True), (8, True), (9, False)):
         if both:
             x0 = min(a.get_xlim()[0] for a in axs); x1 = max(a.get_xlim()[1] for a in axs)
             for a in axs: a.set_xlim(x0, x1)
-plt.savefig(sys.argv[1], dpi=200); print("ok")
+if EXPLICIT_RUNS:
+    for text in fig.findobj(plt.Text):
+        text.set_text(text.get_text().replace("converged window", "final window").replace("at the final snapshot (step 20,000), specific to each feed", f"at step {int(r0['steps']):,}, specific to each network").replace("per feed", "per network"))
+plt.savefig(sys.argv[1], dpi=200)
+if os.environ.get("PLOT_EXPORT_PREFIX"):
+    from matplotlib.transforms import Bbox
+    prefix = os.environ["PLOT_EXPORT_PREFIX"]
+    # Export the same native figure panels, without resampling an existing bitmap.
+    for name, first, last in [("network_snapshots",15,18), ("action_selection",0,3)]:
+        lower = gs[last,0].get_position(fig).y0 - .009
+        upper = gs[first,0].get_position(fig).y1 + (.006 if name == 'network_snapshots' else .018)
+        bounds = Bbox.from_extents(0, lower*fig.get_figheight(), fig.get_figwidth(), upper*fig.get_figheight())
+        fig.savefig(prefix+'_'+name+'.png', dpi=180, bbox_inches=bounds)
+print("ok")

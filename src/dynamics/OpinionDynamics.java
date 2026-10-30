@@ -93,6 +93,7 @@ public class OpinionDynamics {
     private final StepStats stepStats = new StepStats();
 
     private final ExperimentConfig cfg;
+    private final CalibrationLog calibration;
 
     // constructor
     public OpinionDynamics(ExperimentConfig cfg) {
@@ -100,6 +101,7 @@ public class OpinionDynamics {
         this.params = SimParams.from(cfg);
         this.folerPath = params.resultFolder();
         this.agentNum = cfg.n;      
+        this.calibration = cfg.calibrationLog ? new CalibrationLog(agentNum) : null;
         this.t = cfg.steps;         
         this.agentSet = new Agent[agentNum];
         this.reactionsReceived = new long[agentNum];
@@ -292,6 +294,7 @@ public class OpinionDynamics {
                 // read state, learn from the transition since the previous visit, choose an action
                 int state = agent.observeAndLearn(step);
                 int action = agent.chooseAction(state);
+                if (calibration != null) calibration.visit(agentId);
                 if (population) {
                     stepStats.activeCount++;
                     stepStats.identityFitSum += agent.getLastIdentityFit();
@@ -311,6 +314,7 @@ public class OpinionDynamics {
                 switch (action) {
                     case Agent.POST -> {
                         Post post = agent.makePost(step);
+                        if (calibration != null) calibration.original(agentId);
                         stepStats.originalPostCount++;
                         admin.addRecentPost(post);
                         for (int followerId : admin.getFollowers(agentId)) {
@@ -338,6 +342,7 @@ public class OpinionDynamics {
                     case Agent.RESHARE -> {
                         Post src = agent.pickFromFeed(Agent.RESHARE);
                         Post copy = agent.reshare(src, step, admin, agent.receivedViaAlgo(src));
+                        if (calibration != null) calibration.reshare(agentId, src.getPostUserId(), src.getRootAuthorId());
                         admin.updateEstimate(agentId, src.getPostOpinion(), params.rhoReshare());
                         admin.notifyOriginal(copy.getRootAuthorId(), copy);
                         reactionsReceived[src.getPostUserId()]++;
@@ -417,7 +422,14 @@ public class OpinionDynamics {
             }
             if (step % STATE_LOG_INTERVAL == 0) writeStateLog(step);
             curStep = step;
-            exportStepMetrics();
+            if (step % cfg.metricsEvery == 0 || step == t) exportStepMetrics();
+            if (calibration != null && (step % 5000 == 0 || step == t)) {
+                try {
+                    calibration.flush(step, agentSet, Path.of(folerPath, "metrics"));
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException("Calibration log failed", e);
+                }
+            }
             if (step == t / 2) writeEdges("edges_mid.csv");
             if (step % cfg.interactionWindow == 0) repostNetworkWindow.clear();
         }
@@ -600,7 +612,7 @@ public class OpinionDynamics {
     private int curStep = 0;
 
     // Converged-window diagnostics (last CONV_WINDOW steps): who reacted to whom, and how long / how much posts live.
-    private static final int CONV_WINDOW = 5000, HIST_MAX = 3000;
+    private static final int CONV_WINDOW = 5000, HIST_MAX = 20000;
     private final SparseIntMatrix likeConv = new SparseIntMatrix();      // liker -> author of the liked post
     private final SparseIntMatrix reshareConv = new SparseIntMatrix();   // resharer -> author of the reshared post
     private final long[][] lifeHist = new long[2][HIST_MAX + 1];         // [original|reshare copy][lifetime in steps], posts created in the window

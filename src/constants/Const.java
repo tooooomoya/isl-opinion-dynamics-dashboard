@@ -60,6 +60,9 @@ public class Const {
     public static final int NUM_OF_BINS_EMPIRICAL_7 = 7;
     // Respondent counts by bin (population/self-reported-ideology distribution). Sum = 765.
     public static final int[] EMPIRICAL_OPINION_BIN_COUNTS = {160, 131, 85, 208, 46, 71, 64};
+    // 2026-10-27 primary-source audit: the historical 765 rows contain 3 duplicate handles.
+    // Match the authors' drop_duplicates(handle), rather than reusing the historical weights.
+    public static final int[] EMPIRICAL_UNIQUE_OPINION_BIN_COUNTS = {160, 130, 85, 207, 46, 71, 63};
     // Mean total posts per respondent by bin, full 2020-2022 observation window (posting-activity
     // target). NOT monotonic in extremity -- the "somewhat" bins post less than moderates; only
     // the most-extreme bin shows the well-known hyper-partisan elevation (~2x moderates).

@@ -1,0 +1,14 @@
+{
+  "seed": 271002.0,
+  "stable_dominant_action_fraction": 1.0,
+  "median_window_total_variation": 0.015448974950851065,
+  "tie_fraction": 0.0,
+  "preferred_post": 0.014000000000000002,
+  "actual_post": 0.050369184376852026,
+  "preferred_like": 0.985,
+  "actual_like": 0.8794182555311902,
+  "preferred_repost": 0.0004,
+  "actual_repost": 0.03508366624323706,
+  "preferred_rewire": 0.0006000000000000001,
+  "actual_rewire": 0.035128893848720644
+}

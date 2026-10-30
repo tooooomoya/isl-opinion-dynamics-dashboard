@@ -1,0 +1,25 @@
+{
+  "loss": {
+    "training_target": "raw score (same as the search)",
+    "forest_raw_rmse": 12.27480003585985,
+    "constant_raw_rmse": 16.736693448028273,
+    "forest_log1p_rmse": 0.6774357524477235,
+    "constant_log1p_rmse": 0.8958044029463308,
+    "gp_raw_rmse": 12.533976498952319,
+    "gp_log1p_rmse": 0.7618228533502418
+  },
+  "all_activity_loss": {
+    "training_target": "raw score (same as the search)",
+    "forest_raw_rmse": 12.928273495123065,
+    "constant_raw_rmse": 16.015087288538368,
+    "forest_log1p_rmse": 0.6131948097154817,
+    "constant_log1p_rmse": 0.6630944304272145
+  },
+  "network_loss": {
+    "training_target": "raw score (same as the search)",
+    "forest_raw_rmse": 17.97492072079576,
+    "constant_raw_rmse": 24.937708138263087,
+    "forest_log1p_rmse": 1.1590477925811804,
+    "constant_log1p_rmse": 1.3708482728513764
+  }
+}

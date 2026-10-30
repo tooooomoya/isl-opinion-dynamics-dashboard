@@ -66,6 +66,13 @@ public class Agent {
                 x = randomGenerator.dynamics().nextGaussian() * p.initSd();
             } while (Math.abs(x) > 1.0);
             this.intrinsicX = x;
+        } else if (p.initOpinionDist().equals("empirical")) {
+            int[] counts = Const.EMPIRICAL_UNIQUE_OPINION_BIN_COUNTS;
+            int draw = randomGenerator.dynamics().nextInt(java.util.Arrays.stream(counts).sum());
+            int bin = 0;
+            while (draw >= counts[bin]) draw -= counts[bin++];
+            // Survey responses are ordinal: uniform-within-bin is an explicit model mapping.
+            this.intrinsicX = -1.0 + (bin + randomGenerator.dynamics().nextDouble()) * (2.0 / counts.length);
         } else { // uniform: X ~ U[-1, 1]
             this.intrinsicX = -1.0 + randomGenerator.dynamics().nextDouble() * 2.0;
         }
